@@ -7,13 +7,14 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import Customer, Order, OrderItem
+from app.models import Customer, GrindLog, Order, OrderItem
 from app.order_number import generate_next_order_no
 from app.order_status import format_order_status_display
 from app.models import User as UserModel
 from app.schemas_business import (
     OrderCreate,
     OrderDetailOut,
+    OrderGrindLogRow,
     OrderItemCreate,
     OrderListRow,
     OrderUpdate,
@@ -184,6 +185,36 @@ def create_order(
     )
     assert full is not None
     return OrderDetailOut.model_validate(full)
+
+
+@router.get("/{order_id}/grind-logs", response_model=list[OrderGrindLogRow])
+def list_order_grind_logs(
+    order_id: int,
+    _: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """该订单下全部来料明细的修磨记录，按时间倒序。"""
+    if db.get(Order, order_id) is None:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    rows = db.execute(
+        select(GrindLog, OrderItem.production_no, OrderItem.incoming_no)
+        .join(OrderItem, GrindLog.order_item_id == OrderItem.id)
+        .where(OrderItem.order_id == order_id)
+        .order_by(GrindLog.created_at.desc())
+    ).all()
+    out: list[OrderGrindLogRow] = []
+    for log, prod_no, inc_no in rows:
+        out.append(
+            OrderGrindLogRow(
+                id=log.id,
+                order_item_id=log.order_item_id,
+                production_no=prod_no,
+                incoming_no=inc_no,
+                note=log.note,
+                created_at=log.created_at,
+            )
+        )
+    return out
 
 
 @router.get("/{order_id}", response_model=OrderDetailOut)

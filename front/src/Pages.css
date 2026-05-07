@@ -244,6 +244,40 @@
   font-size: 1.2rem;
 }
 
+.order-detail-nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.order-section {
+  margin-bottom: 1.25rem;
+}
+
+.order-section-title {
+  margin: 0 0 0.65rem;
+  font-size: 1.08rem;
+  font-weight: 600;
+}
+
+.order-section-title-inline {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+}
+
+.order-section-desc {
+  margin: -0.35rem 0 0.75rem;
+  font-size: 0.88rem;
+}
+
+.order-items-wide .text-cell {
+  max-width: 12rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .data-table tr.is-active-row td {
   background: var(--accent-bg);
 }
@@ -342,4 +376,91 @@
 th.task-col-group-start,
 td.task-col-group-start {
   border-left: 2px solid var(--accent-border);
+}
+
+/* 单据 iframe 预览（订单：来料/出库；任务：生产） */
+.slip-preview-hint {
+  font-size: 0.88rem;
+  margin: 0 0 0.75rem;
+  line-height: 1.45;
+}
+
+.order-slip-previews {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.order-slip-empty {
+  margin-top: 1rem;
+}
+
+.slip-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.slip-preview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.slip-preview-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.slip-preview-head strong {
+  font-size: 0.95rem;
+}
+
+.slip-preview-frame {
+  width: 100%;
+  min-height: 260px;
+  max-height: min(55vh, 420px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color-scheme: light;
+}
+
+@media (max-width: 900px) {
+  .slip-preview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tasks-with-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+  gap: 1rem;
+  align-items: start;
+}
+
+.task-slip-aside {
+  position: sticky;
+  top: 0.75rem;
+  padding: 1rem 1.1rem;
+}
+
+.task-slip-aside-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+@media (max-width: 1100px) {
+  .tasks-with-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .task-slip-aside {
+    position: static;
+  }
 }

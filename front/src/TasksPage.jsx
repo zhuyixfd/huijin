@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import './Pages.css'
 import { getJson, patchJson, postJson } from './api.js'
+import { buildSlipDocument, openPrint } from './printSlip.js'
+
+function taskToPrintPayload(it) {
+  return {
+    order: { id: it.order_id, order_no: it.order_no, remark: it.order_remark },
+    customer: { name: it.customer_name },
+    item: it,
+  }
+}
 
 function fmtDate(v) {
   if (!v) return '—'
@@ -34,6 +43,7 @@ export default function TasksPage() {
 
   const [grindItem, setGrindItem] = useState(null)
   const [grindNote, setGrindNote] = useState('')
+  const [selectedId, setSelectedId] = useState(null)
 
   const loadMeta = useCallback(() => {
     getJson('/api/meta/production-statuses').then((d) => setStatuses(d.statuses ?? []))
@@ -59,6 +69,16 @@ export default function TasksPage() {
     queueMicrotask(() => loadTasks())
   }, [loadTasks])
 
+  useEffect(() => {
+    if (rows.length === 0) {
+      setSelectedId(null)
+      return
+    }
+    setSelectedId((prev) =>
+      prev != null && rows.some((r) => r.id === prev) ? prev : rows[0].id,
+    )
+  }, [rows])
+
   async function patchStatus(it, status) {
     setErr(null)
     try {
@@ -68,6 +88,9 @@ export default function TasksPage() {
       setErr(e instanceof Error ? e.message : '更新失败')
     }
   }
+
+  const selectedRow = rows.find((r) => r.id === selectedId)
+  const productionPrintPayload = selectedRow ? taskToPrintPayload(selectedRow) : null
 
   async function submitGrind(e) {
     e.preventDefault()
@@ -90,8 +113,8 @@ export default function TasksPage() {
       <header className="dashboard-page-title">
         <h1>任务管理</h1>
         <p className="dashboard-page-desc">
-          列顺序：订单与主键 → 来料与规格 → 重量尺寸 → 工艺说明 → 日期 → 状态 →
-          操作。竖线为分组示意。
+          点击一行选中任务，右侧可预览生产单并打印。列顺序：订单与主键 → 来料与规格 →
+          重量尺寸 → 工艺说明 → 日期 → 状态 → 操作。竖线为分组示意。
         </p>
       </header>
 
@@ -113,7 +136,8 @@ export default function TasksPage() {
       </div>
       {err ? <p className="err">{err}</p> : null}
 
-      <div className="data-table-wrap task-table-wrap">
+      <div className="tasks-with-preview">
+        <div className="data-table-wrap task-table-wrap">
         <table className="data-table task-mega-table">
           <thead>
             <tr>
@@ -153,7 +177,11 @@ export default function TasksPage() {
               </tr>
             ) : (
               rows.map((it) => (
-                <tr key={it.id}>
+                <tr
+                  key={it.id}
+                  className={`clickable ${selectedId === it.id ? 'is-active-row' : ''}`}
+                  onClick={() => setSelectedId(it.id)}
+                >
                   <td className="cell-nowrap">{it.id}</td>
                   <td className="cell-nowrap">{it.order_no}</td>
                   <td className="text-cell">{fmtNum(it.order_remark)}</td>
@@ -171,7 +199,7 @@ export default function TasksPage() {
                   <td className={GS}>{fmtDate(it.incoming_date)}</td>
                   <td>{fmtCuttingDate(it.cutting_time)}</td>
                   <td>{fmtDate(it.return_date)}</td>
-                  <td className={GS}>
+                  <td className={GS} onClick={(e) => e.stopPropagation()}>
                     <select
                       value={it.production_status}
                       onChange={(e) => patchStatus(it, e.target.value)}
@@ -183,7 +211,10 @@ export default function TasksPage() {
                       ))}
                     </select>
                   </td>
-                  <td className={`row-actions cell-actions ${GS}`}>
+                  <td
+                    className={`row-actions cell-actions ${GS}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button
                       type="button"
                       className="btn btn-ghost"
@@ -216,6 +247,36 @@ export default function TasksPage() {
             )}
           </tbody>
         </table>
+        </div>
+
+        <aside className="task-slip-aside card" aria-label="生产单预览">
+          {productionPrintPayload ? (
+            <>
+              <h2 className="task-slip-aside-title">生产单</h2>
+              <p className="muted slip-preview-hint">
+                订单 {selectedRow?.order_no} · 生产 {selectedRow?.production_no ?? '—'}
+                。在打印对话框中选择打印机或「另存为 PDF」。
+              </p>
+              <div className="slip-preview-head" style={{ marginBottom: '0.5rem' }}>
+                <span />
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => openPrint('production', productionPrintPayload)}
+                >
+                  打印生产单
+                </button>
+              </div>
+              <iframe
+                title="生产单预览"
+                className="slip-preview-frame"
+                srcDoc={buildSlipDocument('production', productionPrintPayload)}
+              />
+            </>
+          ) : (
+            <p className="muted">暂无任务，或正在加载…</p>
+          )}
+        </aside>
       </div>
 
       {grindItem ? (

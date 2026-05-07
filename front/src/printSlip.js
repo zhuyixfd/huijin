@@ -77,16 +77,21 @@ export function buildSlipHtml(kind, { order, customer, item }) {
   `
 }
 
-export function openPrint(kind, payload) {
+/** 完整 HTML 文档，用于 iframe 预览或与 openPrint 共用 */
+export function buildSlipDocument(kind, payload) {
   const html = buildSlipHtml(kind, payload)
+  const titles = { incoming: '来料单', production: '生产单', outbound: '出库单', return: '发回单' }
+  const t = titles[kind] ?? '单据'
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(t)}</title><style>${printCss}</style></head><body>${html}</body></html>`
+}
+
+export function openPrint(kind, payload) {
   const w = window.open('', '_blank')
   if (!w) {
     window.alert('请允许弹出窗口以打印')
     return
   }
-  w.document.write(
-    `<!DOCTYPE html><html><head><meta charset="utf-8"><title>打印</title><style>${printCss}</style></head><body>${html}</body></html>`,
-  )
+  w.document.write(buildSlipDocument(kind, payload))
   w.document.close()
   setTimeout(() => {
     w.focus()

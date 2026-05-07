@@ -124,6 +124,17 @@ class GrindLogOut(BaseModel):
     created_at: datetime | None = None
 
 
+class OrderGrindLogRow(BaseModel):
+    """订单下所有来料明细的修磨等记录（按时间倒序）"""
+
+    id: int
+    order_item_id: int
+    production_no: str | None = None
+    incoming_no: str | None = None
+    note: str | None = None
+    created_at: datetime | None = None
+
+
 class OrderCreate(BaseModel):
     """订单编号由服务端自动生成，无需传 order_no。"""
 
