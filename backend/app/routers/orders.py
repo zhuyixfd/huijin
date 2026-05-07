@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import Customer, Order, OrderItem
+from app.order_number import generate_next_order_no
 from app.models import User as UserModel
 from app.schemas_business import (
     OrderCreate,
@@ -59,17 +61,24 @@ def create_order(
     _: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    order_no = body.order_no.strip()
-    exists = db.scalar(select(Order).where(Order.order_no == order_no))
-    if exists:
-        raise HTTPException(status_code=400, detail="订单编号已存在")
     cust = db.get(Customer, body.customer_id)
     if cust is None:
         raise HTTPException(status_code=404, detail="客户不存在")
 
-    order = Order(order_no=order_no, customer_id=body.customer_id, remark=body.remark)
-    db.add(order)
-    db.flush()
+    order = None
+    for _ in range(40):
+        order_no = generate_next_order_no(db)
+        order = Order(order_no=order_no, customer_id=body.customer_id, remark=body.remark)
+        db.add(order)
+        try:
+            db.flush()
+            break
+        except IntegrityError:
+            db.rollback()
+            order = None
+            continue
+    if order is None:
+        raise HTTPException(status_code=500, detail="无法生成唯一订单编号，请重试")
 
     for i, it in enumerate(body.items):
         db.add(_item_from_create(it, order.id, i))
@@ -113,14 +122,6 @@ def update_order(
     if order is None:
         raise HTTPException(status_code=404, detail="订单不存在")
     data = body.model_dump(exclude_unset=True)
-    if "order_no" in data and data["order_no"] is not None:
-        no = data["order_no"].strip()
-        clash = db.scalar(
-            select(Order).where(Order.order_no == no, Order.id != order_id)
-        )
-        if clash:
-            raise HTTPException(status_code=400, detail="订单编号已被占用")
-        data["order_no"] = no
     if "customer_id" in data and data["customer_id"] is not None:
         if db.get(Customer, data["customer_id"]) is None:
             raise HTTPException(status_code=404, detail="客户不存在")

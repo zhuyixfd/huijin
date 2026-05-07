@@ -59,7 +59,6 @@ export default function OrdersPage() {
 
   const [orderModal, setOrderModal] = useState(false)
   const [newOrder, setNewOrder] = useState({
-    order_no: '',
     customer_id: '',
     remark: '',
   })
@@ -113,13 +112,12 @@ export default function OrdersPage() {
     setErr(null)
     try {
       const created = await postJson('/api/orders', {
-        order_no: newOrder.order_no.trim(),
         customer_id: Number(newOrder.customer_id),
         remark: newOrder.remark || null,
         items: [],
       })
       setOrderModal(false)
-      setNewOrder({ order_no: '', customer_id: '', remark: '' })
+      setNewOrder({ customer_id: '', remark: '' })
       loadOrders()
       await refreshDetail(created.id)
     } catch (e) {
@@ -409,15 +407,10 @@ export default function OrdersPage() {
         <div className="modal-backdrop" onClick={() => setOrderModal(false)} role="presentation">
           <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog">
             <h2>新建订单</h2>
+            <p className="muted" style={{ marginTop: '-0.5rem', marginBottom: '0.5rem' }}>
+              订单编号由系统自动生成（格式：HJ + 日期 + 当日流水号）。
+            </p>
             <form className="form-grid" onSubmit={submitNewOrder}>
-              <label>
-                订单编号 *
-                <input
-                  value={newOrder.order_no}
-                  onChange={(e) => setNewOrder((o) => ({ ...o, order_no: e.target.value }))}
-                  required
-                />
-              </label>
               <label>
                 客户 *
                 <select

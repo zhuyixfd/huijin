@@ -125,14 +125,14 @@ class GrindLogOut(BaseModel):
 
 
 class OrderCreate(BaseModel):
-    order_no: str = Field(min_length=1, max_length=64)
+    """订单编号由服务端自动生成，无需传 order_no。"""
+
     customer_id: int
     remark: str | None = None
     items: list[OrderItemCreate] = Field(default_factory=list)
 
 
 class OrderUpdate(BaseModel):
-    order_no: str | None = Field(None, min_length=1, max_length=64)
     customer_id: int | None = None
     remark: str | None = None
 
