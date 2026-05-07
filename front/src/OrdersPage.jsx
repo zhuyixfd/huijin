@@ -28,6 +28,14 @@ function fmtDateTime(iso) {
   return t.toLocaleString('zh-CN', { hour12: false })
 }
 
+const FALLBACK_ORDER_STATUS_FILTERS = [
+  { value: 'all', label: '全部' },
+  { value: 'placed', label: '已下单' },
+  { value: 'waiting_inbound', label: '待入库' },
+  { value: 'in_progress', label: '待完成' },
+  { value: 'completed', label: '已完成' },
+]
+
 function normalizeItemPayload(form) {
   const q = parseInt(String(form.quantity), 10)
   let cutting = null
@@ -60,6 +68,11 @@ export default function OrdersPage() {
   const [statuses, setStatuses] = useState([])
   const [q, setQ] = useState('')
   const [cid, setCid] = useState('')
+  const [statusCategory, setStatusCategory] = useState('all')
+  const [customerNameQ, setCustomerNameQ] = useState('')
+  const [createdFrom, setCreatedFrom] = useState('')
+  const [createdTo, setCreatedTo] = useState('')
+  const [orderStatusFilters, setOrderStatusFilters] = useState([])
   const [loading, setLoading] = useState(true)
   const [detail, setDetail] = useState(null)
   const [err, setErr] = useState(null)
@@ -77,6 +90,9 @@ export default function OrdersPage() {
 
   const loadMeta = useCallback(() => {
     getJson('/api/meta/production-statuses').then((d) => setStatuses(d.statuses ?? []))
+    getJson('/api/meta/order-status-filters')
+      .then((d) => setOrderStatusFilters(d.filters ?? []))
+      .catch(() => setOrderStatusFilters(FALLBACK_ORDER_STATUS_FILTERS))
     getJson('/api/customers').then(setCustomers)
   }, [])
 
@@ -85,12 +101,16 @@ export default function OrdersPage() {
     const p = new URLSearchParams()
     if (q.trim()) p.set('q', q.trim())
     if (cid) p.set('customer_id', cid)
+    if (statusCategory && statusCategory !== 'all') p.set('status_category', statusCategory)
+    if (customerNameQ.trim()) p.set('customer_q', customerNameQ.trim())
+    if (createdFrom) p.set('created_from', createdFrom)
+    if (createdTo) p.set('created_to', createdTo)
     const qs = p.toString()
     getJson(`/api/orders${qs ? `?${qs}` : ''}`)
       .then(setOrders)
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false))
-  }, [q, cid])
+  }, [q, cid, statusCategory, customerNameQ, createdFrom, createdTo])
 
   useEffect(() => {
     queueMicrotask(() => loadMeta())
@@ -222,7 +242,20 @@ export default function OrdersPage() {
         </p>
       </header>
 
-      <div className="toolbar">
+      <div className="toolbar orders-toolbar">
+        <select
+          aria-label="订单状态"
+          value={statusCategory}
+          onChange={(e) => setStatusCategory(e.target.value)}
+        >
+          {(orderStatusFilters.length ? orderStatusFilters : FALLBACK_ORDER_STATUS_FILTERS).map(
+            (f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ),
+          )}
+        </select>
         <select value={cid} onChange={(e) => setCid(e.target.value)}>
           <option value="">全部客户</option>
           {customers.map((c) => (
@@ -231,6 +264,26 @@ export default function OrdersPage() {
             </option>
           ))}
         </select>
+        <input
+          type="search"
+          placeholder="客户名称（模糊）"
+          value={customerNameQ}
+          onChange={(e) => setCustomerNameQ(e.target.value)}
+        />
+        <input
+          type="date"
+          aria-label="下单时间起"
+          title="下单时间起"
+          value={createdFrom}
+          onChange={(e) => setCreatedFrom(e.target.value)}
+        />
+        <input
+          type="date"
+          aria-label="下单时间止"
+          title="下单时间止"
+          value={createdTo}
+          onChange={(e) => setCreatedTo(e.target.value)}
+        />
         <input
           type="search"
           placeholder="订单编号"

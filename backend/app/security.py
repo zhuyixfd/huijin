@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import bcrypt
 from jose import JWTError, jwt
@@ -21,7 +21,9 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def create_access_token(user_id: int, username: str) -> str:
-    exp = int((datetime.now(UTC) + timedelta(minutes=settings.jwt_expire_minutes)).timestamp())
+    exp = int(
+        (datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)).timestamp()
+    )
     payload = {
         "sub": str(user_id),
         "username": username,

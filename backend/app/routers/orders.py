@@ -1,5 +1,7 @@
+from datetime import date, datetime, time
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import case, func, select
+from sqlalchemy import case, exists, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -33,15 +35,74 @@ def list_orders(
     db: Session = Depends(get_db),
     customer_id: int | None = Query(None),
     q: str | None = Query(None, description="订单编号关键字"),
+    customer_q: str | None = Query(None, description="客户名称模糊搜索"),
+    status_category: str | None = Query(
+        None,
+        description="订单聚合状态：all | placed | waiting_inbound | in_progress | completed",
+    ),
+    created_from: date | None = Query(None, description="下单时间起（含当日 0 点）"),
+    created_to: date | None = Query(None, description="下单时间止（含当日）"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
 ):
-    stmt = select(Order, Customer.name).join(Customer).order_by(Order.id.desc())
+    stmt = select(Order, Customer.name).join(Customer)
     if customer_id is not None:
         stmt = stmt.where(Order.customer_id == customer_id)
+    if customer_q and customer_q.strip():
+        stmt = stmt.where(Customer.name.contains(customer_q.strip()))
     if q:
         stmt = stmt.where(Order.order_no.contains(q.strip()))
-    stmt = stmt.offset(skip).limit(limit)
+    if created_from is not None:
+        start = datetime.combine(created_from, time.min)
+        stmt = stmt.where(Order.created_at >= start)
+    if created_to is not None:
+        end = datetime.combine(created_to, time.max)
+        stmt = stmt.where(Order.created_at <= end)
+
+    cat = (status_category or "all").strip().lower()
+    if cat not in ("", "all"):
+        # 与 format_order_status_display 分组一致
+        if cat == "placed":
+            stmt = stmt.where(~exists(select(OrderItem.id).where(OrderItem.order_id == Order.id)))
+        elif cat == "waiting_inbound":
+            stmt = stmt.where(
+                exists(
+                    select(OrderItem.id).where(
+                        OrderItem.order_id == Order.id,
+                        OrderItem.production_status == "未入库",
+                    )
+                )
+            )
+        elif cat == "completed":
+            stmt = stmt.where(
+                exists(select(OrderItem.id).where(OrderItem.order_id == Order.id)),
+                ~exists(
+                    select(OrderItem.id).where(
+                        OrderItem.order_id == Order.id,
+                        OrderItem.production_status != "已发回",
+                    )
+                ),
+            )
+        elif cat == "in_progress":
+            stmt = stmt.where(
+                exists(select(OrderItem.id).where(OrderItem.order_id == Order.id)),
+                ~exists(
+                    select(OrderItem.id).where(
+                        OrderItem.order_id == Order.id,
+                        OrderItem.production_status == "未入库",
+                    )
+                ),
+                exists(
+                    select(OrderItem.id).where(
+                        OrderItem.order_id == Order.id,
+                        OrderItem.production_status != "已发回",
+                    )
+                ),
+            )
+        else:
+            raise HTTPException(status_code=400, detail="无效的 status_category")
+
+    stmt = stmt.order_by(Order.id.desc()).offset(skip).limit(limit)
     rows = db.execute(stmt).all()
     if not rows:
         return []
