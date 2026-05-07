@@ -1,0 +1,128 @@
+.employee-admin-header {
+  margin-bottom: 1rem;
+}
+
+.employee-admin-header h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+}
+
+.employee-admin-desc {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.employee-form {
+  margin-bottom: 1.5rem;
+}
+
+.employee-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.employee-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  flex: 1;
+  min-width: 140px;
+}
+
+.employee-input {
+  font: inherit;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.employee-submit {
+  font: inherit;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 500;
+  height: fit-content;
+}
+
+.employee-submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.employee-error {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+  color: #b91c1c;
+}
+
+@media (prefers-color-scheme: dark) {
+  .employee-error {
+    color: #fca5a5;
+  }
+}
+
+.employee-list-title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.employee-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.employee-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+}
+
+.employee-item:last-child {
+  border-bottom: none;
+}
+
+.employee-name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+.employee-badge {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  background: var(--code-bg);
+}
+
+.employee-badge--admin {
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.employee-id {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.employee-list-empty {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
