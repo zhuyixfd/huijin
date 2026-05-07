@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -7,6 +7,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import Customer, Order, OrderItem
 from app.order_number import generate_next_order_no
+from app.order_status import format_order_status_display
 from app.models import User as UserModel
 from app.schemas_business import (
     OrderCreate,
@@ -42,17 +43,46 @@ def list_orders(
         stmt = stmt.where(Order.order_no.contains(q.strip()))
     stmt = stmt.offset(skip).limit(limit)
     rows = db.execute(stmt).all()
-    return [
-        OrderListRow(
-            id=o.id,
-            order_no=o.order_no,
-            customer_id=o.customer_id,
-            customer_name=name,
-            remark=o.remark,
-            created_at=o.created_at,
+    if not rows:
+        return []
+
+    ids = [o.id for o, _ in rows]
+    agg_rows = db.execute(
+        select(
+            OrderItem.order_id,
+            func.count(OrderItem.id),
+            func.sum(case((OrderItem.production_status == "已发回", 1), else_=0)),
+            func.sum(case((OrderItem.production_status == "未入库", 1), else_=0)),
         )
-        for o, name in rows
-    ]
+        .where(OrderItem.order_id.in_(ids))
+        .group_by(OrderItem.order_id)
+    ).all()
+    stats: dict[int, tuple[int, int, int]] = {}
+    for oid, cnt, done_sum, wait_sum in agg_rows:
+        stats[int(oid)] = (
+            int(cnt),
+            int(done_sum or 0),
+            int(wait_sum or 0),
+        )
+
+    out: list[OrderListRow] = []
+    for o, name in rows:
+        cnt, done_n, wait_n = stats.get(o.id, (0, 0, 0))
+        status_label = format_order_status_display(cnt, done_n, wait_n)
+        out.append(
+            OrderListRow(
+                id=o.id,
+                order_no=o.order_no,
+                customer_id=o.customer_id,
+                customer_name=name,
+                remark=o.remark,
+                created_at=o.created_at,
+                order_status=status_label,
+                item_count=cnt,
+                item_done_count=done_n,
+            )
+        )
+    return out
 
 
 @router.post("", response_model=OrderDetailOut, status_code=status.HTTP_201_CREATED)

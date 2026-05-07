@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import './Login.css'
-import { clearToken, formatApiError, setToken } from './auth.js'
+import { authFetch, clearToken, formatApiError, setToken } from './auth.js'
 
 export default function Login({ onLoggedIn }) {
   const [username, setUsername] = useState('')
@@ -13,7 +13,7 @@ export default function Login({ onLoggedIn }) {
     setError(null)
     setLoading(true)
     try {
-      const r = await fetch('/api/auth/login', {
+      const r = await authFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),

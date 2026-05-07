@@ -2,6 +2,28 @@ import { useCallback, useEffect, useState } from 'react'
 import './Pages.css'
 import { getJson, patchJson, postJson } from './api.js'
 
+function fmtDate(v) {
+  if (!v) return '—'
+  const s = String(v)
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
+  const t = new Date(s)
+  return Number.isNaN(t.getTime()) ? s : t.toLocaleDateString('zh-CN')
+}
+
+function fmtCuttingDate(v) {
+  if (!v) return '—'
+  const t = new Date(v)
+  if (Number.isNaN(t.getTime())) return String(v).slice(0, 16)
+  return t.toLocaleDateString('zh-CN')
+}
+
+function fmtNum(v) {
+  if (v === null || v === undefined || v === '') return '—'
+  return String(v)
+}
+
+const GS = 'task-col-group-start'
+
 export default function TasksPage() {
   const [statuses, setStatuses] = useState([])
   const [statusFilter, setStatusFilter] = useState('')
@@ -68,7 +90,8 @@ export default function TasksPage() {
       <header className="dashboard-page-title">
         <h1>任务管理</h1>
         <p className="dashboard-page-desc">
-          按生产状态跟踪每条来料明细；「修磨中」可多次记录修磨（日志）。
+          列顺序：订单与主键 → 来料与规格 → 重量尺寸 → 工艺说明 → 日期 → 状态 →
+          操作。竖线为分组示意。
         </p>
       </header>
 
@@ -90,42 +113,65 @@ export default function TasksPage() {
       </div>
       {err ? <p className="err">{err}</p> : null}
 
-      <div className="data-table-wrap">
-        <table className="data-table">
+      <div className="data-table-wrap task-table-wrap">
+        <table className="data-table task-mega-table">
           <thead>
             <tr>
-              <th>订单号</th>
-              <th>客户</th>
+              <th className="cell-nowrap">明细ID</th>
+              <th className="cell-nowrap">订单编号</th>
+              <th>订单备注</th>
+              <th className={GS}>来料编号</th>
               <th>生产编号</th>
-              <th>来料编号</th>
               <th>材质</th>
-              <th>状态</th>
-              <th>快速流转</th>
-              <th />
+              <th>来料规格</th>
+              <th>来料重量</th>
+              <th>个数</th>
+              <th className={GS}>发回重量</th>
+              <th>成型尺寸</th>
+              <th className={GS}>锻造过程要求</th>
+              <th>生产过程</th>
+              <th>备注</th>
+              <th className={GS}>来料日期</th>
+              <th>下料日期</th>
+              <th>发回日期</th>
+              <th className={GS}>生产状态</th>
+              <th className={GS}>操作</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="muted">
+                <td colSpan={19} className="muted">
                   加载中…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="muted">
+                <td colSpan={19} className="muted">
                   暂无任务
                 </td>
               </tr>
             ) : (
               rows.map((it) => (
                 <tr key={it.id}>
-                  <td>{it.order_no}</td>
-                  <td>{it.customer_name}</td>
-                  <td>{it.production_no}</td>
-                  <td>{it.incoming_no}</td>
-                  <td>{it.material_grade}</td>
-                  <td>
+                  <td className="cell-nowrap">{it.id}</td>
+                  <td className="cell-nowrap">{it.order_no}</td>
+                  <td className="text-cell">{fmtNum(it.order_remark)}</td>
+                  <td className={GS}>{fmtNum(it.incoming_no)}</td>
+                  <td>{fmtNum(it.production_no)}</td>
+                  <td>{fmtNum(it.material_grade)}</td>
+                  <td className="text-cell">{fmtNum(it.spec_incoming)}</td>
+                  <td>{fmtNum(it.weight_incoming)}</td>
+                  <td>{it.quantity}</td>
+                  <td className={GS}>{fmtNum(it.weight_return)}</td>
+                  <td className="text-cell">{fmtNum(it.formed_size)}</td>
+                  <td className={`text-cell ${GS}`}>{fmtNum(it.forging_requirements)}</td>
+                  <td className="text-cell">{fmtNum(it.production_process)}</td>
+                  <td className="text-cell">{fmtNum(it.remark)}</td>
+                  <td className={GS}>{fmtDate(it.incoming_date)}</td>
+                  <td>{fmtCuttingDate(it.cutting_time)}</td>
+                  <td>{fmtDate(it.return_date)}</td>
+                  <td className={GS}>
                     <select
                       value={it.production_status}
                       onChange={(e) => patchStatus(it, e.target.value)}
@@ -137,7 +183,7 @@ export default function TasksPage() {
                       ))}
                     </select>
                   </td>
-                  <td className="row-actions">
+                  <td className={`row-actions cell-actions ${GS}`}>
                     <button
                       type="button"
                       className="btn btn-ghost"
@@ -152,8 +198,6 @@ export default function TasksPage() {
                     >
                       →待发回
                     </button>
-                  </td>
-                  <td>
                     {it.production_status === '修磨中' ? (
                       <button
                         type="button"
@@ -165,9 +209,7 @@ export default function TasksPage() {
                       >
                         修磨记录
                       </button>
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
+                    ) : null}
                   </td>
                 </tr>
               ))

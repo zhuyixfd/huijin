@@ -154,6 +154,11 @@ class OrderListRow(BaseModel):
     customer_name: str
     remark: str | None = None
     created_at: datetime | None = None
+    order_status: str = Field(
+        description="聚合状态：已下单 / 待入库 / 待完成 n/m / 已完成",
+    )
+    item_count: int = 0
+    item_done_count: int = 0
 
 
 class OrderDetailOut(OrderListOut):
@@ -162,10 +167,11 @@ class OrderDetailOut(OrderListOut):
 
 
 class TaskItemOut(OrderItemOut):
-    """任务视图：明细 + 订单与客户"""
+    """任务视图：来料任务行 + 订单信息"""
 
     order_no: str
     customer_name: str
+    order_remark: str | None = None
 
 
 class DashboardSummary(BaseModel):

@@ -1,5 +1,7 @@
 .page-wrap {
-  max-width: 56rem;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
 }
 
 .stat-grid {
@@ -225,10 +227,6 @@
   align-items: start;
 }
 
-.orders-page .page-wrap {
-  max-width: none;
-}
-
 .order-detail {
   margin-top: 0;
 }
@@ -310,4 +308,38 @@
 
 .print-menu-list button:hover {
   background: var(--accent-bg);
+}
+
+.cell-nowrap {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tag-status {
+  font-weight: 500;
+}
+
+.task-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.task-mega-table {
+  min-width: max-content;
+}
+
+.task-mega-table .text-cell {
+  max-width: 14rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.task-mega-table .cell-actions {
+  min-width: 11rem;
+  white-space: normal;
+}
+
+th.task-col-group-start,
+td.task-col-group-start {
+  border-left: 2px solid var(--accent-border);
 }

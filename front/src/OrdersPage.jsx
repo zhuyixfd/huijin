@@ -21,6 +21,13 @@ const emptyItemForm = () => ({
   cutting_time: '',
 })
 
+function fmtDateTime(iso) {
+  if (!iso) return '—'
+  const t = new Date(iso)
+  if (Number.isNaN(t.getTime())) return String(iso)
+  return t.toLocaleString('zh-CN', { hour12: false })
+}
+
 function normalizeItemPayload(form) {
   const q = parseInt(String(form.quantity), 10)
   let cutting = null
@@ -211,7 +218,7 @@ export default function OrdersPage() {
       <header className="dashboard-page-title">
         <h1>订单管理</h1>
         <p className="dashboard-page-desc">
-          一单可多组来料：维护明细的生产状态与重量尺寸等信息；每条明细可打印四类单据。
+          一个订单对应多条来料锻造任务（一对多）。左侧列表展示聚合进度；右侧维护每条来料的明细与打印。
         </p>
       </header>
 
@@ -243,19 +250,21 @@ export default function OrdersPage() {
               <tr>
                 <th>订单编号</th>
                 <th>客户</th>
+                <th>下单时间</th>
+                <th>订单状态</th>
                 <th>备注</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={3} className="muted">
+                  <td colSpan={5} className="muted">
                     加载中…
                   </td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="muted">
+                  <td colSpan={5} className="muted">
                     暂无订单
                   </td>
                 </tr>
@@ -268,7 +277,11 @@ export default function OrdersPage() {
                   >
                     <td>{o.order_no}</td>
                     <td>{o.customer_name}</td>
-                    <td>{o.remark}</td>
+                    <td className="cell-nowrap">{fmtDateTime(o.created_at)}</td>
+                    <td>
+                      <span className="tag tag-status">{o.order_status}</span>
+                    </td>
+                    <td>{o.remark ?? '—'}</td>
                   </tr>
                 ))
               )}

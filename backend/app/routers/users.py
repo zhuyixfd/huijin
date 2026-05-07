@@ -23,9 +23,11 @@ def create_employee(
     _admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    dn = body.display_name.strip() if body.display_name else None
     user = User(
         username=body.username.strip(),
         password_hash=hash_password(body.password),
+        display_name=dn,
         role="employee",
     )
     db.add(user)

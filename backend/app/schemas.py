@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 class EmployeeCreate(BaseModel):
@@ -8,6 +8,7 @@ class EmployeeCreate(BaseModel):
 
     username: str = Field(min_length=2, max_length=64)
     password: str = Field(min_length=6, max_length=128)
+    display_name: str | None = Field(None, max_length=64)
 
 
 class LoginBody(BaseModel):
@@ -21,9 +22,17 @@ class TokenResponse(BaseModel):
 
 
 class UserOut(BaseModel):
+    """列表/详情：密码列为掩码，非明文。"""
+
     model_config = {"from_attributes": True}
 
     id: int
     username: str
+    display_name: str | None = None
     role: str
     created_at: datetime | None = None
+    last_login_at: datetime | None = None
+
+    @computed_field
+    def password(self) -> str:
+        return "******"

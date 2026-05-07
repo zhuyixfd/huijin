@@ -21,7 +21,7 @@ def list_task_items(
     limit: int = Query(100, ge=1, le=500),
 ):
     stmt = (
-        select(OrderItem, Order.order_no, Customer.name)
+        select(OrderItem, Order.order_no, Customer.name, Order.remark)
         .join(Order, OrderItem.order_id == Order.id)
         .join(Customer, Order.customer_id == Customer.id)
     )
@@ -39,7 +39,14 @@ def list_task_items(
     stmt = stmt.order_by(OrderItem.id.desc()).offset(skip).limit(limit)
     rows = db.execute(stmt).all()
     out: list[TaskItemOut] = []
-    for item, order_no, cust_name in rows:
+    for item, order_no, cust_name, order_remark in rows:
         base = OrderItemOut.model_validate(item).model_dump()
-        out.append(TaskItemOut(**base, order_no=order_no, customer_name=cust_name))
+        out.append(
+            TaskItemOut(
+                **base,
+                order_no=order_no,
+                customer_name=cust_name,
+                order_remark=order_remark,
+            )
+        )
     return out

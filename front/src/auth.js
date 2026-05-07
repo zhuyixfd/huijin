@@ -1,3 +1,5 @@
+import { apiUrl } from './config.js'
+
 const TOKEN_KEY = 'huijin_access_token'
 
 export function formatApiError(data) {
@@ -28,5 +30,5 @@ export async function authFetch(path, options = {}) {
   if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
     headers.set('Content-Type', 'application/json')
   }
-  return fetch(path, { ...options, headers })
+  return fetch(apiUrl(path), { ...options, headers })
 }

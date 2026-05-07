@@ -6,6 +6,18 @@ from app.models import Base, User
 from app.security import hash_password
 
 
+def ensure_user_profile_columns() -> None:
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("users")}
+    with engine.begin() as conn:
+        if "display_name" not in cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN display_name VARCHAR(64) NULL"))
+        if "last_login_at" not in cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN last_login_at DATETIME NULL"))
+
+
 def ensure_users_role_column() -> None:
     inspector = inspect(engine)
     if "users" not in inspector.get_table_names():
@@ -42,6 +54,7 @@ def seed_admin(db: Session) -> None:
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     ensure_users_role_column()
+    ensure_user_profile_columns()
     db = SessionLocal()
     try:
         seed_admin(db)

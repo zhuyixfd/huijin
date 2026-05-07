@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,6 +22,9 @@ def login(body: LoginBody, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
         )
+    user.last_login_at = datetime.now()
+    db.add(user)
+    db.commit()
     token = create_access_token(user.id, user.username)
     return TokenResponse(access_token=token)
 

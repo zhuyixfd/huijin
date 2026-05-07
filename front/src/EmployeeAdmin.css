@@ -76,6 +76,19 @@
   font-size: 1rem;
 }
 
+.account-table-wrap {
+  margin-top: 0.5rem;
+}
+
+.account-table {
+  min-width: 100%;
+}
+
+.account-table .cell-mono {
+  font-family: var(--mono);
+  letter-spacing: 0.05em;
+}
+
 .employee-list {
   list-style: none;
   margin: 0;
