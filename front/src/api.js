@@ -30,7 +30,7 @@ export function patchJson(path, body) {
 
 export function deleteReq(path) {
   return authFetch(path, { method: 'DELETE' }).then((r) => {
-    if (!r.ok && r.status !== 204) return parseJsonOrThrow(r)
-    return null
+    if (r.ok) return null
+    return parseJsonOrThrow(r)
   })
 }

@@ -1,5 +1,12 @@
 import './DashboardShell.css'
 
+const NAV = [
+  { key: 'home', label: '首页' },
+  { key: 'customers', label: '客户管理' },
+  { key: 'orders', label: '订单管理' },
+  { key: 'tasks', label: '任务管理' },
+]
+
 export default function DashboardShell({
   user,
   activeNav,
@@ -14,13 +21,16 @@ export default function DashboardShell({
       <aside className="dashboard-sidebar">
         <div className="dashboard-brand">汇金特材</div>
         <nav className="dashboard-nav" aria-label="主导航">
-          <button
-            type="button"
-            className={`dashboard-nav-item ${activeNav === 'home' ? 'is-active' : ''}`}
-            onClick={() => onNavChange('home')}
-          >
-            首页
-          </button>
+          {NAV.map((n) => (
+            <button
+              key={n.key}
+              type="button"
+              className={`dashboard-nav-item ${activeNav === n.key ? 'is-active' : ''}`}
+              onClick={() => onNavChange(n.key)}
+            >
+              {n.label}
+            </button>
+          ))}
           {isAdmin ? (
             <button
               type="button"

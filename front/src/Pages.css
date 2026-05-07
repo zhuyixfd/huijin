@@ -202,6 +202,60 @@
   resize: vertical;
 }
 
+.item-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.item-form-grid .full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 640px) {
+  .item-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.orders-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.orders-page .page-wrap {
+  max-width: none;
+}
+
+.order-detail {
+  margin-top: 0;
+}
+
+.order-detail-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.order-detail-head h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.2rem;
+}
+
+.data-table tr.is-active-row td {
+  background: var(--accent-bg);
+}
+
+@media (max-width: 960px) {
+  .orders-split {
+    grid-template-columns: 1fr;
+  }
+}
+
 .form-actions {
   display: flex;
   gap: 0.6rem;
