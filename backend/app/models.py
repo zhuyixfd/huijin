@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -65,6 +65,9 @@ class OrderItem(Base):
     remark: Mapped[str | None] = mapped_column(Text(), nullable=True)
     production_status: Mapped[str] = mapped_column(
         String(32), server_default="未入库", index=True
+    )
+    in_today_queue: Mapped[bool] = mapped_column(
+        Boolean(), server_default="0", default=False
     )
     return_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     incoming_date: Mapped[date | None] = mapped_column(Date, nullable=True)

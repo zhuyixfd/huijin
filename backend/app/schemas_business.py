@@ -110,6 +110,7 @@ class OrderItemUpdate(BaseModel):
     production_process: str | None = None
     remark: str | None = None
     production_status: str | None = None
+    in_today_queue: bool | None = None
     return_date: date | None = None
     incoming_date: date | None = None
     cutting_time: datetime | None = None
@@ -143,6 +144,7 @@ class OrderItemOut(BaseModel):
     production_process: str | None = None
     remark: str | None = None
     production_status: str
+    in_today_queue: bool = False
     return_date: date | None = None
     incoming_date: date | None = None
     cutting_time: datetime | None = None

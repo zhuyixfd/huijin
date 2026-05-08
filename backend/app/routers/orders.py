@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -83,16 +83,6 @@ def list_orders(
             stmt = stmt.where(
                 OrderItem.production_status != "未入库",
                 OrderItem.production_status != "已发回",
-            )
-        elif cat == "in_progress_today":
-            today = date.today()
-            stmt = stmt.where(
-                OrderItem.production_status != "未入库",
-                OrderItem.production_status != "已发回",
-                or_(
-                    OrderItem.incoming_date == today,
-                    func.date(OrderItem.cutting_time) == today,
-                ),
             )
         else:
             raise HTTPException(status_code=400, detail="无效的 status_category")

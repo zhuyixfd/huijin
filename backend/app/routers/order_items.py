@@ -50,6 +50,10 @@ def patch_order_item(
     if row is None:
         raise HTTPException(status_code=404, detail="明细不存在")
     data = body.model_dump(exclude_unset=True)
+    st = data.get("production_status")
+    if st in ("未入库", "已发回"):
+        row.in_today_queue = False
+        data.pop("in_today_queue", None)
     for k, v in data.items():
         setattr(row, k, v)
     db.commit()

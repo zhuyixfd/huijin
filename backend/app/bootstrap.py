@@ -19,6 +19,22 @@ def ensure_user_profile_columns() -> None:
             conn.execute(text("ALTER TABLE users ADD COLUMN last_login_at DATETIME NULL"))
 
 
+def ensure_order_item_in_today_queue() -> None:
+    """order_items.in_today_queue：处理中视图「今日处理」区块勾选"""
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_items")}
+    if "in_today_queue" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE order_items ADD COLUMN in_today_queue TINYINT(1) NOT NULL DEFAULT 0"
+            )
+        )
+
+
 def ensure_customer_abbr_column() -> None:
     """旧库 customers 无 abbr 时补齐：U+id，唯一非空。"""
     inspector = inspect(engine)
@@ -85,6 +101,7 @@ def init_db() -> None:
     ensure_users_role_column()
     ensure_user_profile_columns()
     ensure_customer_abbr_column()
+    ensure_order_item_in_today_queue()
     db = SessionLocal()
     try:
         seed_admin(db)

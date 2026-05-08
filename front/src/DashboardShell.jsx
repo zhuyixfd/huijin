@@ -8,7 +8,6 @@ const NAV = [
     primaryNav: { key: 'tasks-all', label: '全部订单' },
     children: [
       { key: 'tasks-pending', label: '未处理' },
-      { key: 'tasks-processing-today', label: '今日处理' },
       { key: 'tasks-processing', label: '处理中' },
       { key: 'tasks-ready-outbound', label: '待出库' },
       { key: 'tasks-done', label: '已完成' },

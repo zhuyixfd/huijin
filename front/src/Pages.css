@@ -102,6 +102,48 @@
   cursor: pointer;
 }
 
+.task-today-cell,
+.task-today-cell-head {
+  width: 2.75rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.task-today-cell input[type='checkbox'] {
+  width: 1.05rem;
+  height: 1.05rem;
+  cursor: pointer;
+}
+
+.task-queue-section-bar td {
+  background: var(--social-bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0.4rem 0.65rem !important;
+}
+
+.task-queue-section-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-h);
+}
+
+.task-queue-split-row td {
+  padding: 0 !important;
+  border-bottom: none !important;
+  vertical-align: middle;
+}
+
+.task-queue-split-line {
+  margin: 0;
+  border: none;
+  border-top: 2px solid var(--border);
+}
+
+.task-queue-empty-hint {
+  font-size: 0.9rem;
+}
+
 .data-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border);

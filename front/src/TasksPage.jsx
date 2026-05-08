@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './Pages.css'
 import { deleteReq, getJson, patchJson, postJson } from './api.js'
 import { openPrint } from './printSlip.js'
@@ -104,8 +104,6 @@ function listPageTitle(preset) {
       return '全部订单'
     case 'pending':
       return '未处理'
-    case 'processing_today':
-      return '今日处理'
     case 'processing':
       return '处理中'
     case 'ready_outbound':
@@ -166,10 +164,6 @@ export default function TasksPage({ tasksPreset = 'all' }) {
         setStatusCategory('in_progress')
         setStatusFilter('')
         break
-      case 'processing_today':
-        setStatusCategory('in_progress_today')
-        setStatusFilter('')
-        break
       case 'ready_outbound':
         setStatusCategory('all')
         setStatusFilter('待发回')
@@ -184,12 +178,12 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   }, [tasksPreset])
 
   useEffect(() => {
-    if (tasksPreset !== 'processing' && tasksPreset !== 'processing_today') setSelectedIds([])
+    if (tasksPreset !== 'processing') setSelectedIds([])
   }, [tasksPreset])
 
   useEffect(() => {
     const el = headerSelectRef.current
-    if (!el || (tasksPreset !== 'processing' && tasksPreset !== 'processing_today')) return
+    if (!el || tasksPreset !== 'processing') return
     const onPage = rows.map((r) => r.id)
     const nSel = onPage.filter((id) => selectedIds.includes(id)).length
     el.indeterminate = onPage.length > 0 && nSel > 0 && nSel < onPage.length
@@ -261,6 +255,17 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     setErr(null)
     try {
       await patchJson(`/api/order-items/${it.id}`, { production_status: nextStatus })
+      loadTasks()
+      if (detail && detail.id === it.id) await refreshDetail(detail.id)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '更新失败')
+    }
+  }
+
+  async function toggleTodayQueue(it, checked) {
+    setErr(null)
+    try {
+      await patchJson(`/api/order-items/${it.id}`, { in_today_queue: checked })
       loadTasks()
       if (detail && detail.id === it.id) await refreshDetail(detail.id)
     } catch (e) {
@@ -344,13 +349,116 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   }
 
   const showProductionStatusFilter =
-    tasksPreset === 'all' ||
-    tasksPreset === 'processing' ||
-    tasksPreset === 'processing_today'
+    tasksPreset === 'all' || tasksPreset === 'processing'
   const showNewWorkOrder = tasksPreset === 'all' || tasksPreset === 'pending'
-  const isProcessingWorkQueue =
-    tasksPreset === 'processing' || tasksPreset === 'processing_today'
-  const listColSpan = isProcessingWorkQueue ? COL_COUNT + 1 : COL_COUNT
+  const isProcessingWorkQueue = tasksPreset === 'processing'
+  const listColSpan = COL_COUNT + (isProcessingWorkQueue ? 2 : 0)
+
+  const { todayQueueRows, restProcessingRows } = useMemo(() => {
+    if (tasksPreset !== 'processing') {
+      return { todayQueueRows: [], restProcessingRows: [] }
+    }
+    const t = []
+    const r = []
+    for (const row of rows) {
+      if (row.in_today_queue) t.push(row)
+      else r.push(row)
+    }
+    return { todayQueueRows: t, restProcessingRows: r }
+  }, [rows, tasksPreset])
+
+  const renderTaskRow = (it) => (
+    <tr key={it.id} className="clickable" onClick={() => enterDetail(it)}>
+      {isProcessingWorkQueue ? (
+        <td className="task-select-cell" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            aria-label={`选择明细 ${it.id}`}
+            checked={selectedIds.includes(it.id)}
+            onChange={() =>
+              setSelectedIds((prev) =>
+                prev.includes(it.id) ? prev.filter((x) => x !== it.id) : [...prev, it.id],
+              )
+            }
+          />
+        </td>
+      ) : null}
+      {isProcessingWorkQueue ? (
+        <td className="task-today-cell" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            aria-label={`今日处理 ${it.id}`}
+            checked={Boolean(it.in_today_queue)}
+            onChange={(e) => {
+              e.stopPropagation()
+              toggleTodayQueue(it, e.target.checked)
+            }}
+          />
+        </td>
+      ) : null}
+      <td className="cell-nowrap">{it.id}</td>
+      <td className="cell-nowrap">{it.order_no}</td>
+      <td>{fmtNum(it.customer_name)}</td>
+      <td className="cell-nowrap">{fmtDateTime(it.order_created_at)}</td>
+      <td>
+        <span className="tag tag-status">{it.order_status}</span>
+      </td>
+      <td className="text-cell">{fmtNum(it.order_remark)}</td>
+      <td className={GS}>{fmtNum(it.incoming_no)}</td>
+      <td>{fmtNum(it.production_no)}</td>
+      <td>{fmtNum(it.material_grade)}</td>
+      <td className="text-cell">{fmtNum(it.spec_incoming)}</td>
+      <td>{fmtNum(it.weight_incoming)}</td>
+      <td>{it.quantity}</td>
+      <td className={GS}>{fmtNum(it.weight_return)}</td>
+      <td className="text-cell">{fmtNum(it.formed_size)}</td>
+      <td className={`text-cell ${GS}`}>{fmtNum(it.forging_requirements)}</td>
+      <td className="text-cell">{fmtNum(it.production_process)}</td>
+      <td className="text-cell">{fmtNum(it.remark)}</td>
+      <td className={GS}>{fmtDate(it.incoming_date)}</td>
+      <td>{fmtCuttingDate(it.cutting_time)}</td>
+      <td>{fmtDate(it.return_date)}</td>
+      <td className={GS} onClick={(e) => e.stopPropagation()}>
+        <select
+          value={it.production_status}
+          onChange={(e) => patchStatus(it, e.target.value)}
+        >
+          {statuses.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className={`row-actions cell-actions ${GS}`} onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="btn btn-ghost" onClick={() => patchStatus(it, '锻造中')}>
+          →锻造
+        </button>
+        <button type="button" className="btn btn-ghost" onClick={() => patchStatus(it, '待发回')}>
+          →待发回
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => openPrint('production', taskToPrintPayload(it))}
+        >
+          打印生产单
+        </button>
+        {it.production_status === '修磨中' ? (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              setGrindItem(it)
+              setGrindNote('')
+            }}
+          >
+            修磨记录
+          </button>
+        ) : null}
+      </td>
+    </tr>
+  )
 
   async function submitBatchStatus(e) {
     e.preventDefault()
@@ -502,6 +610,11 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                     />
                   </th>
                 ) : null}
+                {isProcessingWorkQueue ? (
+                  <th className="task-today-cell-head" title="勾选后归入上方「今日处理」">
+                    今日
+                  </th>
+                ) : null}
                 <th className="cell-nowrap">明细ID</th>
                 <th className="cell-nowrap">订单编号</th>
                 <th>客户</th>
@@ -539,103 +652,44 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                     暂无来料订单
                   </td>
                 </tr>
-              ) : (
-                rows.map((it) => (
-                  <tr
-                    key={it.id}
-                    className="clickable"
-                    onClick={() => enterDetail(it)}
-                  >
-                    {isProcessingWorkQueue ? (
-                      <td className="task-select-cell" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          aria-label={`选择明细 ${it.id}`}
-                          checked={selectedIds.includes(it.id)}
-                          onChange={() =>
-                            setSelectedIds((prev) =>
-                              prev.includes(it.id)
-                                ? prev.filter((x) => x !== it.id)
-                                : [...prev, it.id],
-                            )
-                          }
-                        />
-                      </td>
-                    ) : null}
-                    <td className="cell-nowrap">{it.id}</td>
-                    <td className="cell-nowrap">{it.order_no}</td>
-                    <td>{fmtNum(it.customer_name)}</td>
-                    <td className="cell-nowrap">{fmtDateTime(it.order_created_at)}</td>
-                    <td>
-                      <span className="tag tag-status">{it.order_status}</span>
-                    </td>
-                    <td className="text-cell">{fmtNum(it.order_remark)}</td>
-                    <td className={GS}>{fmtNum(it.incoming_no)}</td>
-                    <td>{fmtNum(it.production_no)}</td>
-                    <td>{fmtNum(it.material_grade)}</td>
-                    <td className="text-cell">{fmtNum(it.spec_incoming)}</td>
-                    <td>{fmtNum(it.weight_incoming)}</td>
-                    <td>{it.quantity}</td>
-                    <td className={GS}>{fmtNum(it.weight_return)}</td>
-                    <td className="text-cell">{fmtNum(it.formed_size)}</td>
-                    <td className={`text-cell ${GS}`}>{fmtNum(it.forging_requirements)}</td>
-                    <td className="text-cell">{fmtNum(it.production_process)}</td>
-                    <td className="text-cell">{fmtNum(it.remark)}</td>
-                    <td className={GS}>{fmtDate(it.incoming_date)}</td>
-                    <td>{fmtCuttingDate(it.cutting_time)}</td>
-                    <td>{fmtDate(it.return_date)}</td>
-                    <td className={GS} onClick={(e) => e.stopPropagation()}>
-                      <select
-                        value={it.production_status}
-                        onChange={(e) => patchStatus(it, e.target.value)}
-                      >
-                        {statuses.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td
-                      className={`row-actions cell-actions ${GS}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={() => patchStatus(it, '锻造中')}
-                      >
-                        →锻造
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={() => patchStatus(it, '待发回')}
-                      >
-                        →待发回
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={() => openPrint('production', taskToPrintPayload(it))}
-                      >
-                        打印生产单
-                      </button>
-                      {it.production_status === '修磨中' ? (
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          onClick={() => {
-                            setGrindItem(it)
-                            setGrindNote('')
-                          }}
-                        >
-                          修磨记录
-                        </button>
-                      ) : null}
+              ) : tasksPreset === 'processing' ? (
+                <>
+                  <tr className="task-queue-section-bar">
+                    <td colSpan={listColSpan}>
+                      <span className="task-queue-section-title">今日处理</span>
                     </td>
                   </tr>
-                ))
+                  {todayQueueRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={listColSpan} className="muted task-queue-empty-hint">
+                        暂无；勾选「今日」列可将订单移到本节（显示在列表上部）
+                      </td>
+                    </tr>
+                  ) : (
+                    todayQueueRows.map(renderTaskRow)
+                  )}
+                  <tr className="task-queue-split-row">
+                    <td colSpan={listColSpan}>
+                      <hr className="task-queue-split-line" />
+                    </td>
+                  </tr>
+                  <tr className="task-queue-section-bar">
+                    <td colSpan={listColSpan}>
+                      <span className="task-queue-section-title">处理中</span>
+                    </td>
+                  </tr>
+                  {restProcessingRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={listColSpan} className="muted">
+                        暂无其他处理中单
+                      </td>
+                    </tr>
+                  ) : (
+                    restProcessingRows.map(renderTaskRow)
+                  )}
+                </>
+              ) : (
+                rows.map(renderTaskRow)
               )}
             </tbody>
           </table>
