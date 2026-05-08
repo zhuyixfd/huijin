@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import './Pages.css'
 import { deleteReq, getJson, patchJson, postJson } from './api.js'
-import { buildSlipDocument, openPrint } from './printSlip.js'
+import { openPrint } from './printSlip.js'
 
 const FALLBACK_ORDER_STATUS_FILTERS = [
   { value: 'all', label: '全部' },
@@ -127,9 +127,6 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   const [detail, setDetail] = useState(null)
   const [grindLogs, setGrindLogs] = useState([])
   const [detailLoading, setDetailLoading] = useState(false)
-  const [previewItemId, setPreviewItemId] = useState(null)
-  const [printOpen, setPrintOpen] = useState(null)
-
   const [grindItem, setGrindItem] = useState(null)
   const [grindNote, setGrindNote] = useState('')
 
@@ -199,16 +196,6 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     queueMicrotask(() => loadTasks())
   }, [loadTasks])
 
-  useEffect(() => {
-    if (!detail?.items?.length) {
-      setPreviewItemId(null)
-      return
-    }
-    setPreviewItemId((prev) =>
-      prev != null && detail.items.some((x) => x.id === prev) ? prev : detail.items[0].id,
-    )
-  }, [detail?.id, detail?.items])
-
   async function refreshDetail(orderId) {
     const [d, logs] = await Promise.all([
       getJson(`/api/orders/${orderId}`),
@@ -238,8 +225,6 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     setView('list')
     setDetail(null)
     setGrindLogs([])
-    setPreviewItemId(null)
-    setPrintOpen(null)
     loadTasks()
   }
 
@@ -341,35 +326,20 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     }
   }
 
-  const previewItem = detail?.items?.find((x) => x.id === previewItemId)
-  const slipPayload =
-    detail && previewItem
-      ? { order: detail, customer: detail.customer, item: previewItem }
-      : null
-
-  const productionPrintPayload =
-    detail?.items?.[0] && detail.customer
-      ? {
-          order: detail,
-          customer: detail.customer,
-          item: detail.items[0],
-        }
-      : null
-
   return (
     <div className="page-wrap tasks-page-merged">
       <header className="dashboard-page-title">
         <h1>
           {view === 'list'
-            ? '订单管理'
+            ? '全部订单'
             : detail?.order_no
               ? `订单明细 · ${detail.order_no}`
               : '订单明细'}
         </h1>
         <p className="dashboard-page-desc">
           {view === 'list'
-            ? '一单一条来料。列表汇总筛选；点击一行进入明细（预览单据、修磨记录）。订单号规则：hj + 企业缩写 + 日期 + 流水（见服务端配置）。'
-            : '每条来料即一张订单；下方可预览来料单、出库单、生产单并打印。'}
+            ? '一单一条来料。列表汇总筛选；点击一行进入明细查看修磨等记录。订单号规则：hj + 企业缩写 + 日期 + 流水（见服务端配置）。'
+            : '每条来料即一张订单；下方可查看来料字段与操作记录。'}
         </p>
       </header>
 
@@ -606,16 +576,12 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                         <th>个数</th>
                         <th>成型尺寸</th>
                         <th>状态</th>
-                        <th style={{ minWidth: '14rem' }}>操作</th>
+                        <th style={{ minWidth: '6rem' }}>操作</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(detail.items ?? []).map((it) => (
-                        <tr
-                          key={it.id}
-                          className={`clickable ${previewItemId === it.id ? 'is-active-row' : ''}`}
-                          onClick={() => setPreviewItemId(it.id)}
-                        >
+                        <tr key={it.id}>
                           <td>{it.production_no}</td>
                           <td>{it.incoming_no}</td>
                           <td>{it.material_grade}</td>
@@ -626,7 +592,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                           <td>
                             <span className="tag">{it.production_status}</span>
                           </td>
-                          <td className="row-actions" onClick={(e) => e.stopPropagation()}>
+                          <td className="row-actions">
                             <button
                               type="button"
                               className="btn btn-ghost"
@@ -634,73 +600,6 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                             >
                               编辑
                             </button>
-                            <div className="print-menu">
-                              <button
-                                type="button"
-                                className="btn"
-                                onClick={() =>
-                                  setPrintOpen(printOpen === it.id ? null : it.id)
-                                }
-                              >
-                                打印 ▾
-                              </button>
-                              {printOpen === it.id ? (
-                                <div className="print-menu-list">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      openPrint('incoming', {
-                                        order: detail,
-                                        customer: detail.customer,
-                                        item: it,
-                                      })
-                                      setPrintOpen(null)
-                                    }}
-                                  >
-                                    来料单
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      openPrint('production', {
-                                        order: detail,
-                                        customer: detail.customer,
-                                        item: it,
-                                      })
-                                      setPrintOpen(null)
-                                    }}
-                                  >
-                                    生产单
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      openPrint('outbound', {
-                                        order: detail,
-                                        customer: detail.customer,
-                                        item: it,
-                                      })
-                                      setPrintOpen(null)
-                                    }}
-                                  >
-                                    出库单
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      openPrint('return', {
-                                        order: detail,
-                                        customer: detail.customer,
-                                        item: it,
-                                      })
-                                      setPrintOpen(null)
-                                    }}
-                                  >
-                                    发回单
-                                  </button>
-                                </div>
-                              ) : null}
-                            </div>
                           </td>
                         </tr>
                       ))}
@@ -708,93 +607,10 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                   </table>
                 </div>
 
-                <div className="slip-inline-actions" style={{ marginTop: '0.75rem' }}>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={!productionPrintPayload}
-                    onClick={() =>
-                      productionPrintPayload &&
-                      openPrint('production', productionPrintPayload)
-                    }
-                  >
-                    打印生产单（本单）
-                  </button>
-                </div>
-
-                {slipPayload ? (
-                  <section className="order-slip-previews" aria-label="单据预览">
-                    <p className="slip-preview-hint muted">
-                      已选来料：
-                      {previewItem?.production_no || previewItem?.incoming_no || `#${previewItem?.id}`}
-                    </p>
-                    <div className="slip-preview-grid">
-                      <div className="slip-preview-card">
-                        <div className="slip-preview-head">
-                          <strong>来料单</strong>
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={() => openPrint('incoming', slipPayload)}
-                          >
-                            打印来料单
-                          </button>
-                        </div>
-                        <iframe
-                          title="来料单预览"
-                          className="slip-preview-frame"
-                          srcDoc={buildSlipDocument('incoming', slipPayload)}
-                        />
-                      </div>
-                      <div className="slip-preview-card">
-                        <div className="slip-preview-head">
-                          <strong>出库单</strong>
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={() => openPrint('outbound', slipPayload)}
-                          >
-                            打印出库单
-                          </button>
-                        </div>
-                        <iframe
-                          title="出库单预览"
-                          className="slip-preview-frame"
-                          srcDoc={buildSlipDocument('outbound', slipPayload)}
-                        />
-                      </div>
-                      <div className="slip-preview-card">
-                        <div className="slip-preview-head">
-                          <strong>生产单</strong>
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={() =>
-                              slipPayload &&
-                              openPrint('production', {
-                                order: detail,
-                                customer: detail.customer,
-                                item: previewItem,
-                              })
-                            }
-                          >
-                            打印生产单
-                          </button>
-                        </div>
-                        <iframe
-                          title="生产单预览"
-                          className="slip-preview-frame"
-                          srcDoc={buildSlipDocument('production', {
-                            order: detail,
-                            customer: detail.customer,
-                            item: previewItem,
-                          })}
-                        />
-                      </div>
-                    </div>
-                  </section>
-                ) : detail.items?.length === 0 ? (
-                  <p className="muted order-slip-empty">暂无来料数据。</p>
+                {detail.items?.length === 0 ? (
+                  <p className="muted order-slip-empty" style={{ marginTop: '0.75rem' }}>
+                    暂无来料数据。
+                  </p>
                 ) : null}
               </section>
 

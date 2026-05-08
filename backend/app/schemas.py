@@ -11,6 +11,12 @@ class EmployeeCreate(BaseModel):
     display_name: str | None = Field(None, max_length=64)
 
 
+class EmployeePasswordSet(BaseModel):
+    """管理员重置员工登录密码"""
+
+    password: str = Field(min_length=6, max_length=128)
+
+
 class LoginBody(BaseModel):
     username: str
     password: str

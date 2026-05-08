@@ -61,19 +61,8 @@
   margin-bottom: 0.35rem;
 }
 
-.dashboard-nav-section-title {
-  padding: 0.35rem 0.85rem 0.15rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text);
-  opacity: 0.55;
-}
-
-.dashboard-nav-section.is-active-group .dashboard-nav-section-title {
-  opacity: 0.75;
-  color: var(--text-h);
+.dashboard-nav-section > .dashboard-nav-item:first-child {
+  margin-bottom: 0.1rem;
 }
 
 .dashboard-nav-sub {

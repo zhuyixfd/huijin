@@ -5,9 +5,8 @@ const NAV = [
   { key: 'customers', label: '客户管理' },
   {
     key: 'orders-section',
-    label: '订单管理',
+    primaryNav: { key: 'tasks-all', label: '全部订单' },
     children: [
-      { key: 'tasks-all', label: '全部订单' },
       { key: 'tasks-pending', label: '未处理' },
       { key: 'tasks-processing', label: '处理中' },
       { key: 'tasks-ready-outbound', label: '待出库' },
@@ -17,7 +16,10 @@ const NAV = [
 ]
 
 function ordersSectionActive(activeNav) {
-  return NAV.find((n) => n.children)?.children?.some((c) => c.key === activeNav) ?? false
+  const section = NAV.find((n) => n.primaryNav)
+  if (!section?.primaryNav) return false
+  if (section.primaryNav.key === activeNav) return true
+  return section.children?.some((c) => c.key === activeNav) ?? false
 }
 
 export default function DashboardShell({
@@ -35,14 +37,20 @@ export default function DashboardShell({
         <div className="dashboard-brand">汇金特材</div>
         <nav className="dashboard-nav" aria-label="主导航">
           {NAV.map((n) => {
-            if (n.children) {
+            if (n.primaryNav) {
               const groupActive = ordersSectionActive(activeNav)
               return (
                 <div
                   key={n.key}
                   className={`dashboard-nav-section ${groupActive ? 'is-active-group' : ''}`}
                 >
-                  <div className="dashboard-nav-section-title">{n.label}</div>
+                  <button
+                    type="button"
+                    className={`dashboard-nav-item ${activeNav === n.primaryNav.key ? 'is-active' : ''}`}
+                    onClick={() => onNavChange(n.primaryNav.key)}
+                  >
+                    {n.primaryNav.label}
+                  </button>
                   <div className="dashboard-nav-sub">
                     {n.children.map((c) => (
                       <button
