@@ -460,6 +460,63 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     </tr>
   )
 
+  const renderMegaThead = (bulkControls) => (
+    <thead>
+      <tr>
+        {isProcessingWorkQueue ? (
+          <th className="task-select-cell">
+            {bulkControls ? (
+              <input
+                ref={headerSelectRef}
+                type="checkbox"
+                aria-label="全选本页"
+                checked={
+                  rows.length > 0 && rows.every((r) => selectedIds.includes(r.id))
+                }
+                onChange={() => {
+                  if (rows.length === 0) return
+                  const ids = rows.map((r) => r.id)
+                  const allOnPageSelected =
+                    ids.length > 0 && ids.every((id) => selectedIds.includes(id))
+                  setSelectedIds(allOnPageSelected ? [] : ids)
+                }}
+              />
+            ) : (
+              <span className="task-thead-placeholder" aria-hidden />
+            )}
+          </th>
+        ) : null}
+        {isProcessingWorkQueue ? (
+          <th className="task-today-cell-head" title="勾选后归入左侧「今日处理」">
+            今日
+          </th>
+        ) : null}
+        <th className="cell-nowrap">明细ID</th>
+        <th className="cell-nowrap">订单编号</th>
+        <th>客户</th>
+        <th className="cell-nowrap">下单时间</th>
+        <th>订单状态</th>
+        <th>订单备注</th>
+        <th className={GS}>来料编号</th>
+        <th>生产编号</th>
+        <th>材质</th>
+        <th>来料规格</th>
+        <th>来料重量</th>
+        <th>个数</th>
+        <th className={GS}>发回重量</th>
+        <th>成型尺寸</th>
+        <th className={GS}>锻造过程要求</th>
+        <th>生产过程</th>
+        <th>备注</th>
+        <th className={GS}>来料日期</th>
+        <th>下料日期</th>
+        <th>发回日期</th>
+        <th className={GS}>生产状态</th>
+        <th className={GS}>操作</th>
+      </tr>
+    </thead>
+  )
+
   async function submitBatchStatus(e) {
     e.preventDefault()
     if (selectedIds.length === 0 || !batchTargetStatus) return
@@ -586,114 +643,81 @@ export default function TasksPage({ tasksPreset = 'all' }) {
       {err ? <p className="err">{err}</p> : null}
 
       {view === 'list' ? (
-        <div className="data-table-wrap task-table-wrap">
-          <table className="data-table task-mega-table">
-            <thead>
-              <tr>
-                {isProcessingWorkQueue ? (
-                  <th className="task-select-cell">
-                    <input
-                      ref={headerSelectRef}
-                      type="checkbox"
-                      aria-label="全选本页"
-                      checked={
-                        rows.length > 0 &&
-                        rows.every((r) => selectedIds.includes(r.id))
-                      }
-                      onChange={() => {
-                        if (rows.length === 0) return
-                        const ids = rows.map((r) => r.id)
-                        const allOnPageSelected =
-                          ids.length > 0 && ids.every((id) => selectedIds.includes(id))
-                        setSelectedIds(allOnPageSelected ? [] : ids)
-                      }}
-                    />
-                  </th>
-                ) : null}
-                {isProcessingWorkQueue ? (
-                  <th className="task-today-cell-head" title="勾选后归入上方「今日处理」">
-                    今日
-                  </th>
-                ) : null}
-                <th className="cell-nowrap">明细ID</th>
-                <th className="cell-nowrap">订单编号</th>
-                <th>客户</th>
-                <th className="cell-nowrap">下单时间</th>
-                <th>订单状态</th>
-                <th>订单备注</th>
-                <th className={GS}>来料编号</th>
-                <th>生产编号</th>
-                <th>材质</th>
-                <th>来料规格</th>
-                <th>来料重量</th>
-                <th>个数</th>
-                <th className={GS}>发回重量</th>
-                <th>成型尺寸</th>
-                <th className={GS}>锻造过程要求</th>
-                <th>生产过程</th>
-                <th>备注</th>
-                <th className={GS}>来料日期</th>
-                <th>下料日期</th>
-                <th>发回日期</th>
-                <th className={GS}>生产状态</th>
-                <th className={GS}>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
+        loading ? (
+          <div className="data-table-wrap task-table-wrap">
+            <table className="data-table task-mega-table">
+              {renderMegaThead(true)}
+              <tbody>
                 <tr>
                   <td colSpan={listColSpan} className="muted">
                     加载中…
                   </td>
                 </tr>
-              ) : rows.length === 0 ? (
+              </tbody>
+            </table>
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="data-table-wrap task-table-wrap">
+            <table className="data-table task-mega-table">
+              {renderMegaThead(true)}
+              <tbody>
                 <tr>
                   <td colSpan={listColSpan} className="muted">
                     暂无来料订单
                   </td>
                 </tr>
-              ) : tasksPreset === 'processing' ? (
-                <>
-                  <tr className="task-queue-section-bar">
-                    <td colSpan={listColSpan}>
-                      <span className="task-queue-section-title">今日处理</span>
-                    </td>
-                  </tr>
-                  {todayQueueRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={listColSpan} className="muted task-queue-empty-hint">
-                        暂无；勾选「今日」列可将订单移到本节（显示在列表上部）
-                      </td>
-                    </tr>
-                  ) : (
-                    todayQueueRows.map(renderTaskRow)
-                  )}
-                  <tr className="task-queue-split-row">
-                    <td colSpan={listColSpan}>
-                      <hr className="task-queue-split-line" />
-                    </td>
-                  </tr>
-                  <tr className="task-queue-section-bar">
-                    <td colSpan={listColSpan}>
-                      <span className="task-queue-section-title">处理中</span>
-                    </td>
-                  </tr>
-                  {restProcessingRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={listColSpan} className="muted">
-                        暂无其他处理中单
-                      </td>
-                    </tr>
-                  ) : (
-                    restProcessingRows.map(renderTaskRow)
-                  )}
-                </>
-              ) : (
-                rows.map(renderTaskRow)
-              )}
-            </tbody>
-          </table>
-        </div>
+              </tbody>
+            </table>
+          </div>
+        ) : tasksPreset === 'processing' ? (
+          <div className="task-queue-panels">
+            <section className="task-queue-panel card">
+              <h3 className="task-queue-panel-title">今日处理</h3>
+              <div className="data-table-wrap task-queue-panel-inner">
+                <table className="data-table task-mega-table">
+                  {renderMegaThead(true)}
+                  <tbody>
+                    {todayQueueRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={listColSpan} className="muted task-queue-empty-hint">
+                          暂无；勾选「今日」列可将订单移入本节
+                        </td>
+                      </tr>
+                    ) : (
+                      todayQueueRows.map(renderTaskRow)
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            <section className="task-queue-panel card">
+              <h3 className="task-queue-panel-title">处理中</h3>
+              <div className="data-table-wrap task-queue-panel-inner">
+                <table className="data-table task-mega-table">
+                  {renderMegaThead(false)}
+                  <tbody>
+                    {restProcessingRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={listColSpan} className="muted">
+                          暂无其他处理中单
+                        </td>
+                      </tr>
+                    ) : (
+                      restProcessingRows.map(renderTaskRow)
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        ) : (
+          <div className="data-table-wrap task-table-wrap">
+            <table className="data-table task-mega-table">
+              {renderMegaThead(true)}
+              <tbody>{rows.map(renderTaskRow)}</tbody>
+            </table>
+          </div>
+        )
       ) : (
         <>
           {!detail && detailLoading ? <p className="muted">加载订单…</p> : null}
