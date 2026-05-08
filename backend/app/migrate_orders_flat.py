@@ -56,23 +56,44 @@ def migrate_orders_flatten() -> None:
                     )
                 )
 
+            # MySQL 1093：不能在 UPDATE order_items 的子查询里再读同一表；先用临时表算每个 order_id 行数
+            conn.execute(
+                text(
+                    """
+                    CREATE TEMPORARY TABLE _hj_migrate_order_counts (
+                      order_id INT NOT NULL PRIMARY KEY,
+                      cnt INT NOT NULL
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO _hj_migrate_order_counts (order_id, cnt)
+                    SELECT order_id, COUNT(*) FROM order_items GROUP BY order_id
+                    """
+                )
+            )
             conn.execute(
                 text(
                     """
                     UPDATE order_items AS oi
                     INNER JOIN orders AS o ON oi.order_id = o.id
+                    INNER JOIN _hj_migrate_order_counts AS oc ON oc.order_id = oi.order_id
                     SET
                       oi.customer_id = o.customer_id,
                       oi.created_at = o.created_at,
                       oi.order_remark = o.remark,
                       oi.order_no = IF(
-                        (SELECT COUNT(*) FROM order_items z WHERE z.order_id = oi.order_id) > 1,
+                        oc.cnt > 1,
                         CONCAT(o.order_no, '-', oi.id),
                         o.order_no
                       )
                     """
                 )
             )
+            conn.execute(text("DROP TEMPORARY TABLE IF EXISTS _hj_migrate_order_counts"))
 
             _drop_order_fks(conn)
 
