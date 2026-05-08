@@ -119,22 +119,36 @@
   font-size: 0.9rem;
 }
 
+/* 双面板必须纵向叠放：用常规块级流 + 间距，避免被误判为横向排列 */
 .task-queue-panels {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  align-items: stretch;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.task-queue-panels > .task-queue-panel {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 1rem;
+}
+
+.task-queue-panels > .task-queue-panel:last-child {
+  margin-bottom: 0;
 }
 
 .task-queue-panel {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  display: block;
 }
 
 .task-queue-panel-title {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   margin: 0;
   padding: 0.55rem 0.85rem;
   font-size: 0.92rem;
@@ -145,6 +159,9 @@
 }
 
 .task-queue-panel-inner {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   margin: 0;
   border: none;
   border-radius: 0;
