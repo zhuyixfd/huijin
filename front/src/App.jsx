@@ -66,9 +66,30 @@ export default function App() {
     return <Login onLoggedIn={refreshUser} />
   }
 
+  const TASKS_PAGE_KEYS = new Set([
+    'tasks',
+    'tasks-all',
+    'tasks-pending',
+    'tasks-processing',
+    'tasks-ready-outbound',
+    'tasks-done',
+  ])
+
+  function tasksPresetFromNav(key) {
+    const map = {
+      tasks: 'all',
+      'tasks-all': 'all',
+      'tasks-pending': 'pending',
+      'tasks-processing': 'processing',
+      'tasks-ready-outbound': 'ready_outbound',
+      'tasks-done': 'done',
+    }
+    return map[key] ?? 'all'
+  }
+
   const resolvedNav =
     activeNav === 'orders'
-      ? 'tasks'
+      ? 'tasks-all'
       : user.role !== 'admin' && activeNav === 'accounts'
         ? 'home'
         : activeNav
@@ -76,11 +97,12 @@ export default function App() {
 
   function renderMain() {
     if (showAccounts) return <EmployeeAdmin />
+    if (TASKS_PAGE_KEYS.has(resolvedNav)) {
+      return <TasksPage tasksPreset={tasksPresetFromNav(resolvedNav)} />
+    }
     switch (resolvedNav) {
       case 'customers':
         return <CustomersPage />
-      case 'tasks':
-        return <TasksPage />
       case 'home':
       default:
         return <HomePage />

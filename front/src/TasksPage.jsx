@@ -106,7 +106,7 @@ function dtLocal(val) {
 const GS = 'task-col-group-start'
 const COL_COUNT = 22
 
-export default function TasksPage() {
+export default function TasksPage({ tasksPreset = 'all' }) {
   const [customers, setCustomers] = useState([])
   const [statuses, setStatuses] = useState([])
   const [orderStatusFilters, setOrderStatusFilters] = useState([])
@@ -138,6 +138,33 @@ export default function TasksPage() {
 
   const [itemModal, setItemModal] = useState(null)
   const [itemForm, setItemForm] = useState(emptyItemForm)
+
+  useEffect(() => {
+    switch (tasksPreset) {
+      case 'all':
+        setStatusCategory('all')
+        setStatusFilter('')
+        break
+      case 'pending':
+        setStatusCategory('waiting_inbound')
+        setStatusFilter('')
+        break
+      case 'processing':
+        setStatusCategory('in_progress')
+        setStatusFilter('')
+        break
+      case 'ready_outbound':
+        setStatusCategory('all')
+        setStatusFilter('待发回')
+        break
+      case 'done':
+        setStatusCategory('completed')
+        setStatusFilter('')
+        break
+      default:
+        break
+    }
+  }, [tasksPreset])
 
   const loadMeta = useCallback(() => {
     getJson('/api/meta/production-statuses').then((d) => setStatuses(d.statuses ?? []))
@@ -334,7 +361,7 @@ export default function TasksPage() {
       <header className="dashboard-page-title">
         <h1>
           {view === 'list'
-            ? '来料订单'
+            ? '订单管理'
             : detail?.order_no
               ? `订单明细 · ${detail.order_no}`
               : '订单明细'}
