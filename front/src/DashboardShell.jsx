@@ -3,8 +3,7 @@ import './DashboardShell.css'
 const NAV = [
   { key: 'home', label: '首页' },
   { key: 'customers', label: '客户管理' },
-  { key: 'orders', label: '订单管理' },
-  { key: 'tasks', label: '任务管理' },
+  { key: 'tasks', label: '来料订单' },
 ]
 
 export default function DashboardShell({

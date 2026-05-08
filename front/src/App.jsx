@@ -5,7 +5,6 @@ import DashboardShell from './DashboardShell.jsx'
 import EmployeeAdmin from './EmployeeAdmin.jsx'
 import HomePage from './HomePage.jsx'
 import Login from './Login.jsx'
-import OrdersPage from './OrdersPage.jsx'
 import TasksPage from './TasksPage.jsx'
 import { authFetch, clearToken, getToken } from './auth.js'
 
@@ -68,7 +67,11 @@ export default function App() {
   }
 
   const resolvedNav =
-    user.role !== 'admin' && activeNav === 'accounts' ? 'home' : activeNav
+    activeNav === 'orders'
+      ? 'tasks'
+      : user.role !== 'admin' && activeNav === 'accounts'
+        ? 'home'
+        : activeNav
   const showAccounts = user.role === 'admin' && resolvedNav === 'accounts'
 
   function renderMain() {
@@ -76,8 +79,6 @@ export default function App() {
     switch (resolvedNav) {
       case 'customers':
         return <CustomersPage />
-      case 'orders':
-        return <OrdersPage />
       case 'tasks':
         return <TasksPage />
       case 'home':

@@ -36,11 +36,7 @@ export default function HomePage() {
             <strong className="stat-value">{summary.customer_count}</strong>
           </div>
           <div className="stat-card card">
-            <span className="stat-label">订单数</span>
-            <strong className="stat-value">{summary.order_count}</strong>
-          </div>
-          <div className="stat-card card">
-            <span className="stat-label">来料明细（行）</span>
+            <span className="stat-label">来料订单（一单一条）</span>
             <strong className="stat-value">{summary.item_count}</strong>
           </div>
         </div>

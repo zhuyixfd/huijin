@@ -153,6 +153,8 @@ def create_order(
     _: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if len(body.items) > 1:
+        raise HTTPException(status_code=400, detail="一单仅允许一条来料明细")
     cust = db.get(Customer, body.customer_id)
     if cust is None:
         raise HTTPException(status_code=404, detail="客户不存在")
@@ -284,6 +286,11 @@ def add_order_item(
     order = db.get(Order, order_id)
     if order is None:
         raise HTTPException(status_code=404, detail="订单不存在")
+    existing_n = (
+        db.scalar(select(func.count(OrderItem.id)).where(OrderItem.order_id == order_id)) or 0
+    )
+    if existing_n >= 1:
+        raise HTTPException(status_code=400, detail="该订单已有来料明细，一单仅一条")
     max_sort = db.scalar(
         select(func.max(OrderItem.sort_order)).where(OrderItem.order_id == order_id)
     )

@@ -177,12 +177,24 @@ class OrderDetailOut(OrderListOut):
     items: list[OrderItemOut] = Field(default_factory=list)
 
 
+class WorkOrderCreate(OrderItemCreate):
+    """一单一条来料：创建订单 + 唯一明细。"""
+
+    customer_id: int
+    order_remark: str | None = Field(None, description="订单备注（抬头）")
+
+
 class TaskItemOut(OrderItemOut):
-    """任务视图：来料任务行 + 订单信息"""
+    """来料订单行：一条明细即一张订单。"""
 
     order_no: str
     customer_name: str
     order_remark: str | None = None
+    order_created_at: datetime | None = None
+    order_status: str = Field(
+        default="",
+        description="与订单列表一致的聚合状态（一单一条来料时等同该行状态）",
+    )
 
 
 class DashboardSummary(BaseModel):

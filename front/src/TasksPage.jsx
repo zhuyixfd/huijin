@@ -1,14 +1,45 @@
 import { useCallback, useEffect, useState } from 'react'
 import './Pages.css'
-import { getJson, patchJson, postJson } from './api.js'
+import { deleteReq, getJson, patchJson, postJson } from './api.js'
 import { buildSlipDocument, openPrint } from './printSlip.js'
 
-function taskToPrintPayload(it) {
-  return {
-    order: { id: it.order_id, order_no: it.order_no, remark: it.order_remark },
-    customer: { name: it.customer_name },
-    item: it,
-  }
+const FALLBACK_ORDER_STATUS_FILTERS = [
+  { value: 'all', label: '全部' },
+  { value: 'placed', label: '已下单' },
+  { value: 'waiting_inbound', label: '待入库' },
+  { value: 'in_progress', label: '待完成' },
+  { value: 'completed', label: '已完成' },
+]
+
+const emptyItemForm = () => ({
+  incoming_no: '',
+  material_grade: '',
+  production_no: '',
+  spec_incoming: '',
+  weight_incoming: '',
+  quantity: 1,
+  weight_return: '',
+  formed_size: '',
+  forging_requirements: '',
+  production_process: '',
+  remark: '',
+  production_status: '未入库',
+  return_date: '',
+  incoming_date: '',
+  cutting_time: '',
+})
+
+const emptyWorkOrderForm = () => ({
+  customer_id: '',
+  order_remark: '',
+  ...emptyItemForm(),
+})
+
+function fmtDateTime(iso) {
+  if (!iso) return '—'
+  const t = new Date(iso)
+  if (Number.isNaN(t.getTime())) return String(iso)
+  return t.toLocaleString('zh-CN', { hour12: false })
 }
 
 function fmtDate(v) {
@@ -31,22 +62,89 @@ function fmtNum(v) {
   return String(v)
 }
 
+function normalizeItemPayload(form) {
+  const q = parseInt(String(form.quantity), 10)
+  let cutting = null
+  if (form.cutting_time) {
+    cutting =
+      form.cutting_time.length === 16 ? `${form.cutting_time}:00` : form.cutting_time
+  }
+  return {
+    incoming_no: form.incoming_no || null,
+    material_grade: form.material_grade || null,
+    production_no: form.production_no || null,
+    spec_incoming: form.spec_incoming || null,
+    weight_incoming: form.weight_incoming === '' ? null : String(form.weight_incoming),
+    quantity: Number.isFinite(q) && q >= 1 ? q : 1,
+    weight_return: form.weight_return === '' ? null : String(form.weight_return),
+    formed_size: form.formed_size || null,
+    forging_requirements: form.forging_requirements || null,
+    production_process: form.production_process || null,
+    remark: form.remark || null,
+    production_status: form.production_status || '未入库',
+    return_date: form.return_date || null,
+    incoming_date: form.incoming_date || null,
+    cutting_time: cutting,
+  }
+}
+
+function taskToPrintPayload(it) {
+  return {
+    order: { id: it.order_id, order_no: it.order_no, remark: it.order_remark },
+    customer: { name: it.customer_name },
+    item: it,
+  }
+}
+
+function dtLocal(val) {
+  if (!val) return ''
+  const s = String(val)
+  if (s.includes('T')) return s.slice(0, 16)
+  return s
+}
+
 const GS = 'task-col-group-start'
+const COL_COUNT = 22
 
 export default function TasksPage() {
+  const [customers, setCustomers] = useState([])
   const [statuses, setStatuses] = useState([])
+  const [orderStatusFilters, setOrderStatusFilters] = useState([])
+
   const [statusFilter, setStatusFilter] = useState('')
+  const [statusCategory, setStatusCategory] = useState('all')
+  const [cid, setCid] = useState('')
+  const [customerNameQ, setCustomerNameQ] = useState('')
+  const [createdFrom, setCreatedFrom] = useState('')
+  const [createdTo, setCreatedTo] = useState('')
   const [q, setQ] = useState('')
+
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
 
+  const [view, setView] = useState('list')
+  const [detail, setDetail] = useState(null)
+  const [grindLogs, setGrindLogs] = useState([])
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [previewItemId, setPreviewItemId] = useState(null)
+  const [printOpen, setPrintOpen] = useState(null)
+
   const [grindItem, setGrindItem] = useState(null)
   const [grindNote, setGrindNote] = useState('')
-  const [selectedId, setSelectedId] = useState(null)
+
+  const [workOrderModal, setWorkOrderModal] = useState(false)
+  const [newWork, setNewWork] = useState(emptyWorkOrderForm)
+
+  const [itemModal, setItemModal] = useState(null)
+  const [itemForm, setItemForm] = useState(emptyItemForm)
 
   const loadMeta = useCallback(() => {
     getJson('/api/meta/production-statuses').then((d) => setStatuses(d.statuses ?? []))
+    getJson('/api/meta/order-status-filters')
+      .then((d) => setOrderStatusFilters(d.filters ?? []))
+      .catch(() => setOrderStatusFilters(FALLBACK_ORDER_STATUS_FILTERS))
+    getJson('/api/customers').then(setCustomers)
   }, [])
 
   const loadTasks = useCallback(() => {
@@ -54,12 +152,17 @@ export default function TasksPage() {
     const p = new URLSearchParams()
     if (statusFilter) p.set('status', statusFilter)
     if (q.trim()) p.set('q', q.trim())
+    if (cid) p.set('customer_id', cid)
+    if (statusCategory && statusCategory !== 'all') p.set('status_category', statusCategory)
+    if (customerNameQ.trim()) p.set('customer_q', customerNameQ.trim())
+    if (createdFrom) p.set('created_from', createdFrom)
+    if (createdTo) p.set('created_to', createdTo)
     const qs = p.toString()
     getJson(`/api/tasks/items${qs ? `?${qs}` : ''}`)
       .then(setRows)
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false))
-  }, [statusFilter, q])
+  }, [statusFilter, q, cid, statusCategory, customerNameQ, createdFrom, createdTo])
 
   useEffect(() => {
     queueMicrotask(() => loadMeta())
@@ -70,27 +173,59 @@ export default function TasksPage() {
   }, [loadTasks])
 
   useEffect(() => {
-    if (rows.length === 0) {
-      setSelectedId(null)
+    if (!detail?.items?.length) {
+      setPreviewItemId(null)
       return
     }
-    setSelectedId((prev) =>
-      prev != null && rows.some((r) => r.id === prev) ? prev : rows[0].id,
+    setPreviewItemId((prev) =>
+      prev != null && detail.items.some((x) => x.id === prev) ? prev : detail.items[0].id,
     )
-  }, [rows])
+  }, [detail?.id, detail?.items])
 
-  async function patchStatus(it, status) {
+  async function refreshDetail(orderId) {
+    const [d, logs] = await Promise.all([
+      getJson(`/api/orders/${orderId}`),
+      getJson(`/api/orders/${orderId}/grind-logs`).catch(() => []),
+    ])
+    setDetail(d)
+    setGrindLogs(Array.isArray(logs) ? logs : [])
+  }
+
+  async function enterDetail(row) {
+    setErr(null)
+    setView('detail')
+    setDetail(null)
+    setGrindLogs([])
+    setDetailLoading(true)
+    try {
+      await refreshDetail(row.order_id)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '加载订单失败')
+      setView('list')
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  function backToList() {
+    setView('list')
+    setDetail(null)
+    setGrindLogs([])
+    setPreviewItemId(null)
+    setPrintOpen(null)
+    loadTasks()
+  }
+
+  async function patchStatus(it, nextStatus) {
     setErr(null)
     try {
-      await patchJson(`/api/order-items/${it.id}`, { production_status: status })
+      await patchJson(`/api/order-items/${it.id}`, { production_status: nextStatus })
       loadTasks()
+      if (detail && detail.id === it.order_id) await refreshDetail(detail.id)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '更新失败')
     }
   }
-
-  const selectedRow = rows.find((r) => r.id === selectedId)
-  const productionPrintPayload = selectedRow ? taskToPrintPayload(selectedRow) : null
 
   async function submitGrind(e) {
     e.preventDefault()
@@ -103,181 +238,888 @@ export default function TasksPage() {
       setGrindItem(null)
       setGrindNote('')
       loadTasks()
+      if (detail && detail.id === grindItem.order_id) await refreshDetail(detail.id)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '记录失败')
     }
   }
 
+  async function submitWorkOrder(e) {
+    e.preventDefault()
+    setErr(null)
+    try {
+      const payload = {
+        customer_id: Number(newWork.customer_id),
+        order_remark: newWork.order_remark || null,
+        ...normalizeItemPayload(newWork),
+      }
+      const created = await postJson('/api/tasks/work-orders', payload)
+      setWorkOrderModal(false)
+      setNewWork(emptyWorkOrderForm())
+      loadTasks()
+      await refreshDetail(created.order_id)
+      setView('detail')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '创建失败')
+    }
+  }
+
+  function openEditItem(it) {
+    setItemForm({
+      incoming_no: it.incoming_no ?? '',
+      material_grade: it.material_grade ?? '',
+      production_no: it.production_no ?? '',
+      spec_incoming: it.spec_incoming ?? '',
+      weight_incoming: it.weight_incoming ?? '',
+      quantity: it.quantity ?? 1,
+      weight_return: it.weight_return ?? '',
+      formed_size: it.formed_size ?? '',
+      forging_requirements: it.forging_requirements ?? '',
+      production_process: it.production_process ?? '',
+      remark: it.remark ?? '',
+      production_status: it.production_status ?? '未入库',
+      return_date: it.return_date ? String(it.return_date).slice(0, 10) : '',
+      incoming_date: it.incoming_date ? String(it.incoming_date).slice(0, 10) : '',
+      cutting_time: it.cutting_time
+        ? String(it.cutting_time).slice(0, 16).replace('T', 'T')
+        : '',
+    })
+    setItemModal({ itemId: it.id })
+  }
+
+  async function submitItem(e) {
+    e.preventDefault()
+    if (!detail || !itemModal) return
+    setErr(null)
+    const payload = normalizeItemPayload(itemForm)
+    try {
+      await patchJson(`/api/order-items/${itemModal.itemId}`, payload)
+      setItemModal(null)
+      await refreshDetail(detail.id)
+      loadTasks()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '保存失败')
+    }
+  }
+
+  async function deleteWorkOrder() {
+    if (!detail?.items?.[0]) return
+    if (!window.confirm(`删除来料订单 ${detail.order_no}？`)) return
+    setErr(null)
+    try {
+      await deleteReq(`/api/tasks/items/${detail.items[0].id}`)
+      backToList()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '删除失败')
+    }
+  }
+
+  const previewItem = detail?.items?.find((x) => x.id === previewItemId)
+  const slipPayload =
+    detail && previewItem
+      ? { order: detail, customer: detail.customer, item: previewItem }
+      : null
+
+  const productionPrintPayload =
+    detail?.items?.[0] && detail.customer
+      ? {
+          order: detail,
+          customer: detail.customer,
+          item: detail.items[0],
+        }
+      : null
+
   return (
-    <div className="page-wrap">
+    <div className="page-wrap tasks-page-merged">
       <header className="dashboard-page-title">
-        <h1>任务管理</h1>
+        <h1>
+          {view === 'list'
+            ? '来料订单'
+            : detail?.order_no
+              ? `订单明细 · ${detail.order_no}`
+              : '订单明细'}
+        </h1>
         <p className="dashboard-page-desc">
-          点击一行选中任务，右侧可预览生产单并打印。列顺序：订单与主键 → 来料与规格 →
-          重量尺寸 → 工艺说明 → 日期 → 状态 → 操作。竖线为分组示意。
+          {view === 'list'
+            ? '一单一条来料。列表汇总筛选；点击一行进入明细（预览单据、修磨记录）。订单号规则：hj + 企业缩写 + 日期 + 流水（见服务端配置）。'
+            : '每条来料即一张订单；下方可预览来料单、出库单、生产单并打印。'}
         </p>
       </header>
 
-      <div className="toolbar">
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">全部状态</option>
-          {statuses.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <input
-          type="search"
-          placeholder="订单号 / 生产编号 / 来料编号"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-      </div>
+      {view === 'list' ? (
+        <div className="toolbar orders-toolbar">
+          <select
+            aria-label="订单状态"
+            value={statusCategory}
+            onChange={(e) => setStatusCategory(e.target.value)}
+          >
+            {(orderStatusFilters.length ? orderStatusFilters : FALLBACK_ORDER_STATUS_FILTERS).map(
+              (f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ),
+            )}
+          </select>
+          <select value={cid} onChange={(e) => setCid(e.target.value)}>
+            <option value="">全部客户</option>
+            {customers.map((c) => (
+              <option key={c.id} value={String(c.id)}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="search"
+            placeholder="客户名称（模糊）"
+            value={customerNameQ}
+            onChange={(e) => setCustomerNameQ(e.target.value)}
+          />
+          <input
+            type="date"
+            aria-label="下单时间起"
+            value={createdFrom}
+            onChange={(e) => setCreatedFrom(e.target.value)}
+          />
+          <input
+            type="date"
+            aria-label="下单时间止"
+            value={createdTo}
+            onChange={(e) => setCreatedTo(e.target.value)}
+          />
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">生产状态（全部）</option>
+            {statuses.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <input
+            type="search"
+            placeholder="订单号 / 生产编号 / 来料编号"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <button type="button" className="btn btn-primary" onClick={() => setWorkOrderModal(true)}>
+            新建来料订单
+          </button>
+        </div>
+      ) : (
+        <div className="order-detail-nav">
+          <button type="button" className="btn" onClick={backToList}>
+            ← 返回列表
+          </button>
+          {detailLoading ? <span className="muted">加载中…</span> : null}
+        </div>
+      )}
+
       {err ? <p className="err">{err}</p> : null}
 
-      <div className="tasks-with-preview">
+      {view === 'list' ? (
         <div className="data-table-wrap task-table-wrap">
-        <table className="data-table task-mega-table">
-          <thead>
-            <tr>
-              <th className="cell-nowrap">明细ID</th>
-              <th className="cell-nowrap">订单编号</th>
-              <th>订单备注</th>
-              <th className={GS}>来料编号</th>
-              <th>生产编号</th>
-              <th>材质</th>
-              <th>来料规格</th>
-              <th>来料重量</th>
-              <th>个数</th>
-              <th className={GS}>发回重量</th>
-              <th>成型尺寸</th>
-              <th className={GS}>锻造过程要求</th>
-              <th>生产过程</th>
-              <th>备注</th>
-              <th className={GS}>来料日期</th>
-              <th>下料日期</th>
-              <th>发回日期</th>
-              <th className={GS}>生产状态</th>
-              <th className={GS}>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+          <table className="data-table task-mega-table">
+            <thead>
               <tr>
-                <td colSpan={19} className="muted">
-                  加载中…
-                </td>
+                <th className="cell-nowrap">明细ID</th>
+                <th className="cell-nowrap">订单编号</th>
+                <th>客户</th>
+                <th className="cell-nowrap">下单时间</th>
+                <th>订单状态</th>
+                <th>订单备注</th>
+                <th className={GS}>来料编号</th>
+                <th>生产编号</th>
+                <th>材质</th>
+                <th>来料规格</th>
+                <th>来料重量</th>
+                <th>个数</th>
+                <th className={GS}>发回重量</th>
+                <th>成型尺寸</th>
+                <th className={GS}>锻造过程要求</th>
+                <th>生产过程</th>
+                <th>备注</th>
+                <th className={GS}>来料日期</th>
+                <th>下料日期</th>
+                <th>发回日期</th>
+                <th className={GS}>生产状态</th>
+                <th className={GS}>操作</th>
               </tr>
-            ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan={19} className="muted">
-                  暂无任务
-                </td>
-              </tr>
-            ) : (
-              rows.map((it) => (
-                <tr
-                  key={it.id}
-                  className={`clickable ${selectedId === it.id ? 'is-active-row' : ''}`}
-                  onClick={() => setSelectedId(it.id)}
-                >
-                  <td className="cell-nowrap">{it.id}</td>
-                  <td className="cell-nowrap">{it.order_no}</td>
-                  <td className="text-cell">{fmtNum(it.order_remark)}</td>
-                  <td className={GS}>{fmtNum(it.incoming_no)}</td>
-                  <td>{fmtNum(it.production_no)}</td>
-                  <td>{fmtNum(it.material_grade)}</td>
-                  <td className="text-cell">{fmtNum(it.spec_incoming)}</td>
-                  <td>{fmtNum(it.weight_incoming)}</td>
-                  <td>{it.quantity}</td>
-                  <td className={GS}>{fmtNum(it.weight_return)}</td>
-                  <td className="text-cell">{fmtNum(it.formed_size)}</td>
-                  <td className={`text-cell ${GS}`}>{fmtNum(it.forging_requirements)}</td>
-                  <td className="text-cell">{fmtNum(it.production_process)}</td>
-                  <td className="text-cell">{fmtNum(it.remark)}</td>
-                  <td className={GS}>{fmtDate(it.incoming_date)}</td>
-                  <td>{fmtCuttingDate(it.cutting_time)}</td>
-                  <td>{fmtDate(it.return_date)}</td>
-                  <td className={GS} onClick={(e) => e.stopPropagation()}>
-                    <select
-                      value={it.production_status}
-                      onChange={(e) => patchStatus(it, e.target.value)}
-                    >
-                      {statuses.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td
-                    className={`row-actions cell-actions ${GS}`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => patchStatus(it, '锻造中')}
-                    >
-                      →锻造
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => patchStatus(it, '待发回')}
-                    >
-                      →待发回
-                    </button>
-                    {it.production_status === '修磨中' ? (
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => {
-                          setGrindItem(it)
-                          setGrindNote('')
-                        }}
-                      >
-                        修磨记录
-                      </button>
-                    ) : null}
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className="muted">
+                    加载中…
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td colSpan={COL_COUNT} className="muted">
+                    暂无来料订单
+                  </td>
+                </tr>
+              ) : (
+                rows.map((it) => (
+                  <tr
+                    key={it.id}
+                    className="clickable"
+                    onClick={() => enterDetail(it)}
+                  >
+                    <td className="cell-nowrap">{it.id}</td>
+                    <td className="cell-nowrap">{it.order_no}</td>
+                    <td>{fmtNum(it.customer_name)}</td>
+                    <td className="cell-nowrap">{fmtDateTime(it.order_created_at)}</td>
+                    <td>
+                      <span className="tag tag-status">{it.order_status}</span>
+                    </td>
+                    <td className="text-cell">{fmtNum(it.order_remark)}</td>
+                    <td className={GS}>{fmtNum(it.incoming_no)}</td>
+                    <td>{fmtNum(it.production_no)}</td>
+                    <td>{fmtNum(it.material_grade)}</td>
+                    <td className="text-cell">{fmtNum(it.spec_incoming)}</td>
+                    <td>{fmtNum(it.weight_incoming)}</td>
+                    <td>{it.quantity}</td>
+                    <td className={GS}>{fmtNum(it.weight_return)}</td>
+                    <td className="text-cell">{fmtNum(it.formed_size)}</td>
+                    <td className={`text-cell ${GS}`}>{fmtNum(it.forging_requirements)}</td>
+                    <td className="text-cell">{fmtNum(it.production_process)}</td>
+                    <td className="text-cell">{fmtNum(it.remark)}</td>
+                    <td className={GS}>{fmtDate(it.incoming_date)}</td>
+                    <td>{fmtCuttingDate(it.cutting_time)}</td>
+                    <td>{fmtDate(it.return_date)}</td>
+                    <td className={GS} onClick={(e) => e.stopPropagation()}>
+                      <select
+                        value={it.production_status}
+                        onChange={(e) => patchStatus(it, e.target.value)}
+                      >
+                        {statuses.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td
+                      className={`row-actions cell-actions ${GS}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => patchStatus(it, '锻造中')}
+                      >
+                        →锻造
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => patchStatus(it, '待发回')}
+                      >
+                        →待发回
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => openPrint('production', taskToPrintPayload(it))}
+                      >
+                        打印生产单
+                      </button>
+                      {it.production_status === '修磨中' ? (
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() => {
+                            setGrindItem(it)
+                            setGrindNote('')
+                          }}
+                        >
+                          修磨记录
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-
-        <aside className="task-slip-aside card" aria-label="生产单预览">
-          {productionPrintPayload ? (
+      ) : (
+        <>
+          {!detail && detailLoading ? <p className="muted">加载订单…</p> : null}
+          {detail ? (
             <>
-              <h2 className="task-slip-aside-title">生产单</h2>
-              <p className="muted slip-preview-hint">
-                订单 {selectedRow?.order_no} · 生产 {selectedRow?.production_no ?? '—'}
-                。在打印对话框中选择打印机或「另存为 PDF」。
-              </p>
-              <div className="slip-preview-head" style={{ marginBottom: '0.5rem' }}>
-                <span />
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => openPrint('production', productionPrintPayload)}
+              <section className="card order-section">
+                <div className="order-detail-head">
+                  <div>
+                    <h2 className="order-section-title-inline">{detail.order_no}</h2>
+                    <p className="muted">
+                      客户：{detail.customer?.name} · 下单时间：
+                      {fmtDateTime(detail.created_at)} · 订单备注：{detail.remark || '—'}
+                    </p>
+                  </div>
+                  <div className="row-actions">
+                    <button type="button" className="btn btn-danger" onClick={deleteWorkOrder}>
+                      删除订单
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              <section className="card order-section">
+                <h2 className="order-section-title">来料信息</h2>
+                <div className="data-table-wrap order-items-wide">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>生产编号</th>
+                        <th>来料编号</th>
+                        <th>材质</th>
+                        <th>来料规格</th>
+                        <th>来料重</th>
+                        <th>个数</th>
+                        <th>成型尺寸</th>
+                        <th>状态</th>
+                        <th style={{ minWidth: '14rem' }}>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(detail.items ?? []).map((it) => (
+                        <tr
+                          key={it.id}
+                          className={`clickable ${previewItemId === it.id ? 'is-active-row' : ''}`}
+                          onClick={() => setPreviewItemId(it.id)}
+                        >
+                          <td>{it.production_no}</td>
+                          <td>{it.incoming_no}</td>
+                          <td>{it.material_grade}</td>
+                          <td className="text-cell">{it.spec_incoming ?? '—'}</td>
+                          <td>{it.weight_incoming ?? '—'}</td>
+                          <td>{it.quantity}</td>
+                          <td className="text-cell">{it.formed_size ?? '—'}</td>
+                          <td>
+                            <span className="tag">{it.production_status}</span>
+                          </td>
+                          <td className="row-actions" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              className="btn btn-ghost"
+                              onClick={() => openEditItem(it)}
+                            >
+                              编辑
+                            </button>
+                            <div className="print-menu">
+                              <button
+                                type="button"
+                                className="btn"
+                                onClick={() =>
+                                  setPrintOpen(printOpen === it.id ? null : it.id)
+                                }
+                              >
+                                打印 ▾
+                              </button>
+                              {printOpen === it.id ? (
+                                <div className="print-menu-list">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      openPrint('incoming', {
+                                        order: detail,
+                                        customer: detail.customer,
+                                        item: it,
+                                      })
+                                      setPrintOpen(null)
+                                    }}
+                                  >
+                                    来料单
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      openPrint('production', {
+                                        order: detail,
+                                        customer: detail.customer,
+                                        item: it,
+                                      })
+                                      setPrintOpen(null)
+                                    }}
+                                  >
+                                    生产单
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      openPrint('outbound', {
+                                        order: detail,
+                                        customer: detail.customer,
+                                        item: it,
+                                      })
+                                      setPrintOpen(null)
+                                    }}
+                                  >
+                                    出库单
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      openPrint('return', {
+                                        order: detail,
+                                        customer: detail.customer,
+                                        item: it,
+                                      })
+                                      setPrintOpen(null)
+                                    }}
+                                  >
+                                    发回单
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="slip-inline-actions" style={{ marginTop: '0.75rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={!productionPrintPayload}
+                    onClick={() =>
+                      productionPrintPayload &&
+                      openPrint('production', productionPrintPayload)
+                    }
+                  >
+                    打印生产单（本单）
+                  </button>
+                </div>
+
+                {slipPayload ? (
+                  <section className="order-slip-previews" aria-label="单据预览">
+                    <p className="slip-preview-hint muted">
+                      已选来料：
+                      {previewItem?.production_no || previewItem?.incoming_no || `#${previewItem?.id}`}
+                    </p>
+                    <div className="slip-preview-grid">
+                      <div className="slip-preview-card">
+                        <div className="slip-preview-head">
+                          <strong>来料单</strong>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => openPrint('incoming', slipPayload)}
+                          >
+                            打印来料单
+                          </button>
+                        </div>
+                        <iframe
+                          title="来料单预览"
+                          className="slip-preview-frame"
+                          srcDoc={buildSlipDocument('incoming', slipPayload)}
+                        />
+                      </div>
+                      <div className="slip-preview-card">
+                        <div className="slip-preview-head">
+                          <strong>出库单</strong>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => openPrint('outbound', slipPayload)}
+                          >
+                            打印出库单
+                          </button>
+                        </div>
+                        <iframe
+                          title="出库单预览"
+                          className="slip-preview-frame"
+                          srcDoc={buildSlipDocument('outbound', slipPayload)}
+                        />
+                      </div>
+                      <div className="slip-preview-card">
+                        <div className="slip-preview-head">
+                          <strong>生产单</strong>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() =>
+                              slipPayload &&
+                              openPrint('production', {
+                                order: detail,
+                                customer: detail.customer,
+                                item: previewItem,
+                              })
+                            }
+                          >
+                            打印生产单
+                          </button>
+                        </div>
+                        <iframe
+                          title="生产单预览"
+                          className="slip-preview-frame"
+                          srcDoc={buildSlipDocument('production', {
+                            order: detail,
+                            customer: detail.customer,
+                            item: previewItem,
+                          })}
+                        />
+                      </div>
+                    </div>
+                  </section>
+                ) : detail.items?.length === 0 ? (
+                  <p className="muted order-slip-empty">暂无来料数据。</p>
+                ) : null}
+              </section>
+
+              <section className="card order-section">
+                <h2 className="order-section-title">操作记录</h2>
+                <p className="muted order-section-desc">修磨等环节登记</p>
+                <div className="data-table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>时间</th>
+                        <th>生产编号</th>
+                        <th>来料编号</th>
+                        <th>备注</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {grindLogs.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="muted">
+                            暂无操作记录
+                          </td>
+                        </tr>
+                      ) : (
+                        grindLogs.map((log) => (
+                          <tr key={log.id}>
+                            <td className="cell-nowrap">{fmtDateTime(log.created_at)}</td>
+                            <td>{log.production_no ?? '—'}</td>
+                            <td>{log.incoming_no ?? '—'}</td>
+                            <td className="text-cell">{log.note ?? '—'}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </>
+          ) : null}
+        </>
+      )}
+
+      {workOrderModal ? (
+        <div className="modal-backdrop" onClick={() => setWorkOrderModal(false)} role="presentation">
+          <div className="modal-card wide" onClick={(e) => e.stopPropagation()} role="dialog">
+            <h2>新建来料订单</h2>
+            <p className="muted" style={{ marginTop: '-0.5rem', marginBottom: '0.5rem' }}>
+              一单一条来料；订单号由服务端按 hj+企业缩写+日期+流水 生成。
+            </p>
+            <form className="form-grid item-form-grid" onSubmit={submitWorkOrder}>
+              <label>
+                客户 *
+                <select
+                  value={newWork.customer_id}
+                  onChange={(e) => setNewWork((o) => ({ ...o, customer_id: e.target.value }))}
+                  required
                 >
-                  打印生产单
+                  <option value="">请选择</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="full">
+                订单备注
+                <textarea
+                  value={newWork.order_remark}
+                  onChange={(e) => setNewWork((o) => ({ ...o, order_remark: e.target.value }))}
+                />
+              </label>
+              <label>
+                来料编号
+                <input
+                  value={newWork.incoming_no}
+                  onChange={(e) => setNewWork((o) => ({ ...o, incoming_no: e.target.value }))}
+                />
+              </label>
+              <label>
+                材质
+                <input
+                  value={newWork.material_grade}
+                  onChange={(e) => setNewWork((o) => ({ ...o, material_grade: e.target.value }))}
+                />
+              </label>
+              <label>
+                生产编号
+                <input
+                  value={newWork.production_no}
+                  onChange={(e) => setNewWork((o) => ({ ...o, production_no: e.target.value }))}
+                />
+              </label>
+              <label>
+                来料规格
+                <input
+                  value={newWork.spec_incoming}
+                  onChange={(e) => setNewWork((o) => ({ ...o, spec_incoming: e.target.value }))}
+                />
+              </label>
+              <label>
+                来料重
+                <input
+                  value={newWork.weight_incoming}
+                  onChange={(e) => setNewWork((o) => ({ ...o, weight_incoming: e.target.value }))}
+                />
+              </label>
+              <label>
+                个数
+                <input
+                  type="number"
+                  min={1}
+                  value={newWork.quantity}
+                  onChange={(e) => setNewWork((o) => ({ ...o, quantity: e.target.value }))}
+                />
+              </label>
+              <label>
+                发回重量
+                <input
+                  value={newWork.weight_return}
+                  onChange={(e) => setNewWork((o) => ({ ...o, weight_return: e.target.value }))}
+                />
+              </label>
+              <label>
+                成型尺寸
+                <input
+                  value={newWork.formed_size}
+                  onChange={(e) => setNewWork((o) => ({ ...o, formed_size: e.target.value }))}
+                />
+              </label>
+              <label className="full">
+                锻造过程要求
+                <textarea
+                  value={newWork.forging_requirements}
+                  onChange={(e) =>
+                    setNewWork((o) => ({ ...o, forging_requirements: e.target.value }))
+                  }
+                />
+              </label>
+              <label className="full">
+                生产过程
+                <textarea
+                  value={newWork.production_process}
+                  onChange={(e) =>
+                    setNewWork((o) => ({ ...o, production_process: e.target.value }))
+                  }
+                />
+              </label>
+              <label className="full">
+                来料备注
+                <textarea
+                  value={newWork.remark}
+                  onChange={(e) => setNewWork((o) => ({ ...o, remark: e.target.value }))}
+                />
+              </label>
+              <label>
+                生产状态
+                <select
+                  value={newWork.production_status}
+                  onChange={(e) =>
+                    setNewWork((o) => ({ ...o, production_status: e.target.value }))
+                  }
+                >
+                  {statuses.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                来料日期
+                <input
+                  type="date"
+                  value={newWork.incoming_date}
+                  onChange={(e) => setNewWork((o) => ({ ...o, incoming_date: e.target.value }))}
+                />
+              </label>
+              <label>
+                发回日期
+                <input
+                  type="date"
+                  value={newWork.return_date}
+                  onChange={(e) => setNewWork((o) => ({ ...o, return_date: e.target.value }))}
+                />
+              </label>
+              <label>
+                下料时间
+                <input
+                  type="datetime-local"
+                  value={dtLocal(newWork.cutting_time)}
+                  onChange={(e) =>
+                    setNewWork((o) => ({ ...o, cutting_time: e.target.value }))
+                  }
+                />
+              </label>
+              {err ? <p className="err full">{err}</p> : null}
+              <div className="form-actions full">
+                <button type="button" className="btn" onClick={() => setWorkOrderModal(false)}>
+                  取消
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  创建
                 </button>
               </div>
-              <iframe
-                title="生产单预览"
-                className="slip-preview-frame"
-                srcDoc={buildSlipDocument('production', productionPrintPayload)}
-              />
-            </>
-          ) : (
-            <p className="muted">暂无任务，或正在加载…</p>
-          )}
-        </aside>
-      </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {itemModal ? (
+        <div className="modal-backdrop" onClick={() => setItemModal(null)} role="presentation">
+          <div className="modal-card wide" onClick={(e) => e.stopPropagation()} role="dialog">
+            <h2>编辑来料</h2>
+            <form className="form-grid item-form-grid" onSubmit={submitItem}>
+              <label>
+                来料编号
+                <input
+                  value={itemForm.incoming_no}
+                  onChange={(e) => setItemForm((f) => ({ ...f, incoming_no: e.target.value }))}
+                />
+              </label>
+              <label>
+                材质
+                <input
+                  value={itemForm.material_grade}
+                  onChange={(e) => setItemForm((f) => ({ ...f, material_grade: e.target.value }))}
+                />
+              </label>
+              <label>
+                生产编号
+                <input
+                  value={itemForm.production_no}
+                  onChange={(e) => setItemForm((f) => ({ ...f, production_no: e.target.value }))}
+                />
+              </label>
+              <label>
+                来料规格
+                <input
+                  value={itemForm.spec_incoming}
+                  onChange={(e) => setItemForm((f) => ({ ...f, spec_incoming: e.target.value }))}
+                />
+              </label>
+              <label>
+                来料重
+                <input
+                  value={itemForm.weight_incoming}
+                  onChange={(e) => setItemForm((f) => ({ ...f, weight_incoming: e.target.value }))}
+                />
+              </label>
+              <label>
+                个数
+                <input
+                  type="number"
+                  min={1}
+                  value={itemForm.quantity}
+                  onChange={(e) => setItemForm((f) => ({ ...f, quantity: e.target.value }))}
+                />
+              </label>
+              <label>
+                发回重量
+                <input
+                  value={itemForm.weight_return}
+                  onChange={(e) => setItemForm((f) => ({ ...f, weight_return: e.target.value }))}
+                />
+              </label>
+              <label>
+                成型尺寸
+                <input
+                  value={itemForm.formed_size}
+                  onChange={(e) => setItemForm((f) => ({ ...f, formed_size: e.target.value }))}
+                />
+              </label>
+              <label className="full">
+                锻造过程要求
+                <textarea
+                  value={itemForm.forging_requirements}
+                  onChange={(e) =>
+                    setItemForm((f) => ({ ...f, forging_requirements: e.target.value }))
+                  }
+                />
+              </label>
+              <label className="full">
+                生产过程
+                <textarea
+                  value={itemForm.production_process}
+                  onChange={(e) =>
+                    setItemForm((f) => ({ ...f, production_process: e.target.value }))
+                  }
+                />
+              </label>
+              <label className="full">
+                备注
+                <textarea
+                  value={itemForm.remark}
+                  onChange={(e) => setItemForm((f) => ({ ...f, remark: e.target.value }))}
+                />
+              </label>
+              <label>
+                生产状态
+                <select
+                  value={itemForm.production_status}
+                  onChange={(e) =>
+                    setItemForm((f) => ({ ...f, production_status: e.target.value }))
+                  }
+                >
+                  {statuses.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                来料日期
+                <input
+                  type="date"
+                  value={itemForm.incoming_date}
+                  onChange={(e) => setItemForm((f) => ({ ...f, incoming_date: e.target.value }))}
+                />
+              </label>
+              <label>
+                发回日期
+                <input
+                  type="date"
+                  value={itemForm.return_date}
+                  onChange={(e) => setItemForm((f) => ({ ...f, return_date: e.target.value }))}
+                />
+              </label>
+              <label>
+                下料时间
+                <input
+                  type="datetime-local"
+                  value={dtLocal(itemForm.cutting_time)}
+                  onChange={(e) =>
+                    setItemForm((f) => ({ ...f, cutting_time: e.target.value }))
+                  }
+                />
+              </label>
+              {err ? <p className="err full">{err}</p> : null}
+              <div className="form-actions full">
+                <button type="button" className="btn" onClick={() => setItemModal(null)}>
+                  取消
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  保存
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       {grindItem ? (
         <div className="modal-backdrop" onClick={() => setGrindItem(null)} role="presentation">
