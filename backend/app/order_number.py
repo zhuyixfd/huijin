@@ -6,14 +6,13 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Order
+from app.models import OrderItem
 
 
 def _enterprise_abbr() -> str:
     raw = os.environ.get("ORDER_ENTERPRISE_ABBR", "HJT").strip()
     if not raw:
         return "HJT"
-    # 仅保留字母数字，防止注入异常字符
     return "".join(c for c in raw if c.isalnum()) or "HJT"
 
 
@@ -21,7 +20,9 @@ def generate_next_order_no(db: Session) -> str:
     abbr = _enterprise_abbr()
     day = datetime.now().strftime("%Y%m%d")
     prefix = f"hj{abbr}{day}"
-    nos = db.scalars(select(Order.order_no).where(Order.order_no.startswith(prefix))).all()
+    nos = db.scalars(
+        select(OrderItem.order_no).where(OrderItem.order_no.startswith(prefix))
+    ).all()
     max_n = 0
     for raw in nos:
         suf = raw[len(prefix) :]

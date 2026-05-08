@@ -34,35 +34,21 @@ class Customer(Base):
     remark: Mapped[str | None] = mapped_column(Text(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    orders: Mapped[list["Order"]] = relationship(back_populates="customer")
-
-
-class Order(Base):
-    __tablename__ = "orders"
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    order_no: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
-    remark: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-
-    customer: Mapped["Customer"] = relationship(back_populates="orders")
-    items: Mapped[list["OrderItem"]] = relationship(
-        back_populates="order",
-        cascade="all, delete-orphan",
-        order_by="OrderItem.sort_order",
-    )
+    order_items: Mapped[list["OrderItem"]] = relationship(back_populates="customer")
 
 
 class OrderItem(Base):
-    """订单下来料/加工行（一单多料）"""
+    """来料订单（一行一单）：订单编号与客户均在同一表"""
 
     __tablename__ = "order_items"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    order_id: Mapped[int] = mapped_column(
-        ForeignKey("orders.id", ondelete="CASCADE"), index=True
-    )
+
+    order_no: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    order_remark: Mapped[str | None] = mapped_column(Text(), nullable=True)
+
     sort_order: Mapped[int] = mapped_column(Integer, server_default="0")
 
     incoming_no: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -83,7 +69,7 @@ class OrderItem(Base):
     incoming_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     cutting_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    order: Mapped["Order"] = relationship(back_populates="items")
+    customer: Mapped["Customer"] = relationship(back_populates="order_items")
     grind_logs: Mapped[list["GrindLog"]] = relationship(
         back_populates="item",
         cascade="all, delete-orphan",

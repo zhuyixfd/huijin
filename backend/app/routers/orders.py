@@ -1,33 +1,44 @@
 from datetime import date, datetime, time
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import case, exists, func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import Customer, GrindLog, Order, OrderItem
+from app.models import Customer, GrindLog, OrderItem
+from app.models import User as UserModel
 from app.order_number import generate_next_order_no
 from app.order_status import format_order_status_display
-from app.models import User as UserModel
 from app.schemas_business import (
+    CustomerOut,
     OrderCreate,
     OrderDetailOut,
     OrderGrindLogRow,
     OrderItemCreate,
     OrderListRow,
     OrderUpdate,
-    ReorderItemsBody,
 )
 from app.schemas_business import OrderItemOut as OrderItemOutSchema
 
 router = APIRouter()
 
 
-def _item_from_create(body: OrderItemCreate, order_id: int, sort_order: int) -> OrderItem:
-    d = body.model_dump()
-    return OrderItem(order_id=order_id, sort_order=sort_order, **d)
+def _detail_out(db: Session, item: OrderItem) -> OrderDetailOut:
+    cust = db.get(Customer, item.customer_id)
+    if cust is None:
+        raise HTTPException(status_code=404, detail="客户不存在")
+    item_out = OrderItemOutSchema.model_validate(item)
+    return OrderDetailOut(
+        id=item.id,
+        order_no=item.order_no,
+        customer_id=item.customer_id,
+        remark=item.order_remark,
+        created_at=item.created_at,
+        customer=CustomerOut.model_validate(cust),
+        items=[item_out],
+    )
 
 
 @router.get("", response_model=list[OrderListRow])
@@ -39,106 +50,59 @@ def list_orders(
     customer_q: str | None = Query(None, description="客户名称模糊搜索"),
     status_category: str | None = Query(
         None,
-        description="订单聚合状态：all | placed | waiting_inbound | in_progress | completed",
+        description="聚合筛选：all | placed | waiting_inbound | in_progress | completed",
     ),
     created_from: date | None = Query(None, description="下单时间起（含当日 0 点）"),
     created_to: date | None = Query(None, description="下单时间止（含当日）"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
 ):
-    stmt = select(Order, Customer.name).join(Customer)
+    stmt = select(OrderItem, Customer.name).join(Customer, OrderItem.customer_id == Customer.id)
     if customer_id is not None:
-        stmt = stmt.where(Order.customer_id == customer_id)
+        stmt = stmt.where(OrderItem.customer_id == customer_id)
     if customer_q and customer_q.strip():
         stmt = stmt.where(Customer.name.contains(customer_q.strip()))
     if q:
-        stmt = stmt.where(Order.order_no.contains(q.strip()))
+        stmt = stmt.where(OrderItem.order_no.contains(q.strip()))
     if created_from is not None:
         start = datetime.combine(created_from, time.min)
-        stmt = stmt.where(Order.created_at >= start)
+        stmt = stmt.where(OrderItem.created_at >= start)
     if created_to is not None:
         end = datetime.combine(created_to, time.max)
-        stmt = stmt.where(Order.created_at <= end)
+        stmt = stmt.where(OrderItem.created_at <= end)
 
     cat = (status_category or "all").strip().lower()
     if cat not in ("", "all"):
-        # 与 format_order_status_display 分组一致
         if cat == "placed":
-            stmt = stmt.where(~exists(select(OrderItem.id).where(OrderItem.order_id == Order.id)))
+            stmt = stmt.where(OrderItem.id == -1)
         elif cat == "waiting_inbound":
-            stmt = stmt.where(
-                exists(
-                    select(OrderItem.id).where(
-                        OrderItem.order_id == Order.id,
-                        OrderItem.production_status == "未入库",
-                    )
-                )
-            )
+            stmt = stmt.where(OrderItem.production_status == "未入库")
         elif cat == "completed":
-            stmt = stmt.where(
-                exists(select(OrderItem.id).where(OrderItem.order_id == Order.id)),
-                ~exists(
-                    select(OrderItem.id).where(
-                        OrderItem.order_id == Order.id,
-                        OrderItem.production_status != "已发回",
-                    )
-                ),
-            )
+            stmt = stmt.where(OrderItem.production_status == "已发回")
         elif cat == "in_progress":
             stmt = stmt.where(
-                exists(select(OrderItem.id).where(OrderItem.order_id == Order.id)),
-                ~exists(
-                    select(OrderItem.id).where(
-                        OrderItem.order_id == Order.id,
-                        OrderItem.production_status == "未入库",
-                    )
-                ),
-                exists(
-                    select(OrderItem.id).where(
-                        OrderItem.order_id == Order.id,
-                        OrderItem.production_status != "已发回",
-                    )
-                ),
+                OrderItem.production_status != "未入库",
+                OrderItem.production_status != "已发回",
             )
         else:
             raise HTTPException(status_code=400, detail="无效的 status_category")
 
-    stmt = stmt.order_by(Order.id.desc()).offset(skip).limit(limit)
+    stmt = stmt.order_by(OrderItem.id.desc()).offset(skip).limit(limit)
     rows = db.execute(stmt).all()
-    if not rows:
-        return []
-
-    ids = [o.id for o, _ in rows]
-    agg_rows = db.execute(
-        select(
-            OrderItem.order_id,
-            func.count(OrderItem.id),
-            func.sum(case((OrderItem.production_status == "已发回", 1), else_=0)),
-            func.sum(case((OrderItem.production_status == "未入库", 1), else_=0)),
-        )
-        .where(OrderItem.order_id.in_(ids))
-        .group_by(OrderItem.order_id)
-    ).all()
-    stats: dict[int, tuple[int, int, int]] = {}
-    for oid, cnt, done_sum, wait_sum in agg_rows:
-        stats[int(oid)] = (
-            int(cnt),
-            int(done_sum or 0),
-            int(wait_sum or 0),
-        )
-
     out: list[OrderListRow] = []
-    for o, name in rows:
-        cnt, done_n, wait_n = stats.get(o.id, (0, 0, 0))
+    for item, name in rows:
+        cnt = 1
+        done_n = 1 if item.production_status == "已发回" else 0
+        wait_n = 1 if item.production_status == "未入库" else 0
         status_label = format_order_status_display(cnt, done_n, wait_n)
         out.append(
             OrderListRow(
-                id=o.id,
-                order_no=o.order_no,
-                customer_id=o.customer_id,
+                id=item.id,
+                order_no=item.order_no,
+                customer_id=item.customer_id,
                 customer_name=name,
-                remark=o.remark,
-                created_at=o.created_at,
+                remark=item.order_remark,
+                created_at=item.created_at,
                 order_status=status_label,
                 item_count=cnt,
                 item_done_count=done_n,
@@ -153,55 +117,53 @@ def create_order(
     _: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if len(body.items) > 1:
-        raise HTTPException(status_code=400, detail="一单仅允许一条来料明细")
+    if len(body.items) != 1:
+        raise HTTPException(status_code=400, detail="必须且仅能包含 1 条来料明细")
     cust = db.get(Customer, body.customer_id)
     if cust is None:
         raise HTTPException(status_code=404, detail="客户不存在")
 
-    order = None
+    it = body.items[0]
+    payload = it.model_dump()
+
+    row = None
     for _ in range(40):
         order_no = generate_next_order_no(db)
-        order = Order(order_no=order_no, customer_id=body.customer_id, remark=body.remark)
-        db.add(order)
+        row = OrderItem(
+            order_no=order_no,
+            customer_id=body.customer_id,
+            order_remark=body.remark,
+            sort_order=0,
+            **payload,
+        )
+        db.add(row)
         try:
-            db.flush()
+            db.commit()
+            db.refresh(row)
             break
         except IntegrityError:
             db.rollback()
-            order = None
+            row = None
             continue
-    if order is None:
+    if row is None:
         raise HTTPException(status_code=500, detail="无法生成唯一订单编号，请重试")
-
-    for i, it in enumerate(body.items):
-        db.add(_item_from_create(it, order.id, i))
-
-    db.commit()
-    db.refresh(order)
-    oid = order.id
-    full = db.scalar(
-        select(Order)
-        .options(joinedload(Order.customer), joinedload(Order.items))
-        .where(Order.id == oid)
-    )
-    assert full is not None
-    return OrderDetailOut.model_validate(full)
+    return _detail_out(db, row)
 
 
-@router.get("/{order_id}/grind-logs", response_model=list[OrderGrindLogRow])
+@router.get("/{item_id}/grind-logs", response_model=list[OrderGrindLogRow])
 def list_order_grind_logs(
-    order_id: int,
+    item_id: int,
     _: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """该订单下全部来料明细的修磨记录，按时间倒序。"""
-    if db.get(Order, order_id) is None:
+    """某条来料订单（order_items 行）下的修磨记录。"""
+    item = db.get(OrderItem, item_id)
+    if item is None:
         raise HTTPException(status_code=404, detail="订单不存在")
     rows = db.execute(
         select(GrindLog, OrderItem.production_no, OrderItem.incoming_no)
         .join(OrderItem, GrindLog.order_item_id == OrderItem.id)
-        .where(OrderItem.order_id == order_id)
+        .where(OrderItem.id == item_id)
         .order_by(GrindLog.created_at.desc())
     ).all()
     out: list[OrderGrindLogRow] = []
@@ -219,116 +181,50 @@ def list_order_grind_logs(
     return out
 
 
-@router.get("/{order_id}", response_model=OrderDetailOut)
+@router.get("/{item_id}", response_model=OrderDetailOut)
 def get_order(
-    order_id: int,
+    item_id: int,
     _: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    order = db.scalar(
-        select(Order)
-        .options(joinedload(Order.customer), joinedload(Order.items))
-        .where(Order.id == order_id)
-    )
-    if order is None:
+    item = db.get(OrderItem, item_id)
+    if item is None:
         raise HTTPException(status_code=404, detail="订单不存在")
-    return OrderDetailOut.model_validate(order)
+    return _detail_out(db, item)
 
 
-@router.patch("/{order_id}", response_model=OrderDetailOut)
+@router.patch("/{item_id}", response_model=OrderDetailOut)
 def update_order(
-    order_id: int,
+    item_id: int,
     body: OrderUpdate,
     _: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    order = db.get(Order, order_id)
-    if order is None:
+    item = db.get(OrderItem, item_id)
+    if item is None:
         raise HTTPException(status_code=404, detail="订单不存在")
     data = body.model_dump(exclude_unset=True)
     if "customer_id" in data and data["customer_id"] is not None:
         if db.get(Customer, data["customer_id"]) is None:
             raise HTTPException(status_code=404, detail="客户不存在")
+    if "remark" in data:
+        item.order_remark = data.pop("remark")
     for k, v in data.items():
-        setattr(order, k, v)
+        setattr(item, k, v)
     db.commit()
-    db.refresh(order)
-    full = db.scalar(
-        select(Order)
-        .options(joinedload(Order.customer), joinedload(Order.items))
-        .where(Order.id == order_id)
-    )
-    assert full is not None
-    return OrderDetailOut.model_validate(full)
+    db.refresh(item)
+    return _detail_out(db, item)
 
 
-@router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_order(
-    order_id: int,
+    item_id: int,
     _: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    order = db.get(Order, order_id)
-    if order is None:
+    item = db.get(OrderItem, item_id)
+    if item is None:
         raise HTTPException(status_code=404, detail="订单不存在")
-    db.delete(order)
+    db.delete(item)
     db.commit()
     return None
-
-
-@router.post("/{order_id}/items", response_model=OrderItemOutSchema, status_code=status.HTTP_201_CREATED)
-def add_order_item(
-    order_id: int,
-    body: OrderItemCreate,
-    _: UserModel = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    order = db.get(Order, order_id)
-    if order is None:
-        raise HTTPException(status_code=404, detail="订单不存在")
-    existing_n = (
-        db.scalar(select(func.count(OrderItem.id)).where(OrderItem.order_id == order_id)) or 0
-    )
-    if existing_n >= 1:
-        raise HTTPException(status_code=400, detail="该订单已有来料明细，一单仅一条")
-    max_sort = db.scalar(
-        select(func.max(OrderItem.sort_order)).where(OrderItem.order_id == order_id)
-    )
-    next_order = (max_sort if max_sort is not None else -1) + 1
-    row = _item_from_create(body, order_id, next_order)
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return row
-
-
-@router.post("/{order_id}/reorder-items", response_model=OrderDetailOut)
-def reorder_items(
-    order_id: int,
-    body: ReorderItemsBody,
-    _: UserModel = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """按传入 id 顺序重写 sort_order"""
-    order = db.get(Order, order_id)
-    if order is None:
-        raise HTTPException(status_code=404, detail="订单不存在")
-    existing = db.scalars(
-        select(OrderItem).where(OrderItem.order_id == order_id)
-    ).all()
-    id_set = {r.id for r in existing}
-    item_ids = body.item_ids
-    if set(item_ids) != id_set:
-        raise HTTPException(status_code=400, detail="明细 id 列表与订单不一致")
-    for i, iid in enumerate(item_ids):
-        row = db.get(OrderItem, iid)
-        if row:
-            row.sort_order = i
-    db.commit()
-    full = db.scalar(
-        select(Order)
-        .options(joinedload(Order.customer), joinedload(Order.items))
-        .where(Order.id == order_id)
-    )
-    assert full is not None
-    return OrderDetailOut.model_validate(full)

@@ -2,6 +2,7 @@ from sqlalchemy import inspect, select, text
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, engine
+from app.migrate_orders_flat import migrate_orders_flatten
 from app.models import Base, User
 from app.security import hash_password
 
@@ -52,6 +53,7 @@ def seed_admin(db: Session) -> None:
 
 
 def init_db() -> None:
+    migrate_orders_flatten()
     Base.metadata.create_all(bind=engine)
     ensure_users_role_column()
     ensure_user_profile_columns()

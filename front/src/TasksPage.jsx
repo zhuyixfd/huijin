@@ -90,7 +90,7 @@ function normalizeItemPayload(form) {
 
 function taskToPrintPayload(it) {
   return {
-    order: { id: it.order_id, order_no: it.order_no, remark: it.order_remark },
+    order: { id: it.id, order_no: it.order_no, remark: it.order_remark },
     customer: { name: it.customer_name },
     item: it,
   }
@@ -198,7 +198,7 @@ export default function TasksPage() {
     setGrindLogs([])
     setDetailLoading(true)
     try {
-      await refreshDetail(row.order_id)
+      await refreshDetail(row.id)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '加载订单失败')
       setView('list')
@@ -221,7 +221,7 @@ export default function TasksPage() {
     try {
       await patchJson(`/api/order-items/${it.id}`, { production_status: nextStatus })
       loadTasks()
-      if (detail && detail.id === it.order_id) await refreshDetail(detail.id)
+      if (detail && detail.id === it.id) await refreshDetail(detail.id)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '更新失败')
     }
@@ -238,7 +238,7 @@ export default function TasksPage() {
       setGrindItem(null)
       setGrindNote('')
       loadTasks()
-      if (detail && detail.id === grindItem.order_id) await refreshDetail(detail.id)
+      if (detail && detail.id === grindItem.id) await refreshDetail(detail.id)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '记录失败')
     }
@@ -257,7 +257,7 @@ export default function TasksPage() {
       setWorkOrderModal(false)
       setNewWork(emptyWorkOrderForm())
       loadTasks()
-      await refreshDetail(created.order_id)
+      await refreshDetail(created.id)
       setView('detail')
     } catch (e) {
       setErr(e instanceof Error ? e.message : '创建失败')

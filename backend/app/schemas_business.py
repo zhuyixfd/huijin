@@ -92,8 +92,11 @@ class OrderItemOut(BaseModel):
     model_config = {"from_attributes": True}
 
     id: int
-    order_id: int
-    sort_order: int
+    order_no: str
+    customer_id: int
+    created_at: datetime | None = None
+    order_remark: str | None = None
+    sort_order: int = 0
     incoming_no: str | None = None
     material_grade: str | None = None
     production_no: str | None = None
@@ -185,11 +188,9 @@ class WorkOrderCreate(OrderItemCreate):
 
 
 class TaskItemOut(OrderItemOut):
-    """来料订单行：一条明细即一张订单。"""
+    """来料订单列表行（表连接补充客户名、展示用状态）。"""
 
-    order_no: str
     customer_name: str
-    order_remark: str | None = None
     order_created_at: datetime | None = None
     order_status: str = Field(
         default="",

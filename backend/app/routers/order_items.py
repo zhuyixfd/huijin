@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import GrindLog, Order, OrderItem
+from app.models import GrindLog, OrderItem
 from app.models import User as UserModel
 from app.schemas_business import GrindLogCreate, GrindLogOut, OrderItemUpdate
 from app.schemas_business import OrderItemOut as OrderItemOutSchema
@@ -39,14 +39,7 @@ def delete_order_item(
     row = db.get(OrderItem, item_id)
     if row is None:
         raise HTTPException(status_code=404, detail="明细不存在")
-    oid = row.order_id
     db.delete(row)
-    db.flush()
-    remaining = db.scalar(select(func.count(OrderItem.id)).where(OrderItem.order_id == oid)) or 0
-    if remaining == 0:
-        order = db.get(Order, oid)
-        if order is not None:
-            db.delete(order)
     db.commit()
     return None
 

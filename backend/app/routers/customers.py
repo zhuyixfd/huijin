@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import Customer, Order
+from app.models import Customer, OrderItem
 from app.models import User as UserModel
 from app.schemas_business import CustomerCreate, CustomerOut, CustomerUpdate
 
@@ -86,7 +86,9 @@ def delete_customer(
     row = db.get(Customer, customer_id)
     if row is None:
         raise HTTPException(status_code=404, detail="客户不存在")
-    cnt = db.scalar(select(func.count()).select_from(Order).where(Order.customer_id == customer_id))
+    cnt = db.scalar(
+        select(func.count()).select_from(OrderItem).where(OrderItem.customer_id == customer_id)
+    )
     if cnt and cnt > 0:
         raise HTTPException(status_code=400, detail="该客户下已有订单，无法删除")
     db.delete(row)

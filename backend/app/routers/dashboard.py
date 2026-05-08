@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import Customer, Order, OrderItem
+from app.models import Customer, OrderItem
 from app.models import User as UserModel
 from app.schemas_business import DashboardSummary
 
@@ -17,8 +17,8 @@ def summary(
     db: Session = Depends(get_db),
 ):
     customer_count = db.scalar(select(func.count()).select_from(Customer)) or 0
-    order_count = db.scalar(select(func.count()).select_from(Order)) or 0
-    item_count = db.scalar(select(func.count()).select_from(OrderItem)) or 0
+    order_count = db.scalar(select(func.count()).select_from(OrderItem)) or 0
+    item_count = order_count
 
     rows = db.execute(
         select(OrderItem.production_status, func.count(OrderItem.id)).group_by(
