@@ -82,6 +82,26 @@
   color: var(--text-h);
 }
 
+.toolbar select.select-production-status {
+  min-width: 12rem;
+  max-width: min(100%, 18rem);
+  padding: 0.5rem 0.65rem;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.task-select-cell {
+  width: 2.75rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.task-select-cell input[type='checkbox'] {
+  width: 1.05rem;
+  height: 1.05rem;
+  cursor: pointer;
+}
+
 .data-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border);

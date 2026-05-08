@@ -1,15 +1,42 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import GrindLog, OrderItem
 from app.models import User as UserModel
-from app.schemas_business import GrindLogCreate, GrindLogOut, OrderItemUpdate
+from app.schemas_business import (
+    GrindLogCreate,
+    GrindLogOut,
+    OrderItemBatchProductionStatus,
+    OrderItemUpdate,
+)
 from app.schemas_business import OrderItemOut as OrderItemOutSchema
 
 router = APIRouter()
+
+
+@router.post("/batch-production-status")
+def batch_set_production_status(
+    body: OrderItemBatchProductionStatus,
+    _: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    ids = list(dict.fromkeys(body.item_ids))
+    if not ids:
+        raise HTTPException(status_code=400, detail="请至少选择一条明细")
+    st = body.production_status
+    result = db.execute(
+        update(OrderItem)
+        .where(OrderItem.id.in_(ids))
+        .values(production_status=st)
+    )
+    db.commit()
+    n = int(result.rowcount or 0)
+    if n == 0:
+        raise HTTPException(status_code=404, detail="未找到所选明细")
+    return {"updated": n}
 
 
 @router.patch("/{item_id}", response_model=OrderItemOutSchema)

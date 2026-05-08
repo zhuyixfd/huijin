@@ -85,6 +85,18 @@ class OrderItemCreate(BaseModel):
         return _status_ok(v)
 
 
+class OrderItemBatchProductionStatus(BaseModel):
+    """批量将多条来料明细设为同一生产状态。"""
+
+    item_ids: list[int] = Field(min_length=1, max_length=500)
+    production_status: str
+
+    @field_validator("production_status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        return _status_ok(v)
+
+
 class OrderItemUpdate(BaseModel):
     incoming_no: str | None = None
     material_grade: str | None = None

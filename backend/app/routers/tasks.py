@@ -10,17 +10,14 @@ from app.deps import get_current_user
 from app.models import Customer, OrderItem
 from app.models import User as UserModel
 from app.order_number import generate_next_order_no
-from app.order_status import format_order_status_display
+from app.order_status import format_single_line_item_order_status
 from app.schemas_business import OrderItemCreate, OrderItemOut, TaskItemOut, WorkOrderCreate
 
 router = APIRouter()
 
 
 def _single_row_order_status(item: OrderItem) -> str:
-    cnt = 1
-    done_n = 1 if item.production_status == "已发回" else 0
-    wait_n = 1 if item.production_status == "未入库" else 0
-    return format_order_status_display(cnt, done_n, wait_n)
+    return format_single_line_item_order_status(item.production_status)
 
 
 @router.get("/items", response_model=list[TaskItemOut])

@@ -10,7 +10,7 @@ from app.deps import get_current_user
 from app.models import Customer, GrindLog, OrderItem
 from app.models import User as UserModel
 from app.order_number import generate_next_order_no
-from app.order_status import format_order_status_display
+from app.order_status import format_single_line_item_order_status
 from app.schemas_business import (
     CustomerOut,
     OrderCreate,
@@ -93,8 +93,7 @@ def list_orders(
     for item, name in rows:
         cnt = 1
         done_n = 1 if item.production_status == "已发回" else 0
-        wait_n = 1 if item.production_status == "未入库" else 0
-        status_label = format_order_status_display(cnt, done_n, wait_n)
+        status_label = format_single_line_item_order_status(item.production_status)
         out.append(
             OrderListRow(
                 id=item.id,

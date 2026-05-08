@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './Pages.css'
 import { deleteReq, getJson, patchJson, postJson } from './api.js'
 import { openPrint } from './printSlip.js'
@@ -127,6 +127,12 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   const [itemModal, setItemModal] = useState(null)
   const [itemForm, setItemForm] = useState(emptyItemForm)
 
+  const [selectedIds, setSelectedIds] = useState([])
+  const [batchStatusModal, setBatchStatusModal] = useState(false)
+  const [batchTargetStatus, setBatchTargetStatus] = useState('')
+  const [batchSubmitting, setBatchSubmitting] = useState(false)
+  const headerSelectRef = useRef(null)
+
   useEffect(() => {
     switch (tasksPreset) {
       case 'all':
@@ -153,6 +159,18 @@ export default function TasksPage({ tasksPreset = 'all' }) {
         break
     }
   }, [tasksPreset])
+
+  useEffect(() => {
+    if (tasksPreset !== 'processing') setSelectedIds([])
+  }, [tasksPreset])
+
+  useEffect(() => {
+    const el = headerSelectRef.current
+    if (!el || tasksPreset !== 'processing') return
+    const onPage = rows.map((r) => r.id)
+    const nSel = onPage.filter((id) => selectedIds.includes(id)).length
+    el.indeterminate = onPage.length > 0 && nSel > 0 && nSel < onPage.length
+  }, [tasksPreset, rows, selectedIds])
 
   const loadMeta = useCallback(() => {
     getJson('/api/meta/production-statuses').then((d) => setStatuses(d.statuses ?? []))
@@ -302,6 +320,33 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     }
   }
 
+  const showProductionStatusFilter =
+    tasksPreset === 'all' || tasksPreset === 'processing'
+  const showNewWorkOrder = tasksPreset === 'all' || tasksPreset === 'pending'
+  const isProcessingPreset = tasksPreset === 'processing'
+  const listColSpan = isProcessingPreset ? COL_COUNT + 1 : COL_COUNT
+
+  async function submitBatchStatus(e) {
+    e.preventDefault()
+    if (selectedIds.length === 0 || !batchTargetStatus) return
+    setErr(null)
+    setBatchSubmitting(true)
+    try {
+      await postJson('/api/order-items/batch-production-status', {
+        item_ids: selectedIds,
+        production_status: batchTargetStatus,
+      })
+      setBatchStatusModal(false)
+      setBatchTargetStatus('')
+      setSelectedIds([])
+      loadTasks()
+    } catch (err) {
+      setErr(err instanceof Error ? err.message : '批量更新失败')
+    } finally {
+      setBatchSubmitting(false)
+    }
+  }
+
   async function deleteWorkOrder() {
     if (!detail?.items?.[0]) return
     if (!window.confirm(`删除来料订单 ${detail.order_no}？`)) return
@@ -354,23 +399,46 @@ export default function TasksPage({ tasksPreset = 'all' }) {
             value={createdTo}
             onChange={(e) => setCreatedTo(e.target.value)}
           />
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">生产状态（全部）</option>
-            {statuses.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          {showProductionStatusFilter ? (
+            <select
+              className="select-production-status"
+              aria-label="按生产状态筛选"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">全部生产状态</option>
+              {statuses.map((s) => (
+                <option key={s} value={s}>
+                  {s === '待发回' ? '待发回（待出库）' : s}
+                </option>
+              ))}
+            </select>
+          ) : null}
           <input
             type="search"
             placeholder="订单号 / 生产编号 / 来料编号"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
-          <button type="button" className="btn btn-primary" onClick={() => setWorkOrderModal(true)}>
-            新建来料订单
-          </button>
+          {showNewWorkOrder ? (
+            <button type="button" className="btn btn-primary" onClick={() => setWorkOrderModal(true)}>
+              新建来料订单
+            </button>
+          ) : null}
+          {isProcessingPreset ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={selectedIds.length === 0}
+              onClick={() => {
+                setErr(null)
+                setBatchTargetStatus('')
+                setBatchStatusModal(true)
+              }}
+            >
+              批量修改生产状态
+            </button>
+          ) : null}
         </div>
       ) : (
         <div className="order-detail-nav">
@@ -388,6 +456,26 @@ export default function TasksPage({ tasksPreset = 'all' }) {
           <table className="data-table task-mega-table">
             <thead>
               <tr>
+                {isProcessingPreset ? (
+                  <th className="task-select-cell">
+                    <input
+                      ref={headerSelectRef}
+                      type="checkbox"
+                      aria-label="全选本页"
+                      checked={
+                        rows.length > 0 &&
+                        rows.every((r) => selectedIds.includes(r.id))
+                      }
+                      onChange={() => {
+                        if (rows.length === 0) return
+                        const ids = rows.map((r) => r.id)
+                        const allOnPageSelected =
+                          ids.length > 0 && ids.every((id) => selectedIds.includes(id))
+                        setSelectedIds(allOnPageSelected ? [] : ids)
+                      }}
+                    />
+                  </th>
+                ) : null}
                 <th className="cell-nowrap">明细ID</th>
                 <th className="cell-nowrap">订单编号</th>
                 <th>客户</th>
@@ -415,13 +503,13 @@ export default function TasksPage({ tasksPreset = 'all' }) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className="muted">
+                  <td colSpan={listColSpan} className="muted">
                     加载中…
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={COL_COUNT} className="muted">
+                  <td colSpan={listColSpan} className="muted">
                     暂无来料订单
                   </td>
                 </tr>
@@ -432,6 +520,22 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                     className="clickable"
                     onClick={() => enterDetail(it)}
                   >
+                    {isProcessingPreset ? (
+                      <td className="task-select-cell" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          aria-label={`选择明细 ${it.id}`}
+                          checked={selectedIds.includes(it.id)}
+                          onChange={() =>
+                            setSelectedIds((prev) =>
+                              prev.includes(it.id)
+                                ? prev.filter((x) => x !== it.id)
+                                : [...prev, it.id],
+                            )
+                          }
+                        />
+                      </td>
+                    ) : null}
                     <td className="cell-nowrap">{it.id}</td>
                     <td className="cell-nowrap">{it.order_no}</td>
                     <td>{fmtNum(it.customer_name)}</td>
@@ -927,6 +1031,51 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                 </button>
                 <button type="submit" className="btn btn-primary">
                   保存
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {batchStatusModal ? (
+        <div
+          className="modal-backdrop"
+          onClick={() => !batchSubmitting && setBatchStatusModal(false)}
+          role="presentation"
+        >
+          <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog">
+            <h2 style={{ marginTop: 0 }}>批量修改生产状态</h2>
+            <p className="muted">已选择 {selectedIds.length} 条明细</p>
+            <form className="form-grid" onSubmit={submitBatchStatus}>
+              <label className="full">
+                修改为
+                <select
+                  value={batchTargetStatus}
+                  onChange={(e) => setBatchTargetStatus(e.target.value)}
+                  required
+                  aria-label="目标生产状态"
+                >
+                  <option value="">请选择生产状态</option>
+                  {statuses.map((s) => (
+                    <option key={s} value={s}>
+                      {s === '待发回' ? '待发回（待出库）' : s}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {err ? <p className="err">{err}</p> : null}
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={batchSubmitting}
+                  onClick={() => setBatchStatusModal(false)}
+                >
+                  取消
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={batchSubmitting}>
+                  {batchSubmitting ? '提交中…' : '确定'}
                 </button>
               </div>
             </form>
