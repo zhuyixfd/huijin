@@ -98,6 +98,25 @@ function dtLocal(val) {
 const GS = 'task-col-group-start'
 const COL_COUNT = 22
 
+function listPageTitle(preset) {
+  switch (preset) {
+    case 'all':
+      return '全部订单'
+    case 'pending':
+      return '未处理'
+    case 'processing_today':
+      return '今日处理'
+    case 'processing':
+      return '处理中'
+    case 'ready_outbound':
+      return '待出库'
+    case 'done':
+      return '已完成'
+    default:
+      return '全部订单'
+  }
+}
+
 export default function TasksPage({ tasksPreset = 'all' }) {
   const [customers, setCustomers] = useState([])
   const [statuses, setStatuses] = useState([])
@@ -147,6 +166,10 @@ export default function TasksPage({ tasksPreset = 'all' }) {
         setStatusCategory('in_progress')
         setStatusFilter('')
         break
+      case 'processing_today':
+        setStatusCategory('in_progress_today')
+        setStatusFilter('')
+        break
       case 'ready_outbound':
         setStatusCategory('all')
         setStatusFilter('待发回')
@@ -161,12 +184,12 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   }, [tasksPreset])
 
   useEffect(() => {
-    if (tasksPreset !== 'processing') setSelectedIds([])
+    if (tasksPreset !== 'processing' && tasksPreset !== 'processing_today') setSelectedIds([])
   }, [tasksPreset])
 
   useEffect(() => {
     const el = headerSelectRef.current
-    if (!el || tasksPreset !== 'processing') return
+    if (!el || (tasksPreset !== 'processing' && tasksPreset !== 'processing_today')) return
     const onPage = rows.map((r) => r.id)
     const nSel = onPage.filter((id) => selectedIds.includes(id)).length
     el.indeterminate = onPage.length > 0 && nSel > 0 && nSel < onPage.length
@@ -321,10 +344,13 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   }
 
   const showProductionStatusFilter =
-    tasksPreset === 'all' || tasksPreset === 'processing'
+    tasksPreset === 'all' ||
+    tasksPreset === 'processing' ||
+    tasksPreset === 'processing_today'
   const showNewWorkOrder = tasksPreset === 'all' || tasksPreset === 'pending'
-  const isProcessingPreset = tasksPreset === 'processing'
-  const listColSpan = isProcessingPreset ? COL_COUNT + 1 : COL_COUNT
+  const isProcessingWorkQueue =
+    tasksPreset === 'processing' || tasksPreset === 'processing_today'
+  const listColSpan = isProcessingWorkQueue ? COL_COUNT + 1 : COL_COUNT
 
   async function submitBatchStatus(e) {
     e.preventDefault()
@@ -364,7 +390,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
       <header className="dashboard-page-title">
         <h1>
           {view === 'list'
-            ? '全部订单'
+            ? listPageTitle(tasksPreset)
             : detail?.order_no
               ? `订单明细 · ${detail.order_no}`
               : '订单明细'}
@@ -425,7 +451,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
               新建来料订单
             </button>
           ) : null}
-          {isProcessingPreset ? (
+          {isProcessingWorkQueue ? (
             <button
               type="button"
               className="btn"
@@ -456,7 +482,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
           <table className="data-table task-mega-table">
             <thead>
               <tr>
-                {isProcessingPreset ? (
+                {isProcessingWorkQueue ? (
                   <th className="task-select-cell">
                     <input
                       ref={headerSelectRef}
@@ -520,7 +546,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                     className="clickable"
                     onClick={() => enterDetail(it)}
                   >
-                    {isProcessingPreset ? (
+                    {isProcessingWorkQueue ? (
                       <td className="task-select-cell" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
