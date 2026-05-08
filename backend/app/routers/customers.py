@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -34,13 +35,21 @@ def create_customer(
 ):
     row = Customer(
         name=body.name.strip(),
+        abbr=body.abbr,
         contact_name=body.contact_name,
         phone=body.phone,
         address=body.address,
         remark=body.remark,
     )
     db.add(row)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="客户缩写已存在",
+        ) from None
     db.refresh(row)
     return row
 
@@ -72,7 +81,14 @@ def update_customer(
         data["name"] = data["name"].strip()
     for k, v in data.items():
         setattr(row, k, v)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="客户缩写已存在",
+        ) from None
     db.refresh(row)
     return row
 

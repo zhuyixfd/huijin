@@ -9,6 +9,7 @@ export default function CustomersPage() {
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState({
     name: '',
+    abbr: '',
     contact_name: '',
     phone: '',
     address: '',
@@ -33,6 +34,7 @@ export default function CustomersPage() {
     setErr(null)
     setForm({
       name: '',
+      abbr: '',
       contact_name: '',
       phone: '',
       address: '',
@@ -45,6 +47,7 @@ export default function CustomersPage() {
     setErr(null)
     setForm({
       name: row.name,
+      abbr: row.abbr ?? '',
       contact_name: row.contact_name ?? '',
       phone: row.phone ?? '',
       address: row.address ?? '',
@@ -59,6 +62,7 @@ export default function CustomersPage() {
     try {
       await postJson('/api/customers', {
         name: form.name.trim(),
+        abbr: form.abbr.trim(),
         contact_name: form.contact_name || null,
         phone: form.phone || null,
         address: form.address || null,
@@ -77,6 +81,7 @@ export default function CustomersPage() {
     try {
       await patchJson(`/api/customers/${modal.editId}`, {
         name: form.name.trim(),
+        abbr: form.abbr.trim(),
         contact_name: form.contact_name || null,
         phone: form.phone || null,
         address: form.address || null,
@@ -104,7 +109,6 @@ export default function CustomersPage() {
     <div className="page-wrap">
       <header className="dashboard-page-title">
         <h1>客户管理</h1>
-        <p className="dashboard-page-desc">维护客户名称与联系方式，订单中将关联客户。</p>
       </header>
       <div className="toolbar">
         <input
@@ -123,6 +127,7 @@ export default function CustomersPage() {
           <thead>
             <tr>
               <th>名称</th>
+              <th className="cell-nowrap">客户缩写</th>
               <th>联系人</th>
               <th>电话</th>
               <th>地址</th>
@@ -133,13 +138,13 @@ export default function CustomersPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="muted">
+                <td colSpan={7} className="muted">
                   加载中…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="muted">
+                <td colSpan={7} className="muted">
                   暂无客户
                 </td>
               </tr>
@@ -147,6 +152,7 @@ export default function CustomersPage() {
               rows.map((r) => (
                 <tr key={r.id}>
                   <td>{r.name}</td>
+                  <td className="cell-mono">{r.abbr}</td>
                   <td>{r.contact_name}</td>
                   <td>{r.phone}</td>
                   <td>{r.address}</td>
@@ -181,6 +187,17 @@ export default function CustomersPage() {
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   required
+                />
+              </label>
+              <label>
+                客户缩写 *（订单号用，全库唯一，字母或数字）
+                <input
+                  value={form.abbr}
+                  onChange={(e) => setForm((f) => ({ ...f, abbr: e.target.value }))}
+                  required
+                  maxLength={32}
+                  autoComplete="off"
+                  placeholder="如 ABC"
                 />
               </label>
               <label>
@@ -240,6 +257,16 @@ export default function CustomersPage() {
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   required
+                />
+              </label>
+              <label>
+                客户缩写 *（订单号用，全库唯一）
+                <input
+                  value={form.abbr}
+                  onChange={(e) => setForm((f) => ({ ...f, abbr: e.target.value }))}
+                  required
+                  maxLength={32}
+                  autoComplete="off"
                 />
               </label>
               <label>

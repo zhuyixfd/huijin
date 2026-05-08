@@ -92,9 +92,6 @@ export default function EmployeeAdmin() {
     <section className="employee-admin card">
       <header className="employee-admin-header">
         <h2>帐号管理</h2>
-        <p className="employee-admin-desc">
-          新建员工帐号时可填写姓名；密码存储为加密哈希，列表中的密码列仅为掩码展示。员工帐号可在列表中修改登录密码。
-        </p>
       </header>
       <form className="employee-form" onSubmit={handleCreate}>
         <div className="employee-form-row">

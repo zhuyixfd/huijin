@@ -12,20 +12,41 @@ def _status_ok(v: str) -> str:
     return v
 
 
+def _normalize_customer_abbr(v: str) -> str:
+    s = "".join(c for c in v.strip() if c.isalnum())
+    if not s:
+        raise ValueError("客户缩写须为字母或数字，且不能为空")
+    return s.upper()
+
+
 class CustomerCreate(BaseModel):
     name: str = Field(min_length=1, max_length=128)
+    abbr: str = Field(min_length=1, max_length=32, description="订单号用，全库唯一，建议大写字母与数字")
     contact_name: str | None = None
     phone: str | None = None
     address: str | None = None
     remark: str | None = None
+
+    @field_validator("abbr")
+    @classmethod
+    def validate_abbr(cls, v: str) -> str:
+        return _normalize_customer_abbr(v)
 
 
 class CustomerUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=128)
+    abbr: str | None = Field(None, min_length=1, max_length=32)
     contact_name: str | None = None
     phone: str | None = None
     address: str | None = None
     remark: str | None = None
+
+    @field_validator("abbr")
+    @classmethod
+    def validate_abbr(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return _normalize_customer_abbr(v)
 
 
 class CustomerOut(BaseModel):
@@ -33,6 +54,7 @@ class CustomerOut(BaseModel):
 
     id: int
     name: str
+    abbr: str
     contact_name: str | None = None
     phone: str | None = None
     address: str | None = None

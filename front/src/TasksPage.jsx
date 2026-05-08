@@ -3,14 +3,6 @@ import './Pages.css'
 import { deleteReq, getJson, patchJson, postJson } from './api.js'
 import { openPrint } from './printSlip.js'
 
-const FALLBACK_ORDER_STATUS_FILTERS = [
-  { value: 'all', label: '全部' },
-  { value: 'placed', label: '已下单' },
-  { value: 'waiting_inbound', label: '待入库' },
-  { value: 'in_progress', label: '待完成' },
-  { value: 'completed', label: '已完成' },
-]
-
 const emptyItemForm = () => ({
   incoming_no: '',
   material_grade: '',
@@ -109,7 +101,6 @@ const COL_COUNT = 22
 export default function TasksPage({ tasksPreset = 'all' }) {
   const [customers, setCustomers] = useState([])
   const [statuses, setStatuses] = useState([])
-  const [orderStatusFilters, setOrderStatusFilters] = useState([])
 
   const [statusFilter, setStatusFilter] = useState('')
   const [statusCategory, setStatusCategory] = useState('all')
@@ -165,9 +156,6 @@ export default function TasksPage({ tasksPreset = 'all' }) {
 
   const loadMeta = useCallback(() => {
     getJson('/api/meta/production-statuses').then((d) => setStatuses(d.statuses ?? []))
-    getJson('/api/meta/order-status-filters')
-      .then((d) => setOrderStatusFilters(d.filters ?? []))
-      .catch(() => setOrderStatusFilters(FALLBACK_ORDER_STATUS_FILTERS))
     getJson('/api/customers').then(setCustomers)
   }, [])
 
@@ -336,28 +324,10 @@ export default function TasksPage({ tasksPreset = 'all' }) {
               ? `订单明细 · ${detail.order_no}`
               : '订单明细'}
         </h1>
-        <p className="dashboard-page-desc">
-          {view === 'list'
-            ? '一单一条来料。列表汇总筛选；点击一行进入明细查看修磨等记录。订单号规则：hj + 企业缩写 + 日期 + 流水（见服务端配置）。'
-            : '每条来料即一张订单；下方可查看来料字段与操作记录。'}
-        </p>
       </header>
 
       {view === 'list' ? (
         <div className="toolbar orders-toolbar">
-          <select
-            aria-label="订单状态"
-            value={statusCategory}
-            onChange={(e) => setStatusCategory(e.target.value)}
-          >
-            {(orderStatusFilters.length ? orderStatusFilters : FALLBACK_ORDER_STATUS_FILTERS).map(
-              (f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ),
-            )}
-          </select>
           <select value={cid} onChange={(e) => setCid(e.target.value)}>
             <option value="">全部客户</option>
             {customers.map((c) => (
@@ -658,7 +628,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
           <div className="modal-card wide" onClick={(e) => e.stopPropagation()} role="dialog">
             <h2>新建来料订单</h2>
             <p className="muted" style={{ marginTop: '-0.5rem', marginBottom: '0.5rem' }}>
-              一单一条来料；订单号由服务端按 hj+企业缩写+日期+流水 生成。
+              一单一条来料；订单号由服务端按 hj + 该客户的「客户缩写」+ 日期 + 流水 自动生成。
             </p>
             <form className="form-grid item-form-grid" onSubmit={submitWorkOrder}>
               <label>

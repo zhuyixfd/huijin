@@ -24,9 +24,6 @@ export default function HomePage() {
     <div className="page-wrap">
       <header className="dashboard-page-title">
         <h1>首页</h1>
-        <p className="dashboard-page-desc">
-          汇金特材 · 金属加工订单与生产进度概览。
-        </p>
       </header>
       {err ? <p className="err">{err}</p> : null}
       {summary ? (

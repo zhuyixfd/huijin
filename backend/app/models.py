@@ -28,6 +28,7 @@ class Customer(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(128), index=True)
+    abbr: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     contact_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     address: Mapped[str | None] = mapped_column(String(512), nullable=True)

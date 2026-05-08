@@ -19,6 +19,33 @@ def ensure_user_profile_columns() -> None:
             conn.execute(text("ALTER TABLE users ADD COLUMN last_login_at DATETIME NULL"))
 
 
+def ensure_customer_abbr_column() -> None:
+    """旧库 customers 无 abbr 时补齐：U+id，唯一非空。"""
+    inspector = inspect(engine)
+    if "customers" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("customers")}
+    if "abbr" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text("ALTER TABLE customers ADD COLUMN abbr VARCHAR(32) NULL")
+        )
+        conn.execute(
+            text(
+                "UPDATE customers SET abbr = CONCAT('U', id) "
+                "WHERE abbr IS NULL OR TRIM(abbr) = ''"
+            )
+        )
+        conn.execute(text("ALTER TABLE customers MODIFY COLUMN abbr VARCHAR(32) NOT NULL"))
+        try:
+            conn.execute(
+                text("ALTER TABLE customers ADD UNIQUE KEY uq_customers_abbr (abbr)")
+            )
+        except Exception:
+            pass
+
+
 def ensure_users_role_column() -> None:
     inspector = inspect(engine)
     if "users" not in inspector.get_table_names():
@@ -57,6 +84,7 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     ensure_users_role_column()
     ensure_user_profile_columns()
+    ensure_customer_abbr_column()
     db = SessionLocal()
     try:
         seed_admin(db)

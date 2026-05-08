@@ -116,7 +116,10 @@ def create_work_order(
 
     row = None
     for _ in range(40):
-        order_no = generate_next_order_no(db)
+        try:
+            order_no = generate_next_order_no(db, customer_id=cust_id)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
         row = OrderItem(
             order_no=order_no,
             customer_id=cust_id,
