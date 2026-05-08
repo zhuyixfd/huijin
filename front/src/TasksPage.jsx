@@ -487,7 +487,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
           </th>
         ) : null}
         {isProcessingWorkQueue ? (
-          <th className="task-today-cell-head" title="勾选后归入左侧「今日处理」">
+          <th className="task-today-cell-head" title="勾选后归入上方「今日处理」">
             今日
           </th>
         ) : null}
