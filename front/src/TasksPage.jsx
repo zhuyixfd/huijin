@@ -146,8 +146,6 @@ export default function TasksPage({ tasksPreset = 'all' }) {
 
   const [selectedIds, setSelectedIds] = useState([])
   const [bulkSelectColumnVisible, setBulkSelectColumnVisible] = useState(false)
-  const [todayBulkExpanded, setTodayBulkExpanded] = useState(false)
-  const [todayBulkAction, setTodayBulkAction] = useState('')
   const [batchProductionExpanded, setBatchProductionExpanded] = useState(false)
   const [batchTargetStatus, setBatchTargetStatus] = useState('')
   const [batchSubmitting, setBatchSubmitting] = useState(false)
@@ -187,9 +185,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   useEffect(() => {
     queueMicrotask(() => {
       setBulkSelectColumnVisible(false)
-      setTodayBulkExpanded(false)
       setBatchProductionExpanded(false)
-      setTodayBulkAction('')
     })
   }, [tasksPreset])
 
@@ -203,7 +199,6 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     tasksPreset === 'processing' ||
     tasksPreset === 'pending' ||
     tasksPreset === 'ready_outbound'
-  const showTodayCol = tasksPreset === 'processing' || tasksPreset === 'pending'
 
   useEffect(() => {
     if (!showBulkCheckboxCol) {
@@ -292,17 +287,6 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     }
   }
 
-  async function toggleTodayQueue(it, checked) {
-    setErr(null)
-    try {
-      await patchJson(`/api/order-items/${it.id}`, { in_today_queue: checked })
-      loadTasks()
-      if (detail && detail.id === it.id) await refreshDetail(detail.id)
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : '更新失败')
-    }
-  }
-
   function captureUndoSnapshot(ids) {
     const out = []
     for (const id of ids) {
@@ -361,26 +345,6 @@ export default function TasksPage({ tasksPreset = 'all' }) {
       loadTasks()
     } catch (err) {
       setErr(err instanceof Error ? err.message : '操作失败')
-    } finally {
-      setBatchSubmitting(false)
-    }
-  }
-
-  async function executeTodayBulkMark() {
-    if (!todayBulkAction || selectedIds.length === 0) return
-    const mark = todayBulkAction === 'mark'
-    setErr(null)
-    setBatchSubmitting(true)
-    const snap = captureUndoSnapshot(selectedIds)
-    try {
-      for (const id of selectedIds) {
-        await patchJson(`/api/order-items/${id}`, { in_today_queue: mark })
-      }
-      setLastBatchUndo(snap)
-      setSelectedIds([])
-      loadTasks()
-    } catch (err) {
-      setErr(err instanceof Error ? err.message : '更新失败')
     } finally {
       setBatchSubmitting(false)
     }
@@ -465,10 +429,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     tasksPreset === 'all' || tasksPreset === 'processing'
   const showNewWorkOrder = tasksPreset === 'all' || tasksPreset === 'pending'
   const showBulkSelectCol = showBulkCheckboxCol && bulkSelectColumnVisible
-  /** 「今日」列表头勾选列：仅在选择今日处理展开后出现 */
-  const showTodayCheckboxCol = showTodayCol && todayBulkExpanded
-  const listColSpan =
-    COL_COUNT + (showBulkSelectCol ? 1 : 0) + (showTodayCheckboxCol ? 1 : 0)
+  const listColSpan = COL_COUNT + (showBulkSelectCol ? 1 : 0)
 
   const { todayQueueRows, restProcessingRows } = useMemo(() => {
     if (tasksPreset !== 'processing') {
@@ -496,19 +457,6 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                 prev.includes(it.id) ? prev.filter((x) => x !== it.id) : [...prev, it.id],
               )
             }
-          />
-        </td>
-      ) : null}
-      {showTodayCheckboxCol ? (
-        <td className="task-today-cell" onClick={(e) => e.stopPropagation()}>
-          <input
-            type="checkbox"
-            aria-label={`今日处理 ${it.id}`}
-            checked={Boolean(it.in_today_queue)}
-            onChange={(e) => {
-              e.stopPropagation()
-              toggleTodayQueue(it, e.target.checked)
-            }}
           />
         </td>
       ) : null}
@@ -600,18 +548,6 @@ export default function TasksPage({ tasksPreset = 'all' }) {
             ) : (
               <span className="task-thead-placeholder" aria-hidden />
             )}
-          </th>
-        ) : null}
-        {showTodayCheckboxCol ? (
-          <th
-            className="task-today-cell-head"
-            title={
-              tasksPreset === 'pending'
-                ? '勾选标记今日处理；可与「开始处理（今日）」配合进入处理中今日区块'
-                : '勾选后归入上方「今日处理」'
-            }
-          >
-            今日
           </th>
         ) : null}
         <th className="cell-nowrap">明细ID</th>
@@ -754,19 +690,6 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                 >
                   多选
                 </button>
-                {showTodayCol ? (
-                  <button
-                    type="button"
-                    className={`btn ${todayBulkExpanded ? 'is-pressed' : ''}`}
-                    aria-pressed={todayBulkExpanded}
-                    onClick={() => {
-                      setErr(null)
-                      setTodayBulkExpanded((v) => !v)
-                    }}
-                  >
-                    今日处理
-                  </button>
-                ) : null}
                 <button
                   type="button"
                   className={`btn ${batchProductionExpanded ? 'is-pressed' : ''}`}
@@ -782,6 +705,24 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                 >
                   批量修改生产状态
                 </button>
+                {tasksPreset === 'pending' ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={
+                      batchSubmitting ||
+                      selectedIds.filter(
+                        (id) => rows.find((r) => r.id === id)?.production_status === '未入库',
+                      ).length === 0
+                    }
+                    onClick={() => {
+                      setErr(null)
+                      void submitStartProcessingToday()
+                    }}
+                  >
+                    开始处理（今日）
+                  </button>
+                ) : null}
                 {lastBatchUndo?.length ? (
                   <button
                     type="button"
@@ -797,63 +738,6 @@ export default function TasksPage({ tasksPreset = 'all' }) {
               </>
             ) : null}
           </div>
-          {showBulkCheckboxCol && showTodayCol && todayBulkExpanded ? (
-            <div className="toolbar toolbar-secondary toolbar-today-bulk">
-              <span className="toolbar-secondary-label">今日批量</span>
-              <select
-                className="toolbar-batch-select"
-                value={todayBulkAction}
-                onChange={(e) => setTodayBulkAction(e.target.value)}
-                aria-label="今日批量操作"
-              >
-                <option value="">请选择操作</option>
-                <option value="mark">标记所选为今日</option>
-                <option value="unmark">取消所选今日标记</option>
-              </select>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={
-                  batchSubmitting ||
-                  !todayBulkAction ||
-                  selectedIds.length === 0
-                }
-                onClick={() => {
-                  void executeTodayBulkMark()
-                }}
-              >
-                执行
-              </button>
-              {tasksPreset === 'pending' ? (
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={
-                    batchSubmitting ||
-                    selectedIds.filter(
-                      (id) => rows.find((r) => r.id === id)?.production_status === '未入库',
-                    ).length === 0
-                  }
-                  onClick={() => {
-                    setErr(null)
-                    void submitStartProcessingToday()
-                  }}
-                >
-                  开始处理（今日）
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => {
-                  setTodayBulkExpanded(false)
-                  setTodayBulkAction('')
-                }}
-              >
-                收起
-              </button>
-            </div>
-          ) : null}
           {showBulkCheckboxCol && batchProductionExpanded ? (
             <div className="toolbar toolbar-secondary toolbar-batch-production">
               <select
