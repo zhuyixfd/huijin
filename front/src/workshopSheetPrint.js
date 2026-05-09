@@ -29,9 +29,6 @@ const sheetCss = `
   .pos-row td.pos-left-placeholder { background: #fafafa; color: transparent; }
   .pos-row td.pos-slot-label { text-align: center; font-weight: 600; vertical-align: middle; }
   .pos-row td.pos-slot-label.mid { background: #fafafa; }
-  .status-banner td { vertical-align: middle; background: #e8f4fc; border-top-width: 2px !important; }
-  .status-banner .status-banner-label { text-align: left; font-weight: 700; }
-  .status-banner .status-banner-fill { border-left: none; }
   .toolbar-print { margin-top: 16px; text-align: center; }
   @media print {
     body { padding: 0; }
@@ -84,22 +81,7 @@ function fmtSheetDate(d = new Date()) {
   return `${t.getFullYear()}.${t.getMonth() + 1}.${t.getDate()}`
 }
 
-export function splitForgingAndByStatus(expanded) {
-  const forging = []
-  const byStatus = new Map()
-  for (const row of expanded) {
-    const st = row.item.production_status || ''
-    if (st === '锻造中') {
-      forging.push(row)
-      continue
-    }
-    if (!byStatus.has(st)) byStatus.set(st, [])
-    byStatus.get(st).push(row)
-  }
-  return { forging, byStatus }
-}
-
-/** 与下方明细表对齐共 9 列：1、5 列为「第x排」；2～4、6～9 列合并为空白/件号区 */
+/** 排位置嵌套表 9 列：1、5 为「第x排」；2～4、6～9 合并；主表明细另含「生产状态」共 10 列 */
 const MID34 = '<td colspan="3" class="mid"></td>'
 const MID69 = '<td colspan="4" class="mid"></td>'
 
@@ -178,6 +160,7 @@ function buildDataRows(rows) {
       const qty = 1
       return `<tr>
         <td class="num">${esc(pieceLabel)}</td>
+        <td>${esc(item.production_status ?? '')}</td>
         <td>${esc(item.customer_name ?? '')}</td>
         <td>${esc(item.material_grade ?? '')}</td>
         <td>${esc(item.formed_size ?? '')}</td>
@@ -194,11 +177,21 @@ function buildDataRows(rows) {
 export function buildWorkshopProductionSheetHtml(todayQueueRows, options = {}) {
   const { toolbar = true, slotLabels } = options
   const expanded = expandTodayQueueForSheet(todayQueueRows)
-  const { forging, byStatus } = splitForgingAndByStatus(expanded)
 
   const todayStr = fmtSheetDate()
 
-  const headerCols = ['件号', '客户名称', '材质', '成型尺寸', '规格', '数量', '重量', '炉号', '备注']
+  const headerCols = [
+    '件号',
+    '生产状态',
+    '客户名称',
+    '材质',
+    '成型尺寸',
+    '规格',
+    '数量',
+    '重量',
+    '炉号',
+    '备注',
+  ]
 
   let body = ''
   /* 排位置：嵌套独立表；slotLabels 长度 10 时用件号排序模板（第1～10排显示已填序号） */
@@ -206,7 +199,7 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows, options = {}) {
     Array.isArray(slotLabels) && slotLabels.length === 10
       ? buildPositionInnerTableRowsSlotLabels(slotLabels)
       : buildPositionInnerTableRows()
-  body += `<tr class="sheet-pos-wrap"><td colspan="9" class="sheet-pos-cell"><table class="sheet-pos-only"><tbody>${posInner}</tbody></table></td></tr>`
+  body += `<tr class="sheet-pos-wrap"><td colspan="10" class="sheet-pos-cell"><table class="sheet-pos-only"><tbody>${posInner}</tbody></table></td></tr>`
   const qtyColIdx = headerCols.indexOf('数量')
   body += `<tr>${headerCols
     .map((h, i) =>
@@ -215,16 +208,7 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows, options = {}) {
         : `<th>${esc(h)}</th>`,
     )
     .join('')}</tr>`
-  body += buildDataRows(forging)
-
-  const otherStatuses = [...byStatus.entries()].sort(([a], [b]) =>
-    String(a).localeCompare(String(b), 'zh-CN'),
-  )
-
-  for (const [status, pieceRows] of otherStatuses) {
-    body += `<tr class="status-banner"><td class="status-banner-label">${esc(status)}</td><td colspan="8" class="status-banner-fill"></td></tr>`
-    body += buildDataRows(pieceRows)
-  }
+  body += buildDataRows(expanded)
 
   return `
     <h1 class="sheet-title">汇金加工生产单</h1>
