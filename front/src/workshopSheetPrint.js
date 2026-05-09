@@ -12,8 +12,13 @@ const sheetCss = `
   table.sheet th, table.sheet td { border: 1px solid #333; padding: 6px 8px; vertical-align: middle; word-break: break-word; }
   table.sheet th { background: #eee; font-weight: 600; text-align: center; }
   table.sheet td.num { text-align: center; }
+  table.sheet-pos-only { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  table.sheet-pos-only th, table.sheet-pos-only td { border: 1px solid #333; padding: 6px 8px; vertical-align: middle; }
+  td.sheet-pos-cell { padding: 0 !important; vertical-align: top; }
   .pos-row td.mid { background: #fafafa; }
   .pos-row td.pos-slot-empty { min-height: 1.5rem; vertical-align: middle; }
+  .pos-row td.pos-left-placeholder { background: #fafafa; color: transparent; }
+  .pos-row td.pos-slot-label { text-align: center; font-weight: 600; }
   .status-banner td { vertical-align: middle; background: #e8f4fc; border-top-width: 2px !important; }
   .status-banner .status-banner-label { text-align: left; font-weight: 700; }
   .status-banner .status-banner-fill { border-left: none; }
@@ -84,10 +89,9 @@ export function splitForgingAndByStatus(expanded) {
   return { forging, byStatus }
 }
 
-/** 左侧 1～6 排占 6 行；右侧 7～13：7～10 显示文字，11～13 只占格不写文字（第 6 排 rowspan 2 对齐 12、13 两行） */
-function buildPositionTemplateRows() {
+/** 排位置单独嵌套表，无 rowspan，避免与下方表头/正文串行；左侧 1～6，右侧 7～13（11～13 仅占格） */
+function buildPositionInnerTableRows() {
   const emptySlot = '<td class="pos-slot-empty">&nbsp;</td>'
-  /* 第 1～4 排 ↔ 第 7～10 排 */
   let html = ''
   for (let i = 0; i < 4; i += 1) {
     html += `<tr class="pos-row">
@@ -97,25 +101,40 @@ function buildPositionTemplateRows() {
       <td colspan="3" class="mid"></td>
     </tr>`
   }
-  /* 第 5 排 ↔ 第 11 排（占位无字） */
   html += `<tr class="pos-row">
       <td>${esc('第5排')}</td>
       <td colspan="3" class="mid"></td>
       ${emptySlot}
       <td colspan="3" class="mid"></td>
     </tr>`
-  /* 第 6 排 rowspan 2 ↔ 第 12、13 排（占位无字），共 6 行 */
   html += `<tr class="pos-row">
-      <td rowspan="2">${esc('第6排')}</td>
+      <td>${esc('第6排')}</td>
       <td colspan="3" class="mid"></td>
       ${emptySlot}
       <td colspan="3" class="mid"></td>
     </tr>`
   html += `<tr class="pos-row">
+      <td class="pos-left-placeholder">&nbsp;</td>
       <td colspan="3" class="mid"></td>
       ${emptySlot}
       <td colspan="3" class="mid"></td>
     </tr>`
+  return html
+}
+
+/** 第1～10排，右侧格显示已保存的件号（如 A1、B2） */
+function buildPositionInnerTableRowsSlotLabels(labels) {
+  let html = ''
+  for (let i = 0; i < 10; i += 1) {
+    const raw = String(labels[i] ?? '').trim()
+    const show = raw ? esc(raw) : '&nbsp;'
+    html += `<tr class="pos-row">
+      <td>${esc(`第${i + 1}排`)}</td>
+      <td colspan="3" class="mid"></td>
+      <td class="pos-slot-label">${show}</td>
+      <td colspan="3" class="mid"></td>
+    </tr>`
+  }
   return html
 }
 
@@ -138,7 +157,8 @@ function buildDataRows(rows) {
     .join('')
 }
 
-export function buildWorkshopProductionSheetHtml(todayQueueRows) {
+export function buildWorkshopProductionSheetHtml(todayQueueRows, options = {}) {
+  const { toolbar = true, slotLabels } = options
   const expanded = expandTodayQueueForSheet(todayQueueRows)
   const { forging, byStatus } = splitForgingAndByStatus(expanded)
 
@@ -147,8 +167,12 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows) {
   const headerCols = ['件号', '材质', '成型尺寸', '规格', '数量', '重量', '炉号', '备注']
 
   let body = ''
-  /* 同一表格连续：先排位置，再唯一一行表头，再正文 */
-  body += buildPositionTemplateRows()
+  /* 排位置：嵌套独立表；slotLabels 长度 10 时用件号排序模板（第1～10排显示已填序号） */
+  const posInner =
+    Array.isArray(slotLabels) && slotLabels.length === 10
+      ? buildPositionInnerTableRowsSlotLabels(slotLabels)
+      : buildPositionInnerTableRows()
+  body += `<tr class="sheet-pos-wrap"><td colspan="8" class="sheet-pos-cell"><table class="sheet-pos-only"><tbody>${posInner}</tbody></table></td></tr>`
   body += `<tr><th>${headerCols.map((h) => esc(h)).join('</th><th>')}</th></tr>`
   body += buildDataRows(forging)
 
@@ -172,35 +196,88 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows) {
         ${body}
       </tbody>
     </table>
-    <div class="toolbar-print">
+    ${
+      toolbar
+        ? `<div class="toolbar-print">
       <button type="button" onclick="window.print()">打印</button>
-    </div>
+    </div>`
+        : ''
+    }
   `
 }
 
-export function buildWorkshopProductionSheetDocument(todayQueueRows) {
-  const inner = buildWorkshopProductionSheetHtml(todayQueueRows)
+export function buildWorkshopProductionSheetDocument(todayQueueRows, options = {}) {
+  const inner = buildWorkshopProductionSheetHtml(todayQueueRows, options)
   /* 不再用页面标题重复「汇金加工生产单」，正文仅保留一处 h1 */
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title></title><style>${sheetCss}</style></head><body>${inner}</body></html>`
 }
 
-/** 打开预览窗口（可打印）；今日处理为空时返回 false */
-export function openWorkshopProductionPreview(todayQueueRows) {
+const MODAL_STYLE_ID = 'workshop-print-modal-styles'
+
+function ensureModalStyles() {
+  if (document.getElementById(MODAL_STYLE_ID)) return
+  const el = document.createElement('style')
+  el.id = MODAL_STYLE_ID
+  el.textContent = `
+.workshop-print-modal-backdrop { position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; }
+.workshop-print-modal { background: #fff; border-radius: 10px; width: min(920px, 100%); max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,.25); overflow: hidden; }
+.workshop-print-toolbar { flex: 0 0 auto; padding: 10px 12px; border-bottom: 1px solid var(--border, #ddd); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.workshop-print-toolbar .btn { font: inherit; padding: 0.45rem 0.9rem; border-radius: 8px; border: 1px solid #ccc; background: #f4f4f5; cursor: pointer; }
+.workshop-print-toolbar .workshop-print-btn-print { background: #2563eb; color: #fff; border-color: #1d4ed8; }
+.workshop-print-frame { flex: 1 1 auto; width: 100%; min-height: 280px; height: min(78vh, 880px); border: none; background: #fff; }
+`
+  document.head.appendChild(el)
+}
+
+/** 页内 iframe 预览（地址栏不再出现 blob URL）；打印仍走浏览器对话框（页眉/页脚须手动取消，网页无法改默认） */
+export function openWorkshopProductionPreview(todayQueueRows, previewOptions = {}) {
   if (!todayQueueRows?.length) {
     window.alert('暂无今日处理订单')
     return false
   }
-  const docHtml = buildWorkshopProductionSheetDocument(todayQueueRows)
-  const blob = new Blob([docHtml], { type: 'text/html;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const w = window.open(url, '_blank')
-  if (!w) {
-    URL.revokeObjectURL(url)
-    window.alert('请允许弹出窗口以预览')
-    return false
-  }
-  w.addEventListener('load', () => {
-    URL.revokeObjectURL(url)
+  ensureModalStyles()
+  const docHtml = buildWorkshopProductionSheetDocument(todayQueueRows, {
+    toolbar: false,
+    ...previewOptions,
   })
+
+  const backdrop = document.createElement('div')
+  backdrop.className = 'workshop-print-modal-backdrop'
+  backdrop.setAttribute('role', 'dialog')
+  backdrop.setAttribute(
+    'aria-label',
+    Array.isArray(previewOptions.slotLabels)
+      ? '加工生产单预览（件号排序）'
+      : '加工生产单预览',
+  )
+  backdrop.innerHTML =
+    '<div class="workshop-print-modal">' +
+    '<div class="workshop-print-toolbar">' +
+    '<button type="button" class="btn workshop-print-btn-print">打印</button>' +
+    '<button type="button" class="btn workshop-print-btn-close">关闭</button>' +
+    '</div>' +
+    '<iframe class="workshop-print-frame" title="汇金加工生产单"></iframe>' +
+    '</div>'
+
+  const iframe = backdrop.querySelector('iframe')
+  const doc = iframe.contentDocument || iframe.contentWindow.document
+  doc.open()
+  doc.write(docHtml)
+  doc.close()
+
+  const close = () => {
+    backdrop.remove()
+  }
+
+  backdrop.querySelector('.workshop-print-btn-print').addEventListener('click', () => {
+    iframe.contentWindow.focus()
+    iframe.contentWindow.print()
+  })
+  backdrop.querySelector('.workshop-print-btn-close').addEventListener('click', close)
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) close()
+  })
+
+  document.body.appendChild(backdrop)
   return true
 }

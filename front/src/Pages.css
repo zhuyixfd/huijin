@@ -268,6 +268,79 @@
   padding: 0.15rem 0.45rem !important;
 }
 
+.today-slot-order-bar {
+  padding: 0.75rem 0.95rem;
+  margin-bottom: 1rem;
+}
+
+.today-slot-order-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.today-slot-order-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-h);
+}
+
+.today-slot-order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.today-slot-order-body {
+  margin-top: 0.35rem;
+}
+
+.today-slot-order-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.65rem;
+  align-items: center;
+}
+
+.today-slot-chip {
+  font-size: 0.86rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 8px;
+  background: var(--social-bg);
+  border: 1px solid var(--border);
+}
+
+.today-slot-order-empty {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.today-slot-modal-table-wrap {
+  margin-top: 0.5rem;
+  max-height: min(62vh, 520px);
+  overflow: auto;
+}
+
+.today-slot-modal-table .today-slot-modal-mid {
+  background: #fafafa;
+  width: 18%;
+}
+
+.today-slot-modal-input {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+  background: var(--bg);
+  color: var(--text-h);
+}
+
 .home-case-studies h2 {
   margin: 0;
   font-size: 1.05rem;

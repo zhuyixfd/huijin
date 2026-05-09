@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './Pages.css'
 import { deleteReq, getJson, patchJson, postFormData, postJson } from './api.js'
 import { openPrint } from './printSlip.js'
+import { loadTodaySlotOrder, saveTodaySlotOrder } from './todaySlotOrderStorage.js'
 import { openWorkshopProductionPreview } from './workshopSheetPrint.js'
 
 const emptyItemForm = () => ({
@@ -189,15 +190,31 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   const [lastBatchUndo, setLastBatchUndo] = useState(null)
   /** 今日处理：同一订单号多件「聚合」为单行（按订单编号，不是隐藏表格） */
   const [collapsedTodayOrderNos, setCollapsedTodayOrderNos] = useState(() => new Set())
+  /** 待完成：同订单号多件聚合（与今日处理一致） */
+  const [collapsedRestOrderNos, setCollapsedRestOrderNos] = useState(() => new Set())
   const [caseModal, setCaseModal] = useState(null)
   const [caseNote, setCaseNote] = useState('')
   const [caseFiles, setCaseFiles] = useState([])
   const [caseSubmitting, setCaseSubmitting] = useState(false)
+  /** 今日第1～10排件号排序（与加工单预览排位置同结构） */
+  const [todaySlotOrder, setTodaySlotOrder] = useState(() => loadTodaySlotOrder())
+  const [slotOrderModalOpen, setSlotOrderModalOpen] = useState(false)
+  const [slotOrderDraft, setSlotOrderDraft] = useState(() => Array(10).fill(''))
   const headerSelectRef = useRef(null)
 
   function toggleTodayOrderCollapse(orderNo) {
     const key = String(orderNo ?? '')
     setCollapsedTodayOrderNos((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  function toggleRestOrderCollapse(orderNo) {
+    const key = String(orderNo ?? '')
+    setCollapsedRestOrderNos((prev) => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
@@ -240,6 +257,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       setBulkSelectColumnVisible(false)
       setBatchProductionExpanded(false)
       setCollapsedTodayOrderNos(new Set())
+      setCollapsedRestOrderNos(new Set())
     })
   }, [tasksPreset])
 
@@ -666,8 +684,8 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     return n
   }, [todayQueueClusters, collapsedTodayOrderNos])
 
-  /** 下方「处理中」：单行不展开，仅交替底色 */
-  const restProcessingSortedBands = useMemo(() => {
+  /** 待完成：按订单号排序 → 按件展开 → 同订单号分簇（与今日处理一致） */
+  const restProcessingExpandedBands = useMemo(() => {
     const sorted = [...restProcessingRows].sort((a, b) => {
       const ao = String(a.order_no ?? '')
       const bo = String(b.order_no ?? '')
@@ -675,17 +693,89 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       if (cmp !== 0) return cmp
       return a.id - b.id
     })
-    let g = 0
-    return sorted.map((it, idx) => {
-      if (
-        idx > 0 &&
-        String(sorted[idx - 1].order_no ?? '') !== String(sorted[idx].order_no ?? '')
-      ) {
-        g += 1
+    const flat = []
+    for (const it of sorted) {
+      const rawQ = Number(it.quantity)
+      const units = Number.isFinite(rawQ) && rawQ >= 1 ? Math.floor(rawQ) : 1
+      for (let u = 0; u < units; u += 1) {
+        flat.push({ it, unitIndex: u, unitsTotal: units })
       }
-      return { it, orderBand: g % 2 === 0 ? 'a' : 'b' }
+    }
+    let g = 0
+    return flat.map((row, i) => {
+      const ono = String(row.it.order_no ?? '')
+      const prevOno = i > 0 ? String(flat[i - 1].it.order_no ?? '') : '\x00'
+      if (i > 0 && ono !== prevOno) g += 1
+      const codes = Array.isArray(row.it.processing_unit_codes)
+        ? row.it.processing_unit_codes
+        : []
+      const unitLabel = codes[row.unitIndex] ?? '—'
+      return {
+        ...row,
+        orderBand: g % 2 === 0 ? 'a' : 'b',
+        showOrderNo: i === 0 || ono !== prevOno,
+        unitLabel,
+      }
     })
   }, [restProcessingRows])
+
+  const restProcessingClusters = useMemo(() => {
+    const flat = restProcessingExpandedBands
+    const clusters = []
+    let cur = []
+    let curOno = null
+    for (const row of flat) {
+      const ono = String(row.it.order_no ?? '')
+      if (ono !== curOno) {
+        if (cur.length) clusters.push(cur)
+        cur = [row]
+        curOno = ono
+      } else {
+        cur.push(row)
+      }
+    }
+    if (cur.length) clusters.push(cur)
+    return clusters
+  }, [restProcessingExpandedBands])
+
+  const restMultiFoldStats = useMemo(() => {
+    let multi = 0
+    let aggregated = 0
+    for (const c of restProcessingClusters) {
+      if (c.length <= 1) continue
+      multi += 1
+      const ono = String(c[0].it.order_no ?? '')
+      if (collapsedRestOrderNos.has(ono)) aggregated += 1
+    }
+    return { multi, aggregated, expanded: multi - aggregated }
+  }, [restProcessingClusters, collapsedRestOrderNos])
+
+  const restVisibleRowCount = useMemo(() => {
+    let n = 0
+    for (const cluster of restProcessingClusters) {
+      const multi = cluster.length > 1
+      const ono = String(cluster[0].it.order_no ?? '')
+      if (multi && collapsedRestOrderNos.has(ono)) n += 1
+      else n += cluster.length
+    }
+    return n
+  }, [restProcessingClusters, collapsedRestOrderNos])
+
+  function toggleTodayFoldAll() {
+    const multis = todayQueueClusters.filter((c) => c.length > 1)
+    if (multis.length === 0) return
+    const onos = multis.map((c) => String(c[0].it.order_no ?? ''))
+    const allAgg = onos.every((o) => collapsedTodayOrderNos.has(o))
+    setCollapsedTodayOrderNos(allAgg ? new Set() : new Set(onos))
+  }
+
+  function toggleRestFoldAll() {
+    const multis = restProcessingClusters.filter((c) => c.length > 1)
+    if (multis.length === 0) return
+    const onos = multis.map((c) => String(c[0].it.order_no ?? ''))
+    const allAgg = onos.every((o) => collapsedRestOrderNos.has(o))
+    setCollapsedRestOrderNos(allAgg ? new Set() : new Set(onos))
+  }
 
   const showCaseStudyUi = tasksPreset === 'processing'
 
@@ -722,8 +812,20 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     }
   }
 
+  function openSlotOrderModal() {
+    setSlotOrderDraft([...todaySlotOrder])
+    setSlotOrderModalOpen(true)
+  }
+
+  function saveSlotOrderModal() {
+    const next = slotOrderDraft.map((s) => String(s).trim())
+    saveTodaySlotOrder(next)
+    setTodaySlotOrder(next)
+    setSlotOrderModalOpen(false)
+  }
+
   const renderTaskRow = (it, rowOptions = {}) => {
-    const { orderBand, todayExpand } = rowOptions
+    const { orderBand, todayExpand, queueExpandMode = 'today' } = rowOptions
     const groupSummary = Boolean(todayExpand?.groupSummary)
     const rowExpand = Boolean(todayExpand) && !groupSummary
     const bandClass =
@@ -772,7 +874,8 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       }
       onClick={() => {
         if (todayRowToggleExpand) {
-          toggleTodayOrderCollapse(it.order_no)
+          if (queueExpandMode === 'rest') toggleRestOrderCollapse(it.order_no)
+          else toggleTodayOrderCollapse(it.order_no)
           return
         }
         enterDetail(it)
@@ -1302,6 +1405,45 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 </div>
               </div>
             ) : null}
+            {tasksPreset === 'processing' ? (
+              <section className="card today-slot-order-bar" aria-label="今日件号排序">
+                <div className="today-slot-order-head">
+                  <span className="today-slot-order-title">今日件号排序（第1～10排）</span>
+                  <div className="today-slot-order-actions">
+                    <button type="button" className="btn btn-ghost" onClick={openSlotOrderModal}>
+                      编辑排序
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={todayQueueRows.length === 0}
+                      onClick={() =>
+                        openWorkshopProductionPreview(todayQueueRows, {
+                          slotLabels: todaySlotOrder,
+                        })
+                      }
+                    >
+                      打印排序生产单
+                    </button>
+                  </div>
+                </div>
+                <div className="today-slot-order-body">
+                  {todaySlotOrder.some((s) => String(s).trim()) ? (
+                    <div className="today-slot-order-chips">
+                      {todaySlotOrder.map((t, i) =>
+                        String(t).trim() ? (
+                          <span key={i} className="today-slot-chip">
+                            第{i + 1}排 <strong>{String(t).trim()}</strong>
+                          </span>
+                        ) : null,
+                      )}
+                    </div>
+                  ) : (
+                    <p className="muted today-slot-order-empty">尚未填写；点击「编辑排序」在第1～10排填入件号（如 A1）。</p>
+                  )}
+                </div>
+              </section>
+            ) : null}
             <div
               className="task-queue-panels"
               style={{
@@ -1332,6 +1474,20 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   ) : null}
                 </h3>
                 <div className="task-queue-panel-actions">
+                  {todayMultiFoldStats.multi > 0 ? (
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      aria-pressed={
+                        todayMultiFoldStats.aggregated === todayMultiFoldStats.multi
+                      }
+                      onClick={toggleTodayFoldAll}
+                    >
+                      {todayMultiFoldStats.aggregated === todayMultiFoldStats.multi
+                        ? '展开'
+                        : '折叠'}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="btn btn-ghost"
@@ -1364,6 +1520,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                           return [
                             renderTaskRow(it0, {
                               orderBand: cluster[0].orderBand,
+                              queueExpandMode: 'today',
                               todayExpand: {
                                 groupSummary: true,
                                 summaryPieceCount: cluster.length,
@@ -1376,6 +1533,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                         return cluster.map((row) =>
                           renderTaskRow(row.it, {
                             orderBand: row.orderBand,
+                            queueExpandMode: 'today',
                             todayExpand: {
                               unitIndex: row.unitIndex,
                               unitsTotal: row.unitsTotal,
@@ -1400,8 +1558,31 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
             >
               <div className="task-queue-panel-head">
                 <h3 id="task-queue-rest-heading" className="task-queue-panel-title">
-                  待完成 · {restProcessingRows.length} 条
+                  待完成 · {restProcessingRows.length} 条 · 当前 {restVisibleRowCount} 行
+                  {restMultiFoldStats.multi > 0 ? (
+                    <>
+                      {' '}
+                      · 同订单号多件：逐件展开 {restMultiFoldStats.expanded} · 按单聚合{' '}
+                      {restMultiFoldStats.aggregated}
+                    </>
+                  ) : null}
                 </h3>
+                <div className="task-queue-panel-actions">
+                  {restMultiFoldStats.multi > 0 ? (
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      aria-pressed={
+                        restMultiFoldStats.aggregated === restMultiFoldStats.multi
+                      }
+                      onClick={toggleRestFoldAll}
+                    >
+                      {restMultiFoldStats.aggregated === restMultiFoldStats.multi
+                        ? '展开'
+                        : '折叠'}
+                    </button>
+                  ) : null}
+                </div>
               </div>
               <div className="data-table-wrap task-queue-panel-inner">
                 <table className="data-table task-mega-table">
@@ -1414,9 +1595,41 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                         </td>
                       </tr>
                     ) : (
-                      restProcessingSortedBands.map(({ it, orderBand }) =>
-                        renderTaskRow(it, { orderBand }),
-                      )
+                      restProcessingClusters.flatMap((cluster) => {
+                        const it0 = cluster[0].it
+                        const ono = String(it0.order_no ?? '')
+                        const multi = cluster.length > 1
+                        const aggregated = multi && collapsedRestOrderNos.has(ono)
+                        const summaryLabelShort = todayClusterPieceLabelShort(cluster)
+                        if (multi && aggregated) {
+                          return [
+                            renderTaskRow(it0, {
+                              orderBand: cluster[0].orderBand,
+                              queueExpandMode: 'rest',
+                              todayExpand: {
+                                groupSummary: true,
+                                summaryPieceCount: cluster.length,
+                                summaryLabelShort,
+                                orderStatusOverride: `聚合 · ${cluster.length}件`,
+                              },
+                            }),
+                          ]
+                        }
+                        return cluster.map((row) =>
+                          renderTaskRow(row.it, {
+                            orderBand: row.orderBand,
+                            queueExpandMode: 'rest',
+                            todayExpand: {
+                              unitIndex: row.unitIndex,
+                              unitsTotal: row.unitsTotal,
+                              showOrderNo: row.showOrderNo,
+                              unitLabel: row.unitLabel,
+                              todayGroupClickToggle:
+                                multi && row.unitIndex === 0 ? true : undefined,
+                            },
+                          }),
+                        )
+                      })
                     )}
                   </tbody>
                 </table>
@@ -2000,6 +2213,61 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {slotOrderModalOpen ? (
+        <div className="modal-backdrop" onClick={() => setSlotOrderModalOpen(false)} role="presentation">
+          <div
+            className="modal-card wide today-slot-order-modal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-labelledby="slot-order-modal-title"
+          >
+            <h2 id="slot-order-modal-title">今日件号排序</h2>
+            <p className="muted" style={{ marginTop: '-0.35rem' }}>
+              与加工生产单排位置一致（第1～10排）；右侧填入车间排序件号，保存后显示在上方并用于「打印排序生产单」。
+            </p>
+            <div className="data-table-wrap today-slot-modal-table-wrap">
+              <table className="data-table today-slot-modal-table">
+                <tbody>
+                  {slotOrderDraft.map((val, i) => (
+                    <tr key={i}>
+                      <td className="cell-nowrap">{`第${i + 1}排`}</td>
+                      <td colSpan={3} className="today-slot-modal-mid">
+                        &nbsp;
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          className="today-slot-modal-input"
+                          value={val}
+                          placeholder="如 A1"
+                          aria-label={`第${i + 1}排件号`}
+                          onChange={(e) => {
+                            const next = [...slotOrderDraft]
+                            next[i] = e.target.value
+                            setSlotOrderDraft(next)
+                          }}
+                        />
+                      </td>
+                      <td colSpan={3} className="today-slot-modal-mid">
+                        &nbsp;
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="form-actions" style={{ marginTop: '0.75rem' }}>
+              <button type="button" className="btn" onClick={() => setSlotOrderModalOpen(false)}>
+                取消
+              </button>
+              <button type="button" className="btn btn-primary" onClick={saveSlotOrderModal}>
+                保存
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
