@@ -465,8 +465,10 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     tasksPreset === 'all' || tasksPreset === 'processing'
   const showNewWorkOrder = tasksPreset === 'all' || tasksPreset === 'pending'
   const showBulkSelectCol = showBulkCheckboxCol && bulkSelectColumnVisible
+  /** 「今日」列表头勾选列：仅在选择今日处理展开后出现 */
+  const showTodayCheckboxCol = showTodayCol && todayBulkExpanded
   const listColSpan =
-    COL_COUNT + (showBulkSelectCol ? 1 : 0) + (showTodayCol ? 1 : 0)
+    COL_COUNT + (showBulkSelectCol ? 1 : 0) + (showTodayCheckboxCol ? 1 : 0)
 
   const { todayQueueRows, restProcessingRows } = useMemo(() => {
     if (tasksPreset !== 'processing') {
@@ -497,7 +499,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
           />
         </td>
       ) : null}
-      {showTodayCol ? (
+      {showTodayCheckboxCol ? (
         <td className="task-today-cell" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
@@ -600,7 +602,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
             )}
           </th>
         ) : null}
-        {showTodayCol ? (
+        {showTodayCheckboxCol ? (
           <th
             className="task-today-cell-head"
             title={
