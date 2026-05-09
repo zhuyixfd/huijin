@@ -13,8 +13,9 @@ const sheetCss = `
   table.sheet th { background: #eee; font-weight: 600; text-align: center; }
   table.sheet td.num { text-align: center; }
   .pos-row td.mid { background: #fafafa; }
-  .section-gap td { border: none !important; height: 14px; padding: 0 !important; }
-  .status-banner td { text-align: center; font-weight: 700; background: #e8f4fc; border-top-width: 2px !important; }
+  .status-banner td { vertical-align: middle; background: #e8f4fc; border-top-width: 2px !important; }
+  .status-banner .status-banner-label { text-align: left; font-weight: 700; }
+  .status-banner .status-banner-fill { border-left: none; }
   .toolbar-print { margin-top: 16px; text-align: center; }
   .muted { color: #555; font-size: 12px; margin-top: 12px; }
   @media print {
@@ -62,6 +63,12 @@ export function expandTodayQueueForSheet(todayQueueRows) {
   return out
 }
 
+/** 日期：2026.5.4（年月日不补零） */
+function fmtSheetDate(d = new Date()) {
+  const t = d instanceof Date ? d : new Date(d)
+  return `${t.getFullYear()}.${t.getMonth() + 1}.${t.getDate()}`
+}
+
 export function splitForgingAndByStatus(expanded) {
   const forging = []
   const byStatus = new Map()
@@ -79,7 +86,8 @@ export function splitForgingAndByStatus(expanded) {
 
 function buildPositionTemplateRows() {
   let html = ''
-  for (let i = 0; i < 7; i += 1) {
+  /* 仅 4 行：避免出现第 11、12、13 排 */
+  for (let i = 0; i < 4; i += 1) {
     const left = `第${i + 1}排`
     const right = `第${i + 7}排`
     /* 8 列：第 1 列、第 5 列为排号，其余列分区合并 */
@@ -116,18 +124,14 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows) {
   const expanded = expandTodayQueueForSheet(todayQueueRows)
   const { forging, byStatus } = splitForgingAndByStatus(expanded)
 
-  const todayStr = new Date().toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
+  const todayStr = fmtSheetDate()
 
   const headerCols = ['件号', '材质', '成型尺寸', '规格', '数量', '重量', '炉号', '备注']
 
   let body = ''
-
-  body += `<tr><th>${headerCols.map((h) => esc(h)).join('</th><th>')}</th></tr>`
+  /* 同一表格连续：先排位置，再唯一一行表头，再正文 */
   body += buildPositionTemplateRows()
+  body += `<tr><th>${headerCols.map((h) => esc(h)).join('</th><th>')}</th></tr>`
   body += buildDataRows(forging)
 
   const otherStatuses = [...byStatus.entries()].sort(([a], [b]) =>
@@ -135,15 +139,10 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows) {
   )
 
   for (const [status, pieceRows] of otherStatuses) {
-    body += `<tr class="section-gap"><td colspan="8"></td></tr>`
-    body += `<tr class="status-banner"><td colspan="8">${esc(status)}</td></tr>`
+    body += `<tr class="status-banner"><td class="status-banner-label">${esc(status)}</td><td colspan="7" class="status-banner-fill"></td></tr>`
     body += buildDataRows(pieceRows)
   }
 
-  const extraNote =
-    otherStatuses.length > 0
-      ? `非「锻造中」工序（${otherStatuses.map(([s]) => s).join('、')}）已列于排位置单下方。`
-      : ''
   return `
     <h1 class="sheet-title">汇金加工生产单</h1>
     <div class="sheet-meta">
@@ -155,7 +154,7 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows) {
         ${body}
       </tbody>
     </table>
-    <p class="muted">炉号栏可打印后手写。${extraNote}</p>
+    <p class="muted">炉号栏可打印后手写。</p>
     <div class="toolbar-print">
       <button type="button" onclick="window.print()">打印</button>
     </div>

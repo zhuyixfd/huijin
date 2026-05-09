@@ -187,21 +187,20 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   const [batchTargetStatus, setBatchTargetStatus] = useState('')
   const [batchSubmitting, setBatchSubmitting] = useState(false)
   const [lastBatchUndo, setLastBatchUndo] = useState(null)
-  /** 今日处理：同一明细多件折叠后只显示一行（按 order_items.id） */
-  const [collapsedTodayItemIds, setCollapsedTodayItemIds] = useState(() => new Set())
-  const [todayPanelOpen, setTodayPanelOpen] = useState(true)
-  const [restPanelOpen, setRestPanelOpen] = useState(true)
+  /** 今日处理：同一订单号多件「聚合」为单行（按订单编号，不是隐藏表格） */
+  const [collapsedTodayOrderNos, setCollapsedTodayOrderNos] = useState(() => new Set())
   const [caseModal, setCaseModal] = useState(null)
   const [caseNote, setCaseNote] = useState('')
   const [caseFiles, setCaseFiles] = useState([])
   const [caseSubmitting, setCaseSubmitting] = useState(false)
   const headerSelectRef = useRef(null)
 
-  function toggleTodayItemCollapse(itemId) {
-    setCollapsedTodayItemIds((prev) => {
+  function toggleTodayOrderCollapse(orderNo) {
+    const key = String(orderNo ?? '')
+    setCollapsedTodayOrderNos((prev) => {
       const next = new Set(prev)
-      if (next.has(itemId)) next.delete(itemId)
-      else next.add(itemId)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }
@@ -240,9 +239,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     queueMicrotask(() => {
       setBulkSelectColumnVisible(false)
       setBatchProductionExpanded(false)
-      setCollapsedTodayItemIds(new Set())
-      setTodayPanelOpen(true)
-      setRestPanelOpen(true)
+      setCollapsedTodayOrderNos(new Set())
     })
   }, [tasksPreset])
 
@@ -625,18 +622,18 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     })
   }, [todayQueueRows])
 
-  /** 今日处理：按明细 id 分簇（同一订单号即同一行明细的多件） */
+  /** 今日处理：按订单编号分簇（同一订单号多件可聚合为一行展示） */
   const todayQueueClusters = useMemo(() => {
     const flat = todayQueueExpandedBands
     const clusters = []
     let cur = []
-    let curId = null
+    let curOno = null
     for (const row of flat) {
-      const id = row.it.id
-      if (id !== curId) {
+      const ono = String(row.it.order_no ?? '')
+      if (ono !== curOno) {
         if (cur.length) clusters.push(cur)
         cur = [row]
-        curId = id
+        curOno = ono
       } else {
         cur.push(row)
       }
@@ -645,28 +642,29 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     return clusters
   }, [todayQueueExpandedBands])
 
-  /** 多件明细：折叠/展开组数（用于标题；折叠行内订单状态不再显示 0/1 式文案） */
+  /** 同一订单号多件：聚合/展开组数（用于标题） */
   const todayMultiFoldStats = useMemo(() => {
     let multi = 0
-    let collapsed = 0
+    let aggregated = 0
     for (const c of todayQueueClusters) {
       if (c.length <= 1) continue
       multi += 1
-      if (collapsedTodayItemIds.has(c[0].it.id)) collapsed += 1
+      const ono = String(c[0].it.order_no ?? '')
+      if (collapsedTodayOrderNos.has(ono)) aggregated += 1
     }
-    return { multi, collapsed, expanded: multi - collapsed }
-  }, [todayQueueClusters, collapsedTodayItemIds])
+    return { multi, aggregated, expanded: multi - aggregated }
+  }, [todayQueueClusters, collapsedTodayOrderNos])
 
   const todayQueueVisibleRowCount = useMemo(() => {
     let n = 0
     for (const cluster of todayQueueClusters) {
       const multi = cluster.length > 1
-      const id = cluster[0].it.id
-      if (multi && collapsedTodayItemIds.has(id)) n += 1
+      const ono = String(cluster[0].it.order_no ?? '')
+      if (multi && collapsedTodayOrderNos.has(ono)) n += 1
       else n += cluster.length
     }
     return n
-  }, [todayQueueClusters, collapsedTodayItemIds])
+  }, [todayQueueClusters, collapsedTodayOrderNos])
 
   /** 下方「处理中」：单行不展开，仅交替底色 */
   const restProcessingSortedBands = useMemo(() => {
@@ -738,7 +736,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     const showOrderNoCell =
       groupSummary || !todayExpand || todayExpand.showOrderNo
     const rowKey = groupSummary
-      ? `sum-${it.id}`
+      ? `sum-${String(it.order_no ?? '')}-${it.id}`
       : rowExpand
         ? `${it.id}-u${todayExpand.unitIndex}`
         : it.id
@@ -768,11 +766,13 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
         .filter(Boolean)
         .join(' ')}
       title={
-        todayRowToggleExpand ? '单击展开或折叠（多件明细）' : undefined
+        todayRowToggleExpand
+          ? '单击展开逐件 / 聚合为同一订单号一行'
+          : undefined
       }
       onClick={() => {
         if (todayRowToggleExpand) {
-          toggleTodayItemCollapse(it.id)
+          toggleTodayOrderCollapse(it.order_no)
           return
         }
         enterDetail(it)
@@ -1326,8 +1326,8 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   {todayMultiFoldStats.multi > 0 ? (
                     <>
                       {' '}
-                      · 多件明细：已展开 {todayMultiFoldStats.expanded} · 已折叠{' '}
-                      {todayMultiFoldStats.collapsed}
+                      · 同订单号多件：逐件展开 {todayMultiFoldStats.expanded} · 按单聚合{' '}
+                      {todayMultiFoldStats.aggregated}
                     </>
                   ) : null}
                 </h3>
@@ -1340,17 +1340,8 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   >
                     加工生产单预览
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost task-queue-panel-toggle"
-                    aria-expanded={todayPanelOpen}
-                    onClick={() => setTodayPanelOpen((v) => !v)}
-                  >
-                    {todayPanelOpen ? '折叠' : '展开'}
-                  </button>
                 </div>
               </div>
-              {todayPanelOpen ? (
               <div className="data-table-wrap task-queue-panel-inner">
                 <table className="data-table task-mega-table">
                   {renderMegaThead(true)}
@@ -1364,10 +1355,12 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                     ) : (
                       todayQueueClusters.flatMap((cluster) => {
                         const it0 = cluster[0].it
+                        const ono = String(it0.order_no ?? '')
                         const multi = cluster.length > 1
-                        const collapsed = multi && collapsedTodayItemIds.has(it0.id)
+                        const aggregated =
+                          multi && collapsedTodayOrderNos.has(ono)
                         const summaryLabelShort = todayClusterPieceLabelShort(cluster)
-                        if (multi && collapsed) {
+                        if (multi && aggregated) {
                           return [
                             renderTaskRow(it0, {
                               orderBand: cluster[0].orderBand,
@@ -1375,7 +1368,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                                 groupSummary: true,
                                 summaryPieceCount: cluster.length,
                                 summaryLabelShort,
-                                orderStatusOverride: `折叠 · ${cluster.length}件`,
+                                orderStatusOverride: `聚合 · ${cluster.length}件`,
                               },
                             }),
                           ]
@@ -1398,9 +1391,6 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   </tbody>
                 </table>
               </div>
-              ) : (
-                <p className="muted task-panel-collapsed-hint">列表已折叠</p>
-              )}
             </div>
             <div
               role="region"
@@ -1412,16 +1402,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 <h3 id="task-queue-rest-heading" className="task-queue-panel-title">
                   待完成 · {restProcessingRows.length} 条
                 </h3>
-                <button
-                  type="button"
-                  className="btn btn-ghost task-queue-panel-toggle"
-                  aria-expanded={restPanelOpen}
-                  onClick={() => setRestPanelOpen((v) => !v)}
-                >
-                  {restPanelOpen ? '折叠' : '展开'}
-                </button>
               </div>
-              {restPanelOpen ? (
               <div className="data-table-wrap task-queue-panel-inner">
                 <table className="data-table task-mega-table">
                   {renderMegaThead(false)}
@@ -1440,9 +1421,6 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   </tbody>
                 </table>
               </div>
-              ) : (
-                <p className="muted task-panel-collapsed-hint">列表已折叠</p>
-              )}
             </div>
           </div>
           </>
