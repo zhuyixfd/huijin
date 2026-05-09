@@ -13,15 +13,15 @@ const sheetCss = `
   table.sheet th { background: #eee; font-weight: 600; text-align: center; }
   table.sheet td.num { text-align: center; }
   .pos-row td.mid { background: #fafafa; }
+  .pos-row td.pos-slot-empty { min-height: 1.5rem; vertical-align: middle; }
   .status-banner td { vertical-align: middle; background: #e8f4fc; border-top-width: 2px !important; }
   .status-banner .status-banner-label { text-align: left; font-weight: 700; }
   .status-banner .status-banner-fill { border-left: none; }
   .toolbar-print { margin-top: 16px; text-align: center; }
-  .muted { color: #555; font-size: 12px; margin-top: 12px; }
   @media print {
     body { padding: 0; }
     .toolbar-print { display: none; }
-    @page { margin: 12mm; size: A4 landscape; }
+    @page { margin: 12mm; size: A4 portrait; }
   }
 `
 
@@ -84,20 +84,38 @@ export function splitForgingAndByStatus(expanded) {
   return { forging, byStatus }
 }
 
+/** 左侧 1～6 排占 6 行；右侧 7～13：7～10 显示文字，11～13 只占格不写文字（第 6 排 rowspan 2 对齐 12、13 两行） */
 function buildPositionTemplateRows() {
+  const emptySlot = '<td class="pos-slot-empty">&nbsp;</td>'
+  /* 第 1～4 排 ↔ 第 7～10 排 */
   let html = ''
-  /* 仅 4 行：避免出现第 11、12、13 排 */
   for (let i = 0; i < 4; i += 1) {
-    const left = `第${i + 1}排`
-    const right = `第${i + 7}排`
-    /* 8 列：第 1 列、第 5 列为排号，其余列分区合并 */
     html += `<tr class="pos-row">
-      <td>${esc(left)}</td>
+      <td>${esc(`第${i + 1}排`)}</td>
       <td colspan="3" class="mid"></td>
-      <td>${esc(right)}</td>
+      <td>${esc(`第${i + 7}排`)}</td>
       <td colspan="3" class="mid"></td>
     </tr>`
   }
+  /* 第 5 排 ↔ 第 11 排（占位无字） */
+  html += `<tr class="pos-row">
+      <td>${esc('第5排')}</td>
+      <td colspan="3" class="mid"></td>
+      ${emptySlot}
+      <td colspan="3" class="mid"></td>
+    </tr>`
+  /* 第 6 排 rowspan 2 ↔ 第 12、13 排（占位无字），共 6 行 */
+  html += `<tr class="pos-row">
+      <td rowspan="2">${esc('第6排')}</td>
+      <td colspan="3" class="mid"></td>
+      ${emptySlot}
+      <td colspan="3" class="mid"></td>
+    </tr>`
+  html += `<tr class="pos-row">
+      <td colspan="3" class="mid"></td>
+      ${emptySlot}
+      <td colspan="3" class="mid"></td>
+    </tr>`
   return html
 }
 
@@ -154,7 +172,6 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows) {
         ${body}
       </tbody>
     </table>
-    <p class="muted">炉号栏可打印后手写。</p>
     <div class="toolbar-print">
       <button type="button" onclick="window.print()">打印</button>
     </div>
@@ -163,7 +180,8 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows) {
 
 export function buildWorkshopProductionSheetDocument(todayQueueRows) {
   const inner = buildWorkshopProductionSheetHtml(todayQueueRows)
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>汇金加工生产单</title><style>${sheetCss}</style></head><body>${inner}</body></html>`
+  /* 不再用页面标题重复「汇金加工生产单」，正文仅保留一处 h1 */
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title></title><style>${sheetCss}</style></head><body>${inner}</body></html>`
 }
 
 /** 打开预览窗口（可打印）；今日处理为空时返回 false */
@@ -172,12 +190,17 @@ export function openWorkshopProductionPreview(todayQueueRows) {
     window.alert('暂无今日处理订单')
     return false
   }
-  const w = window.open('', '_blank')
+  const docHtml = buildWorkshopProductionSheetDocument(todayQueueRows)
+  const blob = new Blob([docHtml], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const w = window.open(url, '_blank')
   if (!w) {
+    URL.revokeObjectURL(url)
     window.alert('请允许弹出窗口以预览')
     return false
   }
-  w.document.write(buildWorkshopProductionSheetDocument(todayQueueRows))
-  w.document.close()
+  w.addEventListener('load', () => {
+    URL.revokeObjectURL(url)
+  })
   return true
 }
