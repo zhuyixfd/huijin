@@ -12,6 +12,13 @@ const sheetCss = `
   table.sheet th, table.sheet td { border: 1px solid #333; padding: 6px 8px; vertical-align: middle; word-break: break-word; }
   table.sheet th { background: #eee; font-weight: 600; text-align: center; }
   table.sheet td.num { text-align: center; }
+  table.sheet th.sheet-col-qty,
+  table.sheet td.sheet-col-qty {
+    width: 2.5rem;
+    max-width: 3rem;
+    padding: 6px 4px;
+    white-space: nowrap;
+  }
   table.sheet-pos-only { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
   table.sheet-pos-only th, table.sheet-pos-only td { border: 1px solid #333; padding: 6px 8px; vertical-align: middle; }
   td.sheet-pos-cell { padding: 0 !important; vertical-align: top; }
@@ -173,7 +180,7 @@ function buildDataRows(rows) {
         <td>${esc(item.material_grade ?? '')}</td>
         <td>${esc(item.formed_size ?? '')}</td>
         <td>${esc(spec)}</td>
-        <td class="num">${qty}</td>
+        <td class="num sheet-col-qty">${qty}</td>
         <td class="num">${esc(fmtWeight(item.weight_incoming))}</td>
         <td class="num"></td>
         <td>${esc(item.remark ?? '')}</td>
@@ -198,7 +205,14 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows, options = {}) {
       ? buildPositionInnerTableRowsSlotLabels(slotLabels)
       : buildPositionInnerTableRows()
   body += `<tr class="sheet-pos-wrap"><td colspan="9" class="sheet-pos-cell"><table class="sheet-pos-only"><tbody>${posInner}</tbody></table></td></tr>`
-  body += `<tr><th>${headerCols.map((h) => esc(h)).join('</th><th>')}</th></tr>`
+  const qtyColIdx = headerCols.indexOf('数量')
+  body += `<tr>${headerCols
+    .map((h, i) =>
+      i === qtyColIdx
+        ? `<th class="sheet-col-qty">${esc(h)}</th>`
+        : `<th>${esc(h)}</th>`,
+    )
+    .join('')}</tr>`
   body += buildDataRows(forging)
 
   const otherStatuses = [...byStatus.entries()].sort(([a], [b]) =>
