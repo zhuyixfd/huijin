@@ -260,24 +260,32 @@ export function openWorkshopProductionPreview(todayQueueRows, previewOptions = {
     '</div>'
 
   const iframe = backdrop.querySelector('iframe')
-  const doc = iframe.contentDocument || iframe.contentWindow.document
-  doc.open()
-  doc.write(docHtml)
-  doc.close()
 
   const close = () => {
     backdrop.remove()
   }
 
   backdrop.querySelector('.workshop-print-btn-print').addEventListener('click', () => {
-    iframe.contentWindow.focus()
-    iframe.contentWindow.print()
+    iframe.contentWindow?.focus()
+    iframe.contentWindow?.print()
   })
   backdrop.querySelector('.workshop-print-btn-close').addEventListener('click', close)
   backdrop.addEventListener('click', (e) => {
     if (e.target === backdrop) close()
   })
 
+  /* 必须先挂到文档树，否则 iframe.contentDocument / contentWindow 常为 null */
   document.body.appendChild(backdrop)
+
+  const doc = iframe.contentDocument || iframe.contentWindow?.document
+  if (!doc) {
+    backdrop.remove()
+    window.alert('预览无法打开，请刷新页面后重试')
+    return false
+  }
+  doc.open()
+  doc.write(docHtml)
+  doc.close()
+
   return true
 }
