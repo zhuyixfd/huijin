@@ -15,7 +15,6 @@ const slipCss = `
   table.delivery-grid th, table.delivery-grid td { border: 1px solid #333; padding: 6px 8px; vertical-align: middle; word-break: break-word; }
   table.delivery-grid th { background: #eee; font-weight: 600; text-align: center; }
   table.delivery-grid td.num { text-align: center; }
-  table.delivery-grid td.right { text-align: right; }
   table.delivery-grid tr.total-row td { font-weight: 700; background: #fafafa; }
   .delivery-sign { display: flex; justify-content: space-between; margin-top: 28px; font-size: 14px; padding: 0 8px; }
   @media print {
@@ -65,10 +64,9 @@ function buildOneSheet(consignee, items, sheetDateStr) {
       return `<tr>
       <td>${esc(it.material_grade)}</td>
       <td>${esc(it.spec_incoming)}</td>
+      <td>${esc(it.formed_size)}</td>
       <td class="num">${n}</td>
       <td class="num">${esc(weightCell(it))}</td>
-      <td class="num">—</td>
-      <td class="right">—</td>
       <td>${esc(it.remark)}</td>
     </tr>`
     })
@@ -86,20 +84,19 @@ function buildOneSheet(consignee, items, sheetDateStr) {
     <thead>
       <tr>
         <th>材质</th>
-        <th>规格</th>
+        <th>来料规格</th>
+        <th>锻造规格</th>
         <th>数量</th>
         <th>重量</th>
-        <th>单价</th>
-        <th>金额</th>
         <th>备注</th>
       </tr>
     </thead>
     <tbody>
       ${body}
       <tr class="total-row">
-        <td colspan="2">合计</td>
+        <td colspan="3">合计</td>
         <td class="num">${qtySum}</td>
-        <td colspan="4"></td>
+        <td colspan="2"></td>
       </tr>
     </tbody>
   </table>

@@ -5,6 +5,9 @@ import { apiUrl } from './config.js'
 
 const CASE_PAGE = 20
 
+/** 首页柱状图不含此处；单独展示「已完成」 */
+const STATUS_DONE_KEY = '已发回'
+
 function fmtDateTime(iso) {
   if (!iso) return '—'
   const t = new Date(iso)
@@ -60,6 +63,18 @@ export default function HomePage() {
 
   const casePages = Math.max(1, Math.ceil(caseTotal / CASE_PAGE))
 
+  const statusCounts = summary?.status_counts
+  const doneCount =
+    statusCounts && typeof statusCounts[STATUS_DONE_KEY] === 'number'
+      ? statusCounts[STATUS_DONE_KEY]
+      : 0
+  const barChartEntries = statusCounts
+    ? Object.entries(statusCounts)
+        .filter(([k]) => k !== STATUS_DONE_KEY)
+        .sort((a, b) => b[1] - a[1])
+    : []
+  const barMax = Math.max(1, ...barChartEntries.map(([, n]) => n))
+
   return (
     <div className="page-wrap">
       <header className="dashboard-page-title">
@@ -85,16 +100,31 @@ export default function HomePage() {
         <p className="muted">加载中…</p>
       ) : null}
       {summary?.status_counts ? (
-        <section className="card status-breakdown">
+        <section className="card status-breakdown" aria-label="生产状态分布">
           <h2>生产状态分布</h2>
-          <ul className="status-list">
-            {Object.entries(summary.status_counts).map(([k, v]) => (
-              <li key={k}>
-                <span>{k}</span>
-                <span className="status-count">{v}</span>
-              </li>
-            ))}
-          </ul>
+          <p className="home-status-done-line">
+            已完成：<strong>{doneCount}</strong>
+          </p>
+          {barChartEntries.length === 0 ? (
+            <p className="muted home-status-chart-empty">除已完成外暂无其他生产状态</p>
+          ) : (
+            <div className="status-bar-chart" role="img" aria-label="各生产状态数量（不含已完成）">
+              {barChartEntries.map(([label, count]) => (
+                <div key={label} className="status-bar-row">
+                  <span className="status-bar-label" title={label}>
+                    {label}
+                  </span>
+                  <div className="status-bar-track">
+                    <div
+                      className="status-bar-fill"
+                      style={{ width: `${Math.round((count / barMax) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="status-bar-num">{count}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       ) : null}
 

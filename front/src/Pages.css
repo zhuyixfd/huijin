@@ -34,6 +34,65 @@
   font-size: 1.05rem;
 }
 
+.home-status-done-line {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  color: var(--text-h);
+}
+
+.home-status-done-line strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.home-status-chart-empty {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.status-bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.status-bar-row {
+  display: grid;
+  grid-template-columns: minmax(5rem, 7.5rem) 1fr auto;
+  gap: 0.5rem 0.65rem;
+  align-items: center;
+}
+
+.status-bar-label {
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-bar-track {
+  height: 1.1rem;
+  border-radius: 6px;
+  background: var(--social-bg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.status-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  min-width: 4px;
+  transition: width 0.2s ease;
+}
+
+.status-bar-num {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  min-width: 2.25rem;
+  text-align: right;
+}
+
 .status-list {
   list-style: none;
   margin: 0;
@@ -305,6 +364,41 @@
   align-items: center;
 }
 
+/* 加工单排位置：左列第1～6排，右列第7～10排；第三列为车间占位（11～13） */
+.today-slot-order-two-col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(2rem, 3rem);
+  gap: 0.5rem 1rem;
+  align-items: start;
+  width: 100%;
+  max-width: 52rem;
+}
+
+.today-slot-order-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.today-slot-order-col-spacer {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  align-self: stretch;
+  padding-top: 0.25rem;
+}
+
+.today-slot-order-slot-spacer {
+  flex: 1;
+  min-height: 1.5rem;
+  max-height: 2.1rem;
+  background: #fafafa;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
 .today-slot-chip {
   font-size: 0.86rem;
   padding: 0.25rem 0.6rem;
@@ -318,15 +412,60 @@
   font-size: 0.88rem;
 }
 
-.today-slot-modal-table-wrap {
+.today-slot-modal-two-col-wrap {
   margin-top: 0.5rem;
-  max-height: min(62vh, 520px);
+  max-height: min(62vh, 560px);
   overflow: auto;
 }
 
-.today-slot-modal-table .today-slot-modal-mid {
+.today-slot-modal-two-col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(2rem, 3rem);
+  gap: 1rem 1.25rem;
+  align-items: start;
+}
+
+.today-slot-modal-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.today-slot-modal-col-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 0.15rem;
+}
+
+.today-slot-modal-field {
+  display: grid;
+  grid-template-columns: 4.25rem minmax(0, 1fr);
+  gap: 0.45rem 0.55rem;
+  align-items: center;
+}
+
+.today-slot-modal-field-label {
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.today-slot-modal-spacer-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  align-self: stretch;
+  padding-top: 1.65rem;
+}
+
+.today-slot-modal-slot-spacer {
+  flex: 1;
+  min-height: 1.55rem;
+  max-height: 2.15rem;
   background: #fafafa;
-  width: 18%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .today-slot-modal-input {

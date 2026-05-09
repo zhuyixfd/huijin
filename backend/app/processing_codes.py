@@ -1,4 +1,4 @@
-"""处理中单件编号：30 日字母轮回 + 全库惟一数字后缀；已写入的编号永久保留。"""
+"""处理中单件编号：32 日字母轮回 + 全库惟一数字后缀；已写入的编号永久保留。"""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.models import OrderItem
 
-# 共 30 个：ABCDEFG + XYZ + abcdef + HIJKLMNOPQRSTU
-DAY_CODE_CYCLE = "ABCDEFGXYZabcdefHIJKLMNOPQRSTU"
+# 共 32 个：A～Z 依次 + abcdef（与车间件号字母排序一致）
+DAY_CODE_CYCLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef"
 
 
 def count_processing_piece_strip(db: Session) -> list[tuple[str, int]]:

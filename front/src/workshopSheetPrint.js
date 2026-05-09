@@ -89,52 +89,105 @@ export function splitForgingAndByStatus(expanded) {
   return { forging, byStatus }
 }
 
-/** 排位置单独嵌套表，无 rowspan，避免与下方表头/正文串行；左侧 1～6，右侧 7～13（11～13 仅占格） */
+const MID_GAP = '<td colspan="3" class="mid"></td>'
+
+/**
+ * 排位置嵌套表：左列第1～6排，右列第7～10排（前四行左右对齐）；第5～6行仅左列排号，右列为占位；
+ * 末列及末行占位对应车间 11～13 格（无文字仅占格）。空白件号格与带件号版列结构一致。
+ */
 function buildPositionInnerTableRows() {
   const emptySlot = '<td class="pos-slot-empty">&nbsp;</td>'
+  const blankVal = '<td class="pos-slot-label">&nbsp;</td>'
+  const mid = MID_GAP
   let html = ''
-  for (let i = 0; i < 4; i += 1) {
+  for (let r = 0; r < 4; r += 1) {
     html += `<tr class="pos-row">
-      <td>${esc(`第${i + 1}排`)}</td>
-      <td colspan="3" class="mid"></td>
-      <td>${esc(`第${i + 7}排`)}</td>
-      <td colspan="3" class="mid"></td>
+      <td>${esc(`第${r + 1}排`)}</td>
+      ${mid}
+      ${blankVal}
+      ${mid}
+      <td>${esc(`第${r + 7}排`)}</td>
+      ${mid}
+      ${blankVal}
+      ${mid}
+      ${emptySlot}
+    </tr>`
+  }
+  for (let r = 4; r < 6; r += 1) {
+    html += `<tr class="pos-row">
+      <td>${esc(`第${r + 1}排`)}</td>
+      ${mid}
+      ${blankVal}
+      ${mid}
+      ${emptySlot}
+      ${mid}
+      ${blankVal}
+      ${mid}
+      ${emptySlot}
     </tr>`
   }
   html += `<tr class="pos-row">
-      <td>${esc('第5排')}</td>
-      <td colspan="3" class="mid"></td>
-      ${emptySlot}
-      <td colspan="3" class="mid"></td>
-    </tr>`
-  html += `<tr class="pos-row">
-      <td>${esc('第6排')}</td>
-      <td colspan="3" class="mid"></td>
-      ${emptySlot}
-      <td colspan="3" class="mid"></td>
-    </tr>`
-  html += `<tr class="pos-row">
       <td class="pos-left-placeholder">&nbsp;</td>
-      <td colspan="3" class="mid"></td>
+      ${mid}
+      ${blankVal}
+      ${mid}
       ${emptySlot}
-      <td colspan="3" class="mid"></td>
+      ${mid}
+      ${blankVal}
+      ${mid}
+      ${emptySlot}
     </tr>`
   return html
 }
 
-/** 第1～10排，右侧格显示已保存的件号（如 A1、B2） */
+/** 第1～10排：左 1～6、右 7～10，与 TasksPage 今日件号排序一致 */
 function buildPositionInnerTableRowsSlotLabels(labels) {
+  const emptySlot = '<td class="pos-slot-empty">&nbsp;</td>'
+  const mid = MID_GAP
   let html = ''
-  for (let i = 0; i < 10; i += 1) {
-    const raw = String(labels[i] ?? '').trim()
-    const show = raw ? esc(raw) : '&nbsp;'
+  for (let r = 0; r < 4; r += 1) {
+    const rawL = String(labels[r] ?? '').trim()
+    const rawR = String(labels[r + 6] ?? '').trim()
+    const showL = rawL ? esc(rawL) : '&nbsp;'
+    const showR = rawR ? esc(rawR) : '&nbsp;'
     html += `<tr class="pos-row">
-      <td>${esc(`第${i + 1}排`)}</td>
-      <td colspan="3" class="mid"></td>
-      <td class="pos-slot-label">${show}</td>
-      <td colspan="3" class="mid"></td>
+      <td>${esc(`第${r + 1}排`)}</td>
+      ${mid}
+      <td class="pos-slot-label">${showL}</td>
+      ${mid}
+      <td>${esc(`第${r + 7}排`)}</td>
+      ${mid}
+      <td class="pos-slot-label">${showR}</td>
+      ${mid}
+      ${emptySlot}
     </tr>`
   }
+  for (let r = 4; r < 6; r += 1) {
+    const rawL = String(labels[r] ?? '').trim()
+    const showL = rawL ? esc(rawL) : '&nbsp;'
+    html += `<tr class="pos-row">
+      <td>${esc(`第${r + 1}排`)}</td>
+      ${mid}
+      <td class="pos-slot-label">${showL}</td>
+      ${mid}
+      ${emptySlot}
+      ${mid}
+      <td class="pos-slot-label">&nbsp;</td>
+      ${mid}
+      ${emptySlot}
+    </tr>`
+  }
+  html += `<tr class="pos-row">
+      <td class="pos-left-placeholder">&nbsp;</td>
+      ${mid}
+      <td class="pos-slot-label">&nbsp;</td>
+      ${mid}
+      ${emptySlot}
+      ${mid}
+      <td class="pos-slot-label">&nbsp;</td>
+      ${mid}
+      ${emptySlot}
+    </tr>`
   return html
 }
 
@@ -145,6 +198,7 @@ function buildDataRows(rows) {
       const qty = 1
       return `<tr>
         <td class="num">${esc(pieceLabel)}</td>
+        <td>${esc(item.customer_name ?? '')}</td>
         <td>${esc(item.material_grade ?? '')}</td>
         <td>${esc(item.formed_size ?? '')}</td>
         <td>${esc(spec)}</td>
@@ -164,7 +218,7 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows, options = {}) {
 
   const todayStr = fmtSheetDate()
 
-  const headerCols = ['件号', '材质', '成型尺寸', '规格', '数量', '重量', '炉号', '备注']
+  const headerCols = ['件号', '客户名称', '材质', '成型尺寸', '规格', '数量', '重量', '炉号', '备注']
 
   let body = ''
   /* 排位置：嵌套独立表；slotLabels 长度 10 时用件号排序模板（第1～10排显示已填序号） */
@@ -172,7 +226,7 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows, options = {}) {
     Array.isArray(slotLabels) && slotLabels.length === 10
       ? buildPositionInnerTableRowsSlotLabels(slotLabels)
       : buildPositionInnerTableRows()
-  body += `<tr class="sheet-pos-wrap"><td colspan="8" class="sheet-pos-cell"><table class="sheet-pos-only"><tbody>${posInner}</tbody></table></td></tr>`
+  body += `<tr class="sheet-pos-wrap"><td colspan="9" class="sheet-pos-cell"><table class="sheet-pos-only"><tbody>${posInner}</tbody></table></td></tr>`
   body += `<tr><th>${headerCols.map((h) => esc(h)).join('</th><th>')}</th></tr>`
   body += buildDataRows(forging)
 
@@ -181,7 +235,7 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows, options = {}) {
   )
 
   for (const [status, pieceRows] of otherStatuses) {
-    body += `<tr class="status-banner"><td class="status-banner-label">${esc(status)}</td><td colspan="7" class="status-banner-fill"></td></tr>`
+    body += `<tr class="status-banner"><td class="status-banner-label">${esc(status)}</td><td colspan="8" class="status-banner-fill"></td></tr>`
     body += buildDataRows(pieceRows)
   }
 

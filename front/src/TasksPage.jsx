@@ -1460,14 +1460,31 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 </div>
                 <div className="today-slot-order-body">
                   {todaySlotOrder.some((s) => String(s).trim()) ? (
-                    <div className="today-slot-order-chips">
-                      {todaySlotOrder.map((t, i) =>
-                        String(t).trim() ? (
-                          <span key={i} className="today-slot-chip">
-                            第{i + 1}排 <strong>{String(t).trim()}</strong>
+                    <div
+                      className="today-slot-order-two-col"
+                      aria-label="件号排序（左列第1～6排，右列第7～10排；右侧窄条为占位）"
+                    >
+                      <div className="today-slot-order-col">
+                        {[0, 1, 2, 3, 4, 5].map((i) => (
+                          <span key={`l-${i}`} className="today-slot-chip">
+                            第{i + 1}排{' '}
+                            <strong>{String(todaySlotOrder[i] ?? '').trim() || '—'}</strong>
                           </span>
-                        ) : null,
-                      )}
+                        ))}
+                      </div>
+                      <div className="today-slot-order-col">
+                        {[6, 7, 8, 9].map((i) => (
+                          <span key={`r-${i}`} className="today-slot-chip">
+                            第{i + 1}排{' '}
+                            <strong>{String(todaySlotOrder[i] ?? '').trim() || '—'}</strong>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="today-slot-order-col today-slot-order-col-spacer" aria-hidden>
+                        <span className="today-slot-order-slot-spacer" />
+                        <span className="today-slot-order-slot-spacer" />
+                        <span className="today-slot-order-slot-spacer" />
+                      </div>
                     </div>
                   ) : (
                     <p className="muted today-slot-order-empty">尚未填写；点击「编辑排序」在第1～10排填入件号（如 A1）。</p>
@@ -1682,34 +1699,6 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
           >
             <div
               role="region"
-              aria-labelledby="outbound-wait-heading"
-              className="task-queue-panel card"
-              style={{ width: '100%', minWidth: 0, flexShrink: 0 }}
-            >
-              <div className="task-queue-panel-head">
-                <h3 id="outbound-wait-heading" className="task-queue-panel-title">
-                  等待出库 · {waitingOutboundRows.length} 条
-                </h3>
-              </div>
-              <div className="data-table-wrap task-queue-panel-inner">
-                <table className="data-table task-mega-table">
-                  {renderMegaThead(true)}
-                  <tbody>
-                    {waitingOutboundRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={listColSpan} className="muted task-queue-empty-hint">
-                          暂无；处理中单据设为「待发回」后进入本节，可点此「→出库中」发运
-                        </td>
-                      </tr>
-                    ) : (
-                      waitingOutboundRows.map((r) => renderTaskRow(r))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div
-              role="region"
               aria-labelledby="outbound-ship-heading"
               className="task-queue-panel card"
               style={{ width: '100%', minWidth: 0, flexShrink: 0 }}
@@ -1731,7 +1720,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
               </div>
               <div className="data-table-wrap task-queue-panel-inner">
                 <table className="data-table task-mega-table">
-                  {renderMegaThead(false)}
+                  {renderMegaThead(true)}
                   <tbody>
                     {shippingOutboundRows.length === 0 ? (
                       <tr>
@@ -1741,6 +1730,34 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                       </tr>
                     ) : (
                       shippingOutboundRows.map((r) => renderTaskRow(r))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div
+              role="region"
+              aria-labelledby="outbound-wait-heading"
+              className="task-queue-panel card"
+              style={{ width: '100%', minWidth: 0, flexShrink: 0 }}
+            >
+              <div className="task-queue-panel-head">
+                <h3 id="outbound-wait-heading" className="task-queue-panel-title">
+                  等待出库 · {waitingOutboundRows.length} 条
+                </h3>
+              </div>
+              <div className="data-table-wrap task-queue-panel-inner">
+                <table className="data-table task-mega-table">
+                  {renderMegaThead(false)}
+                  <tbody>
+                    {waitingOutboundRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={listColSpan} className="muted task-queue-empty-hint">
+                          暂无；处理中单据设为「待发回」后进入本节，可点此「→出库中」发运
+                        </td>
+                      </tr>
+                    ) : (
+                      waitingOutboundRows.map((r) => renderTaskRow(r))
                     )}
                   </tbody>
                 </table>
@@ -2337,38 +2354,56 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
           >
             <h2 id="slot-order-modal-title">今日件号排序</h2>
             <p className="muted" style={{ marginTop: '-0.35rem' }}>
-              与加工生产单排位置一致（第1～10排）；右侧填入车间排序件号，保存后显示在上方并用于「打印排序生产单」。
+              与加工生产单一致：左列第1～6排、右列第7～10排；最右窄列为车间占位（11～13，仅占位）。保存后上方预览并用于「打印排序生产单」。
             </p>
-            <div className="data-table-wrap today-slot-modal-table-wrap">
-              <table className="data-table today-slot-modal-table">
-                <tbody>
-                  {slotOrderDraft.map((val, i) => (
-                    <tr key={i}>
-                      <td className="cell-nowrap">{`第${i + 1}排`}</td>
-                      <td colSpan={3} className="today-slot-modal-mid">
-                        &nbsp;
-                      </td>
-                      <td>
-                        <input
-                          type="text"
-                          className="today-slot-modal-input"
-                          value={val}
-                          placeholder="如 A1"
-                          aria-label={`第${i + 1}排件号`}
-                          onChange={(e) => {
-                            const next = [...slotOrderDraft]
-                            next[i] = e.target.value
-                            setSlotOrderDraft(next)
-                          }}
-                        />
-                      </td>
-                      <td colSpan={3} className="today-slot-modal-mid">
-                        &nbsp;
-                      </td>
-                    </tr>
+            <div className="today-slot-modal-two-col-wrap">
+              <div className="today-slot-modal-two-col">
+                <div className="today-slot-modal-col">
+                  <span className="today-slot-modal-col-title muted">第1～6排</span>
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <label key={i} className="today-slot-modal-field">
+                      <span className="today-slot-modal-field-label">{`第${i + 1}排`}</span>
+                      <input
+                        type="text"
+                        className="today-slot-modal-input"
+                        value={slotOrderDraft[i]}
+                        placeholder="如 A1"
+                        aria-label={`第${i + 1}排件号`}
+                        onChange={(e) => {
+                          const next = [...slotOrderDraft]
+                          next[i] = e.target.value
+                          setSlotOrderDraft(next)
+                        }}
+                      />
+                    </label>
                   ))}
-                </tbody>
-              </table>
+                </div>
+                <div className="today-slot-modal-col">
+                  <span className="today-slot-modal-col-title muted">第7～10排</span>
+                  {[6, 7, 8, 9].map((i) => (
+                    <label key={i} className="today-slot-modal-field">
+                      <span className="today-slot-modal-field-label">{`第${i + 1}排`}</span>
+                      <input
+                        type="text"
+                        className="today-slot-modal-input"
+                        value={slotOrderDraft[i]}
+                        placeholder="如 A1"
+                        aria-label={`第${i + 1}排件号`}
+                        onChange={(e) => {
+                          const next = [...slotOrderDraft]
+                          next[i] = e.target.value
+                          setSlotOrderDraft(next)
+                        }}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <div className="today-slot-modal-col today-slot-modal-spacer-col" aria-hidden>
+                  <span className="today-slot-modal-slot-spacer" />
+                  <span className="today-slot-modal-slot-spacer" />
+                  <span className="today-slot-modal-slot-spacer" />
+                </div>
+              </div>
             </div>
             <div className="form-actions" style={{ marginTop: '0.75rem' }}>
               <button type="button" className="btn" onClick={() => setSlotOrderModalOpen(false)}>
