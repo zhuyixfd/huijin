@@ -21,6 +21,7 @@
   max-height: 100vh;
   overflow-y: auto;
   overscroll-behavior: contain;
+  z-index: 2;
 }
 
 .dashboard-brand {

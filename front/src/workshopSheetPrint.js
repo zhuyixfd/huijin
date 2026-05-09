@@ -18,7 +18,8 @@ const sheetCss = `
   .pos-row td.mid { background: #fafafa; }
   .pos-row td.pos-slot-empty { min-height: 1.5rem; vertical-align: middle; }
   .pos-row td.pos-left-placeholder { background: #fafafa; color: transparent; }
-  .pos-row td.pos-slot-label { text-align: center; font-weight: 600; }
+  .pos-row td.pos-slot-label { text-align: center; font-weight: 600; vertical-align: middle; }
+  .pos-row td.pos-slot-label.mid { background: #fafafa; }
   .status-banner td { vertical-align: middle; background: #e8f4fc; border-top-width: 2px !important; }
   .status-banner .status-banner-label { text-align: left; font-weight: 700; }
   .status-banner .status-banner-fill { border-left: none; }
