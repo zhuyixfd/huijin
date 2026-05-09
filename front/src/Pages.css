@@ -119,30 +119,32 @@
   font-size: 0.9rem;
 }
 
-/* 双面板必须纵向叠放：用常规块级流 + 间距，避免被误判为横向排列 */
+/* 处理中页双表：强制纵向栈（与 JSX 内联 flex 一致；内联优先，此处作兜底） */
 .task-queue-panels {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 1rem;
   width: 100%;
   box-sizing: border-box;
+  align-items: stretch;
 }
 
 .task-queue-panels > .task-queue-panel {
-  display: block;
+  flex: 0 0 auto;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
-  margin-bottom: 1rem;
-}
-
-.task-queue-panels > .task-queue-panel:last-child {
-  margin-bottom: 0;
 }
 
 .task-queue-panel {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .task-queue-panel-title {

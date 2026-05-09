@@ -670,9 +670,26 @@ export default function TasksPage({ tasksPreset = 'all' }) {
             </table>
           </div>
         ) : tasksPreset === 'processing' ? (
-          <div className="task-queue-panels">
-            <section className="task-queue-panel card">
-              <h3 className="task-queue-panel-title">今日处理</h3>
+          <div
+            className="task-queue-panels"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              flexWrap: 'nowrap',
+              gap: '1rem',
+              width: '100%',
+              alignItems: 'stretch',
+            }}
+          >
+            <div
+              role="region"
+              aria-labelledby="task-queue-today-heading"
+              className="task-queue-panel card"
+              style={{ width: '100%', minWidth: 0, flexShrink: 0 }}
+            >
+              <h3 id="task-queue-today-heading" className="task-queue-panel-title">
+                今日处理
+              </h3>
               <div className="data-table-wrap task-queue-panel-inner">
                 <table className="data-table task-mega-table">
                   {renderMegaThead(true)}
@@ -689,9 +706,16 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                   </tbody>
                 </table>
               </div>
-            </section>
-            <section className="task-queue-panel card">
-              <h3 className="task-queue-panel-title">处理中</h3>
+            </div>
+            <div
+              role="region"
+              aria-labelledby="task-queue-rest-heading"
+              className="task-queue-panel card"
+              style={{ width: '100%', minWidth: 0, flexShrink: 0 }}
+            >
+              <h3 id="task-queue-rest-heading" className="task-queue-panel-title">
+                处理中
+              </h3>
               <div className="data-table-wrap task-queue-panel-inner">
                 <table className="data-table task-mega-table">
                   {renderMegaThead(false)}
@@ -708,7 +732,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                   </tbody>
                 </table>
               </div>
-            </section>
+            </div>
           </div>
         ) : (
           <div className="data-table-wrap task-table-wrap">
