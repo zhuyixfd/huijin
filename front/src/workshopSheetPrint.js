@@ -2,6 +2,8 @@
  * 汇金加工生产单：今日处理排产预览 / 打印（快锻机车间）
  */
 
+import { formatSlotPiecesDisplay } from './todaySlotOrderStorage.js'
+
 const sheetCss = `
   * { box-sizing: border-box; }
   body { font-family: system-ui, "Segoe UI", Roboto, "PingFang SC", sans-serif; padding: 16px; color: #111; max-width: 900px; margin: 0 auto; }
@@ -139,10 +141,10 @@ function buildPositionInnerTableRowsSlotLabels(labels) {
   const empty5 = '<td class="pos-slot-empty">&nbsp;</td>'
   let html = ''
   for (let r = 0; r < 4; r += 1) {
-    const rawL = String(labels[r] ?? '').trim()
-    const rawR = String(labels[r + 6] ?? '').trim()
-    const showL = rawL ? esc(rawL) : '&nbsp;'
-    const showR = rawR ? esc(rawR) : '&nbsp;'
+    const dispL = formatSlotPiecesDisplay(labels[r] ?? '')
+    const dispR = formatSlotPiecesDisplay(labels[r + 6] ?? '')
+    const showL = dispL ? esc(dispL) : '&nbsp;'
+    const showR = dispR ? esc(dispR) : '&nbsp;'
     html += `<tr class="pos-row">
       <td>${esc(`第${r + 1}排`)}</td>
       <td colspan="3" class="pos-slot-label mid">${showL}</td>
@@ -151,8 +153,8 @@ function buildPositionInnerTableRowsSlotLabels(labels) {
     </tr>`
   }
   for (let r = 4; r < 6; r += 1) {
-    const rawL = String(labels[r] ?? '').trim()
-    const showL = rawL ? esc(rawL) : '&nbsp;'
+    const dispL = formatSlotPiecesDisplay(labels[r] ?? '')
+    const showL = dispL ? esc(dispL) : '&nbsp;'
     html += `<tr class="pos-row">
       <td>${esc(`第${r + 1}排`)}</td>
       <td colspan="3" class="pos-slot-label mid">${showL}</td>

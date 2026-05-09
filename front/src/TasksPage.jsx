@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './Pages.css'
 import { deleteReq, getJson, patchJson, postFormData, postJson } from './api.js'
 import { openPrint } from './printSlip.js'
-import { loadTodaySlotOrder, saveTodaySlotOrder } from './todaySlotOrderStorage.js'
+import {
+  formatSlotPiecesDisplay,
+  joinSlotPieces,
+  loadTodaySlotOrder,
+  parseSlotPieces,
+  saveTodaySlotOrder,
+} from './todaySlotOrderStorage.js'
 import { openDeliverySlipPreview } from './deliverySheetPrint.js'
 import { openWorkshopProductionPreview } from './workshopSheetPrint.js'
 
@@ -848,13 +854,19 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     if (slot < 0 || slot > 9) return
     setSlotOrderDraft((prev) => {
       const next = [...prev]
+      const cur = parseSlotPieces(next[slot])
       const dedupe = raw !== '—'
-      if (dedupe) {
-        for (let j = 0; j < 10; j += 1) {
-          if (j !== slot && String(next[j]).trim() === raw) next[j] = ''
+      if (cur.includes(raw)) {
+        next[slot] = joinSlotPieces(cur.filter((p) => p !== raw))
+      } else {
+        next[slot] = joinSlotPieces([...cur, raw])
+        if (dedupe) {
+          for (let j = 0; j < 10; j += 1) {
+            if (j === slot) continue
+            next[j] = joinSlotPieces(parseSlotPieces(next[j]).filter((p) => p !== raw))
+          }
         }
       }
-      next[slot] = raw
       return next
     })
   }
@@ -1501,7 +1513,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                         {[0, 1, 2, 3, 4, 5].map((i) => (
                           <span key={`l-${i}`} className="today-slot-chip">
                             第{i + 1}排{' '}
-                            <strong>{String(todaySlotOrder[i] ?? '').trim() || '—'}</strong>
+                            <strong>{formatSlotPiecesDisplay(todaySlotOrder[i] ?? '') || '—'}</strong>
                           </span>
                         ))}
                       </div>
@@ -1509,7 +1521,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                         {[6, 7, 8, 9].map((i) => (
                           <span key={`r-${i}`} className="today-slot-chip">
                             第{i + 1}排{' '}
-                            <strong>{String(todaySlotOrder[i] ?? '').trim() || '—'}</strong>
+                            <strong>{formatSlotPiecesDisplay(todaySlotOrder[i] ?? '') || '—'}</strong>
                           </span>
                         ))}
                       </div>
@@ -2374,7 +2386,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
           >
             <h2 id="slot-order-modal-title">今日件号排序</h2>
             <p className="muted" style={{ marginTop: '-0.35rem' }}>
-              先点选一排（高亮），再点上方的件号填入该排；与加工生产单左1～6、右7～10排一致，保存后用于「打印排序生产单」。
+              先点选一排（高亮），再点上方的件号：可连续点多个件号排进同一排（顿号分隔）；同一排再点已选件号会从该排去掉。非「未编号」的件号仍不可同时出现在两排。
             </p>
             <section className="today-slot-modal-pool" aria-label="今日处理件号">
               <div className="today-slot-modal-pool-head">
@@ -2388,11 +2400,15 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
               ) : (
                 <div className="today-slot-modal-pool-chips">
                   {todaySlotPiecePool.map((p) => {
-                    const dedupeLabel = p.label !== '—'
-                    const placedAt = dedupeLabel
-                      ? slotOrderDraft.findIndex((s) => String(s).trim() === p.label)
-                      : -1
-                    const isPlaced = placedAt >= 0
+                    const placedRows = []
+                    for (let j = 0; j < 10; j += 1) {
+                      if (parseSlotPieces(slotOrderDraft[j]).includes(p.label)) placedRows.push(j)
+                    }
+                    const isPlaced = placedRows.length > 0
+                    const placedLabel =
+                      placedRows.length > 0
+                        ? placedRows.map((i) => `第${i + 1}排`).join('、')
+                        : ''
                     return (
                       <button
                         key={p.key}
@@ -2407,7 +2423,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                           {p.orderNo || `明细${p.detailId}`} · 第{p.unitIndex + 1}件
                         </span>
                         {isPlaced ? (
-                          <span className="today-slot-modal-piece-slot">第{placedAt + 1}排</span>
+                          <span className="today-slot-modal-piece-slot">{placedLabel}</span>
                         ) : null}
                       </button>
                     )
@@ -2420,7 +2436,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 <div className="today-slot-modal-col">
                   <span className="today-slot-modal-col-title muted">第1～6排（点选）</span>
                   {[0, 1, 2, 3, 4, 5].map((i) => {
-                    const val = String(slotOrderDraft[i] ?? '').trim()
+                    const disp = formatSlotPiecesDisplay(slotOrderDraft[i] ?? '')
                     return (
                       <div key={i} className="today-slot-modal-slot-row">
                         <button
@@ -2430,13 +2446,13 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                           onClick={() => setSlotOrderActiveSlot(i)}
                         >
                           <span className="today-slot-modal-slot-num">{`第${i + 1}排`}</span>
-                          <span className="today-slot-modal-slot-val">{val || '空'}</span>
+                          <span className="today-slot-modal-slot-val">{disp || '空'}</span>
                         </button>
                         <button
                           type="button"
                           className="btn btn-ghost today-slot-modal-slot-clear"
                           aria-label={`清空第${i + 1}排`}
-                          disabled={!val}
+                          disabled={!disp}
                           onClick={() => clearSlotOrderRow(i)}
                         >
                           清空
@@ -2448,7 +2464,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 <div className="today-slot-modal-col">
                   <span className="today-slot-modal-col-title muted">第7～10排（点选）</span>
                   {[6, 7, 8, 9].map((i) => {
-                    const val = String(slotOrderDraft[i] ?? '').trim()
+                    const disp = formatSlotPiecesDisplay(slotOrderDraft[i] ?? '')
                     return (
                       <div key={i} className="today-slot-modal-slot-row">
                         <button
@@ -2458,13 +2474,13 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                           onClick={() => setSlotOrderActiveSlot(i)}
                         >
                           <span className="today-slot-modal-slot-num">{`第${i + 1}排`}</span>
-                          <span className="today-slot-modal-slot-val">{val || '空'}</span>
+                          <span className="today-slot-modal-slot-val">{disp || '空'}</span>
                         </button>
                         <button
                           type="button"
                           className="btn btn-ghost today-slot-modal-slot-clear"
                           aria-label={`清空第${i + 1}排`}
-                          disabled={!val}
+                          disabled={!disp}
                           onClick={() => clearSlotOrderRow(i)}
                         >
                           清空
