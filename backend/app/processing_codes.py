@@ -21,6 +21,7 @@ def count_processing_piece_strip(db: Session) -> list[tuple[str, int]]:
             OrderItem.production_status != "未入库",
             OrderItem.production_status != "已发回",
             OrderItem.production_status != "待发回",
+            OrderItem.production_status != "出库中",
             OrderItem.processing_unit_codes.isnot(None),
         )
     ).all()

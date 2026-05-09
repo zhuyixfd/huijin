@@ -3,6 +3,7 @@ import './Pages.css'
 import { deleteReq, getJson, patchJson, postFormData, postJson } from './api.js'
 import { openPrint } from './printSlip.js'
 import { loadTodaySlotOrder, saveTodaySlotOrder } from './todaySlotOrderStorage.js'
+import { openDeliverySlipPreview } from './deliverySheetPrint.js'
 import { openWorkshopProductionPreview } from './workshopSheetPrint.js'
 
 const emptyItemForm = () => ({
@@ -239,8 +240,8 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
         setStatusFilter('')
         break
       case 'ready_outbound':
-        setStatusCategory('all')
-        setStatusFilter('待发回')
+        setStatusCategory('ready_outbound')
+        setStatusFilter('')
         break
       case 'done':
         setStatusCategory('completed')
@@ -542,6 +543,8 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     tasksPreset === 'all' || tasksPreset === 'processing'
   const showNewWorkOrder = tasksPreset === 'all' || tasksPreset === 'pending'
   const showBulkSelectCol = showBulkCheckboxCol && bulkSelectColumnVisible
+  const showReadyOutboundActionsCol = tasksPreset === 'ready_outbound'
+  const customerColLabel = tasksPreset === 'ready_outbound' ? '收货单位' : '客户'
   /** 列表 mega 表列显隐（进入详情改状态；部分预设去掉列减轻干扰） */
   const showTaskActionsCol = !(
     tasksPreset === 'all' ||
@@ -559,7 +562,8 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     (showTaskActionsCol ? 0 : 1) -
     (showCuttingReturnDateCols ? 0 : 2) -
     (showProductionStatusCol ? 0 : 1) +
-    (showProcessingUnitCol ? 1 : 0)
+    (showProcessingUnitCol ? 1 : 0) +
+    (showReadyOutboundActionsCol ? 1 : 0)
   const listColSpan = dataColCount + (showBulkSelectCol ? 1 : 0)
   const totalPages = Math.max(1, Math.ceil(listTotal / pageSize))
 
@@ -574,6 +578,19 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       else r.push(row)
     }
     return { todayQueueRows: t, restProcessingRows: r }
+  }, [rows, tasksPreset])
+
+  const { waitingOutboundRows, shippingOutboundRows } = useMemo(() => {
+    if (tasksPreset !== 'ready_outbound') {
+      return { waitingOutboundRows: [], shippingOutboundRows: [] }
+    }
+    const w = []
+    const s = []
+    for (const row of rows) {
+      if (row.production_status === '待发回') w.push(row)
+      else if (row.production_status === '出库中') s.push(row)
+    }
+    return { waitingOutboundRows: w, shippingOutboundRows: s }
   }, [rows, tasksPreset])
 
   async function submitAddToTodayFromProcessing() {
@@ -980,6 +997,19 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
           ) : null}
         </td>
       ) : null}
+      {showReadyOutboundActionsCol ? (
+        <td className={`row-actions cell-actions ${GS}`} onClick={(e) => e.stopPropagation()}>
+          {it.production_status === '待发回' ? (
+            <button type="button" className="btn btn-primary" onClick={() => patchStatus(it, '出库中')}>
+              →出库中
+            </button>
+          ) : it.production_status === '出库中' ? (
+            <button type="button" className="btn btn-ghost" onClick={() => patchStatus(it, '待发回')}>
+              ←等待出库
+            </button>
+          ) : null}
+        </td>
+      ) : null}
       {showTaskActionsCol ? (
         <td className={`row-actions cell-actions ${GS}`} onClick={(e) => e.stopPropagation()}>
           {showChrome ? (
@@ -1047,7 +1077,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
         <th className="cell-nowrap">明细ID</th>
         {showProcessingUnitCol ? <th className="cell-nowrap">件号</th> : null}
         <th className="cell-nowrap">订单编号</th>
-        <th>客户</th>
+        <th>{customerColLabel}</th>
         <th className="cell-nowrap">下单时间</th>
         <th>订单状态</th>
         <th>订单备注</th>
@@ -1067,6 +1097,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
         {showCuttingReturnDateCols ? <th>发回日期</th> : null}
         {showProductionStatusCol ? <th className={GS}>生产状态</th> : null}
         {showTaskActionsCol ? <th className={GS}>操作</th> : null}
+        {showReadyOutboundActionsCol ? <th className={GS}>操作</th> : null}
       </tr>
     </thead>
   )
@@ -1156,7 +1187,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 <option value="">全部生产状态</option>
                 {statuses.map((s) => (
                   <option key={s} value={s}>
-                    {s === '待发回' ? '待发回（待出库）' : s}
+                    {s === '待发回' ? '待发回（等待出库）' : s}
                   </option>
                 ))}
               </select>
@@ -1265,7 +1296,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 <option value="">请选择生产状态</option>
                 {statuses.map((s) => (
                   <option key={s} value={s}>
-                    {s === '待发回' ? '待发回（待出库）' : s}
+                    {s === '待发回' ? '待发回（等待出库）' : s}
                   </option>
                 ))}
               </select>
@@ -1637,6 +1668,85 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
             </div>
           </div>
           </>
+        ) : tasksPreset === 'ready_outbound' ? (
+          <div
+            className="task-queue-panels"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              flexWrap: 'nowrap',
+              gap: '1rem',
+              width: '100%',
+              alignItems: 'stretch',
+            }}
+          >
+            <div
+              role="region"
+              aria-labelledby="outbound-wait-heading"
+              className="task-queue-panel card"
+              style={{ width: '100%', minWidth: 0, flexShrink: 0 }}
+            >
+              <div className="task-queue-panel-head">
+                <h3 id="outbound-wait-heading" className="task-queue-panel-title">
+                  等待出库 · {waitingOutboundRows.length} 条
+                </h3>
+              </div>
+              <div className="data-table-wrap task-queue-panel-inner">
+                <table className="data-table task-mega-table">
+                  {renderMegaThead(true)}
+                  <tbody>
+                    {waitingOutboundRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={listColSpan} className="muted task-queue-empty-hint">
+                          暂无；处理中单据设为「待发回」后进入本节，可点此「→出库中」发运
+                        </td>
+                      </tr>
+                    ) : (
+                      waitingOutboundRows.map((r) => renderTaskRow(r))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div
+              role="region"
+              aria-labelledby="outbound-ship-heading"
+              className="task-queue-panel card"
+              style={{ width: '100%', minWidth: 0, flexShrink: 0 }}
+            >
+              <div className="task-queue-panel-head">
+                <h3 id="outbound-ship-heading" className="task-queue-panel-title">
+                  出库中 · {shippingOutboundRows.length} 条
+                </h3>
+                <div className="task-queue-panel-actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={shippingOutboundRows.length === 0}
+                    onClick={() => openDeliverySlipPreview(shippingOutboundRows)}
+                  >
+                    打印送货单（按收货单位分页）
+                  </button>
+                </div>
+              </div>
+              <div className="data-table-wrap task-queue-panel-inner">
+                <table className="data-table task-mega-table">
+                  {renderMegaThead(false)}
+                  <tbody>
+                    {shippingOutboundRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={listColSpan} className="muted">
+                          暂无；在等待出库中点击「→出库中」进入本节后可打印送货单
+                        </td>
+                      </tr>
+                    ) : (
+                      shippingOutboundRows.map((r) => renderTaskRow(r))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="data-table-wrap task-table-wrap">
             <table className="data-table task-mega-table">

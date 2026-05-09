@@ -77,6 +77,14 @@ def _task_filter_conditions(
             conds.append(OrderItem.production_status != "未入库")
             conds.append(OrderItem.production_status != "已发回")
             conds.append(OrderItem.production_status != "待发回")
+            conds.append(OrderItem.production_status != "出库中")
+        elif cat == "ready_outbound":
+            conds.append(
+                or_(
+                    OrderItem.production_status == "待发回",
+                    OrderItem.production_status == "出库中",
+                )
+            )
         else:
             raise HTTPException(status_code=400, detail="无效的 status_category")
 
@@ -97,10 +105,16 @@ def task_nav_counts(
             OrderItem.production_status != "未入库",
             OrderItem.production_status != "已发回",
             OrderItem.production_status != "待发回",
+            OrderItem.production_status != "出库中",
         )
     ) or 0
     ready_n = db.scalar(
-        select(func.count(OrderItem.id)).where(OrderItem.production_status == "待发回")
+        select(func.count(OrderItem.id)).where(
+            or_(
+                OrderItem.production_status == "待发回",
+                OrderItem.production_status == "出库中",
+            )
+        )
     ) or 0
     # 全部订单（未完成）= 未处理 + 处理中 + 待出库（三者互斥）
     all_n = int(pending_n) + int(processing_n) + int(ready_n)
@@ -131,7 +145,7 @@ def list_task_items(
     customer_q: str | None = Query(None, description="客户名称模糊"),
     status_category: str | None = Query(
         None,
-        description="聚合筛选：all | placed | waiting_inbound | in_progress | completed",
+        description="聚合筛选：all | placed | waiting_inbound | in_progress | completed | ready_outbound",
     ),
     created_from: date | None = Query(None),
     created_to: date | None = Query(None),
