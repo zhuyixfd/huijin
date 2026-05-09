@@ -22,11 +22,17 @@ function ordersSectionActive(activeNav) {
   return section.children?.some((c) => c.key === activeNav) ?? false
 }
 
+function navCountLabel(counts, key) {
+  if (!counts || typeof counts[key] !== 'number') return '…'
+  return String(counts[key])
+}
+
 export default function DashboardShell({
   user,
   activeNav,
   onNavChange,
   onLogout,
+  taskNavCounts,
   children,
 }) {
   const isAdmin = user.role === 'admin'
@@ -49,19 +55,39 @@ export default function DashboardShell({
                     className={`dashboard-nav-item ${activeNav === n.primaryNav.key ? 'is-active' : ''}`}
                     onClick={() => onNavChange(n.primaryNav.key)}
                   >
-                    {n.primaryNav.label}
+                    {n.primaryNav.label}{' '}
+                    <span className="dashboard-nav-count">
+                      ({navCountLabel(taskNavCounts, 'all')})
+                    </span>
                   </button>
                   <div className="dashboard-nav-sub">
-                    {n.children.map((c) => (
-                      <button
-                        key={c.key}
-                        type="button"
-                        className={`dashboard-nav-item dashboard-nav-sub-item ${activeNav === c.key ? 'is-active' : ''}`}
-                        onClick={() => onNavChange(c.key)}
-                      >
-                        {c.label}
-                      </button>
-                    ))}
+                    {n.children.map((c) => {
+                      const ck =
+                        c.key === 'tasks-pending'
+                          ? 'pending'
+                          : c.key === 'tasks-processing'
+                            ? 'processing'
+                            : c.key === 'tasks-ready-outbound'
+                              ? 'ready_outbound'
+                              : c.key === 'tasks-done'
+                                ? 'done'
+                                : null
+                      return (
+                        <button
+                          key={c.key}
+                          type="button"
+                          className={`dashboard-nav-item dashboard-nav-sub-item ${activeNav === c.key ? 'is-active' : ''}`}
+                          onClick={() => onNavChange(c.key)}
+                        >
+                          {c.label}{' '}
+                          {ck ? (
+                            <span className="dashboard-nav-count">
+                              ({navCountLabel(taskNavCounts, ck)})
+                            </span>
+                          ) : null}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               )

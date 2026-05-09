@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -11,7 +11,14 @@ from app.models import Customer, OrderItem
 from app.models import User as UserModel
 from app.order_number import generate_next_order_no
 from app.order_status import format_single_line_item_order_status
-from app.schemas_business import OrderItemCreate, OrderItemOut, TaskItemOut, WorkOrderCreate
+from app.schemas_business import (
+    OrderItemCreate,
+    OrderItemOut,
+    TaskItemListOut,
+    TaskItemOut,
+    TaskNavCountsOut,
+    WorkOrderCreate,
+)
 
 router = APIRouter()
 
@@ -20,7 +27,88 @@ def _single_row_order_status(item: OrderItem) -> str:
     return format_single_line_item_order_status(item.production_status)
 
 
-@router.get("/items", response_model=list[TaskItemOut])
+def _task_filter_conditions(
+    *,
+    status_filter: str | None,
+    customer_id: int | None,
+    customer_q: str | None,
+    q: str | None,
+    status_category: str | None,
+    created_from: date | None,
+    created_to: date | None,
+) -> list:
+    conds: list = []
+    if status_filter:
+        conds.append(OrderItem.production_status == status_filter)
+    if customer_id is not None:
+        conds.append(OrderItem.customer_id == customer_id)
+    if customer_q and customer_q.strip():
+        conds.append(Customer.name.contains(customer_q.strip()))
+    if q:
+        kw = q.strip()
+        conds.append(
+            or_(
+                OrderItem.order_no.contains(kw),
+                OrderItem.production_no.contains(kw),
+                OrderItem.incoming_no.contains(kw),
+            )
+        )
+    if created_from is not None:
+        start = datetime.combine(created_from, time.min)
+        conds.append(OrderItem.created_at >= start)
+    if created_to is not None:
+        end = datetime.combine(created_to, time.max)
+        conds.append(OrderItem.created_at <= end)
+
+    cat = (status_category or "all").strip().lower()
+    if cat not in ("", "all"):
+        if cat == "placed":
+            conds.append(OrderItem.id == -1)
+        elif cat == "waiting_inbound":
+            conds.append(OrderItem.production_status == "未入库")
+        elif cat == "completed":
+            conds.append(OrderItem.production_status == "已发回")
+        elif cat == "in_progress":
+            conds.append(OrderItem.production_status != "未入库")
+            conds.append(OrderItem.production_status != "已发回")
+        else:
+            raise HTTPException(status_code=400, detail="无效的 status_category")
+
+    return conds
+
+
+@router.get("/nav-counts", response_model=TaskNavCountsOut)
+def task_nav_counts(
+    _: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """侧栏「全部订单 / 未处理 / …」数量（全库汇总，不含列表搜索框条件）。"""
+    all_n = db.scalar(select(func.count(OrderItem.id))) or 0
+    pending_n = db.scalar(
+        select(func.count(OrderItem.id)).where(OrderItem.production_status == "未入库")
+    ) or 0
+    processing_n = db.scalar(
+        select(func.count(OrderItem.id)).where(
+            OrderItem.production_status != "未入库",
+            OrderItem.production_status != "已发回",
+        )
+    ) or 0
+    ready_n = db.scalar(
+        select(func.count(OrderItem.id)).where(OrderItem.production_status == "待发回")
+    ) or 0
+    done_n = db.scalar(
+        select(func.count(OrderItem.id)).where(OrderItem.production_status == "已发回")
+    ) or 0
+    return TaskNavCountsOut(
+        all=int(all_n),
+        pending=int(pending_n),
+        processing=int(processing_n),
+        ready_outbound=int(ready_n),
+        done=int(done_n),
+    )
+
+
+@router.get("/items", response_model=TaskItemListOut)
 def list_task_items(
     _: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -37,50 +125,31 @@ def list_task_items(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
 ):
+    conds = _task_filter_conditions(
+        status_filter=status_filter,
+        customer_id=customer_id,
+        customer_q=customer_q,
+        q=q,
+        status_category=status_category,
+        created_from=created_from,
+        created_to=created_to,
+    )
+
+    count_stmt = (
+        select(func.count(OrderItem.id))
+        .join(Customer, OrderItem.customer_id == Customer.id)
+        .where(*conds)
+    )
+    total = int(db.scalar(count_stmt) or 0)
+
     stmt = (
         select(OrderItem, Customer.name)
         .join(Customer, OrderItem.customer_id == Customer.id)
+        .where(*conds)
+        .order_by(OrderItem.id.desc())
+        .offset(skip)
+        .limit(limit)
     )
-    if status_filter:
-        stmt = stmt.where(OrderItem.production_status == status_filter)
-    if customer_id is not None:
-        stmt = stmt.where(OrderItem.customer_id == customer_id)
-    if customer_q and customer_q.strip():
-        stmt = stmt.where(Customer.name.contains(customer_q.strip()))
-    if q:
-        kw = q.strip()
-        stmt = stmt.where(
-            or_(
-                OrderItem.order_no.contains(kw),
-                OrderItem.production_no.contains(kw),
-                OrderItem.incoming_no.contains(kw),
-            )
-        )
-    if created_from is not None:
-        start = datetime.combine(created_from, time.min)
-        stmt = stmt.where(OrderItem.created_at >= start)
-    if created_to is not None:
-        end = datetime.combine(created_to, time.max)
-        stmt = stmt.where(OrderItem.created_at <= end)
-
-    cat = (status_category or "all").strip().lower()
-    if cat not in ("", "all"):
-        if cat == "placed":
-            # 任务列表以明细为主，无明细的空单不出现在此；占位兼容前端筛选
-            stmt = stmt.where(OrderItem.id == -1)
-        elif cat == "waiting_inbound":
-            stmt = stmt.where(OrderItem.production_status == "未入库")
-        elif cat == "completed":
-            stmt = stmt.where(OrderItem.production_status == "已发回")
-        elif cat == "in_progress":
-            stmt = stmt.where(
-                OrderItem.production_status != "未入库",
-                OrderItem.production_status != "已发回",
-            )
-        else:
-            raise HTTPException(status_code=400, detail="无效的 status_category")
-
-    stmt = stmt.order_by(OrderItem.id.desc()).offset(skip).limit(limit)
     rows = db.execute(stmt).all()
     out: list[TaskItemOut] = []
     for item, cust_name in rows:
@@ -93,7 +162,7 @@ def list_task_items(
                 order_status=_single_row_order_status(item),
             )
         )
-    return out
+    return TaskItemListOut(items=out, total=total)
 
 
 @router.post("/work-orders", response_model=TaskItemOut, status_code=status.HTTP_201_CREATED)

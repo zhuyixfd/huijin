@@ -97,6 +97,7 @@ function dtLocal(val) {
 
 const GS = 'task-col-group-start'
 const COL_COUNT = 22
+const PAGE_SIZE_OPTIONS = [20, 50, 100]
 
 function listPageTitle(preset) {
   switch (preset) {
@@ -115,7 +116,7 @@ function listPageTitle(preset) {
   }
 }
 
-export default function TasksPage({ tasksPreset = 'all' }) {
+export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
   const [customers, setCustomers] = useState([])
   const [statuses, setStatuses] = useState([])
 
@@ -128,6 +129,9 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   const [q, setQ] = useState('')
 
   const [rows, setRows] = useState([])
+  const [listTotal, setListTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
 
@@ -190,6 +194,25 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   }, [tasksPreset])
 
   useEffect(() => {
+    queueMicrotask(() => setPage(1))
+  }, [
+    tasksPreset,
+    statusFilter,
+    statusCategory,
+    cid,
+    q,
+    customerNameQ,
+    createdFrom,
+    createdTo,
+    pageSize,
+  ])
+
+  useEffect(() => {
+    const tp = Math.max(1, Math.ceil(listTotal / pageSize))
+    if (page > tp) queueMicrotask(() => setPage(tp))
+  }, [listTotal, pageSize, page])
+
+  useEffect(() => {
     if (!bulkSelectColumnVisible) {
       queueMicrotask(() => setSelectedIds([]))
     }
@@ -229,12 +252,30 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     if (customerNameQ.trim()) p.set('customer_q', customerNameQ.trim())
     if (createdFrom) p.set('created_from', createdFrom)
     if (createdTo) p.set('created_to', createdTo)
+    p.set('skip', String((page - 1) * pageSize))
+    p.set('limit', String(pageSize))
     const qs = p.toString()
-    getJson(`/api/tasks/items${qs ? `?${qs}` : ''}`)
-      .then(setRows)
+    getJson(`/api/tasks/items?${qs}`)
+      .then((d) => {
+        setErr(null)
+        setRows(d.items)
+        setListTotal(typeof d.total === 'number' ? d.total : 0)
+        onTasksMutated?.()
+      })
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false))
-  }, [statusFilter, q, cid, statusCategory, customerNameQ, createdFrom, createdTo])
+  }, [
+    statusFilter,
+    q,
+    cid,
+    statusCategory,
+    customerNameQ,
+    createdFrom,
+    createdTo,
+    page,
+    pageSize,
+    onTasksMutated,
+  ])
 
   useEffect(() => {
     queueMicrotask(() => loadMeta())
@@ -430,6 +471,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   const showNewWorkOrder = tasksPreset === 'all' || tasksPreset === 'pending'
   const showBulkSelectCol = showBulkCheckboxCol && bulkSelectColumnVisible
   const listColSpan = COL_COUNT + (showBulkSelectCol ? 1 : 0)
+  const totalPages = Math.max(1, Math.ceil(listTotal / pageSize))
 
   const { todayQueueRows, restProcessingRows } = useMemo(() => {
     if (tasksPreset !== 'processing') {
@@ -444,8 +486,45 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     return { todayQueueRows: t, restProcessingRows: r }
   }, [rows, tasksPreset])
 
-  const renderTaskRow = (it) => (
-    <tr key={it.id} className="clickable" onClick={() => enterDetail(it)}>
+  const todayQueueQtySum = useMemo(
+    () => todayQueueRows.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
+    [todayQueueRows],
+  )
+
+  /** 今日处理：按订单号归类并排在一起，组间交替底色（orderBand） */
+  const todayQueueSortedBands = useMemo(() => {
+    const sorted = [...todayQueueRows].sort((a, b) => {
+      const ao = String(a.order_no ?? '')
+      const bo = String(b.order_no ?? '')
+      const cmp = ao.localeCompare(bo, 'zh-CN')
+      if (cmp !== 0) return cmp
+      return a.id - b.id
+    })
+    const groupIdxAtRow = []
+    let g = 0
+    for (let idx = 0; idx < sorted.length; idx += 1) {
+      if (idx > 0 && sorted[idx - 1].order_no !== sorted[idx].order_no) g += 1
+      groupIdxAtRow.push(g)
+    }
+    return sorted.map((it, idx) => ({
+      it,
+      orderBand: groupIdxAtRow[idx] % 2 === 0 ? 'a' : 'b',
+    }))
+  }, [todayQueueRows])
+
+  const renderTaskRow = (it, rowOptions = {}) => {
+    const bandClass =
+      rowOptions.orderBand === 'a'
+        ? 'task-order-group-a'
+        : rowOptions.orderBand === 'b'
+          ? 'task-order-group-b'
+          : ''
+    return (
+    <tr
+      key={it.id}
+      className={['clickable', bandClass].filter(Boolean).join(' ')}
+      onClick={() => enterDetail(it)}
+    >
       {showBulkSelectCol ? (
         <td className="task-select-cell" onClick={(e) => e.stopPropagation()}>
           <input
@@ -522,7 +601,8 @@ export default function TasksPage({ tasksPreset = 'all' }) {
         ) : null}
       </td>
     </tr>
-  )
+    )
+  }
 
   const renderMegaThead = (bulkControls) => (
     <thead>
@@ -800,6 +880,44 @@ export default function TasksPage({ tasksPreset = 'all' }) {
       {err ? <p className="err">{err}</p> : null}
 
       {view === 'list' ? (
+        <div className="tasks-pagination-bar toolbar">
+          <label className="tasks-page-size">
+            每页
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              aria-label="每页条数"
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+          <span className="muted tasks-page-info">
+            共 {listTotal} 条 · 第 {page} / {totalPages} 页
+          </span>
+          <button
+            type="button"
+            className="btn"
+            disabled={loading || page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            上一页
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={loading || page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            下一页
+          </button>
+        </div>
+      ) : null}
+
+      {view === 'list' ? (
         loading ? (
           <div className="data-table-wrap task-table-wrap">
             <table className="data-table task-mega-table">
@@ -845,7 +963,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
               style={{ width: '100%', minWidth: 0, flexShrink: 0 }}
             >
               <h3 id="task-queue-today-heading" className="task-queue-panel-title">
-                今日处理
+                今日处理 · {todayQueueRows.length} 条 · 合计 {todayQueueQtySum} 件
               </h3>
               <div className="data-table-wrap task-queue-panel-inner">
                 <table className="data-table task-mega-table">
@@ -858,7 +976,9 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                         </td>
                       </tr>
                     ) : (
-                      todayQueueRows.map(renderTaskRow)
+                      todayQueueSortedBands.map(({ it, orderBand }) =>
+                        renderTaskRow(it, { orderBand }),
+                      )
                     )}
                   </tbody>
                 </table>

@@ -7,11 +7,13 @@ import HomePage from './HomePage.jsx'
 import Login from './Login.jsx'
 import TasksPage from './TasksPage.jsx'
 import { authFetch, clearToken, getToken } from './auth.js'
+import { getJson } from './api.js'
 
 export default function App() {
   const [sessionChecked, setSessionChecked] = useState(false)
   const [user, setUser] = useState(null)
   const [activeNav, setActiveNav] = useState('home')
+  const [taskNavCounts, setTaskNavCounts] = useState(null)
 
   const refreshUser = useCallback(() => {
     const token = getToken()
@@ -43,6 +45,17 @@ export default function App() {
   useEffect(() => {
     queueMicrotask(() => refreshUser())
   }, [refreshUser])
+
+  const refreshTaskNavCounts = useCallback(() => {
+    getJson('/api/tasks/nav-counts')
+      .then(setTaskNavCounts)
+      .catch(() => setTaskNavCounts(null))
+  }, [])
+
+  useEffect(() => {
+    if (!user) return
+    refreshTaskNavCounts()
+  }, [user, refreshTaskNavCounts])
 
   function handleLogout() {
     clearToken()
@@ -98,7 +111,12 @@ export default function App() {
   function renderMain() {
     if (showAccounts) return <EmployeeAdmin />
     if (TASKS_PAGE_KEYS.has(resolvedNav)) {
-      return <TasksPage tasksPreset={tasksPresetFromNav(resolvedNav)} />
+      return (
+        <TasksPage
+          tasksPreset={tasksPresetFromNav(resolvedNav)}
+          onTasksMutated={refreshTaskNavCounts}
+        />
+      )
     }
     switch (resolvedNav) {
       case 'customers':
@@ -115,6 +133,7 @@ export default function App() {
       activeNav={resolvedNav}
       onNavChange={handleNavChange}
       onLogout={handleLogout}
+      taskNavCounts={taskNavCounts}
     >
       {renderMain()}
     </DashboardShell>

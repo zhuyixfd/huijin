@@ -95,6 +95,26 @@
   min-width: 0;
 }
 
+.tasks-pagination-bar {
+  margin-top: -0.25rem;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.tasks-page-size select {
+  margin-left: 0.35rem;
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.tasks-page-info {
+  font-size: 0.9rem;
+}
+
 .toolbar-batch-select {
   min-width: 11rem;
   max-width: min(100%, 22rem);
@@ -248,6 +268,35 @@
 
 .data-table tr.clickable:hover {
   background: var(--accent-bg);
+}
+
+/* 处理中 · 今日处理：同一订单号同色，相邻订单号交替底色（着色在 td） */
+.task-mega-table tbody tr.task-order-group-a.clickable:hover,
+.task-mega-table tbody tr.task-order-group-b.clickable:hover {
+  background: transparent;
+}
+
+.task-mega-table tbody tr.task-order-group-a td {
+  background-color: rgba(244, 243, 236, 0.72);
+}
+
+.task-mega-table tbody tr.task-order-group-b td {
+  background-color: rgba(232, 230, 222, 0.55);
+}
+
+.task-mega-table tbody tr.task-order-group-a.clickable:hover td,
+.task-mega-table tbody tr.task-order-group-b.clickable:hover td {
+  background-color: var(--accent-bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  .task-mega-table tbody tr.task-order-group-a td {
+    background-color: rgba(52, 53, 62, 0.78);
+  }
+
+  .task-mega-table tbody tr.task-order-group-b td {
+    background-color: rgba(38, 39, 48, 0.68);
+  }
 }
 
 .btn {

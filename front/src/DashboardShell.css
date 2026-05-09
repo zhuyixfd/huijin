@@ -54,6 +54,12 @@
   font-weight: 500;
 }
 
+.dashboard-nav-count {
+  font-weight: 500;
+  opacity: 0.82;
+  font-variant-numeric: tabular-nums;
+}
+
 .dashboard-nav-section {
   display: flex;
   flex-direction: column;

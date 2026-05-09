@@ -235,6 +235,23 @@ class TaskItemOut(OrderItemOut):
     )
 
 
+class TaskItemListOut(BaseModel):
+    """分页列表：items + 筛选条件下的总数 total。"""
+
+    items: list[TaskItemOut]
+    total: int
+
+
+class TaskNavCountsOut(BaseModel):
+    """侧栏订单分组数量（不受列表搜索条件影响）。"""
+
+    all: int
+    pending: int
+    processing: int
+    ready_outbound: int
+    done: int
+
+
 class DashboardSummary(BaseModel):
     customer_count: int
     order_count: int
