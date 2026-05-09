@@ -412,9 +412,92 @@
   font-size: 0.88rem;
 }
 
+.today-slot-modal-pool {
+  margin-top: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--social-bg);
+}
+
+.today-slot-modal-pool-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.today-slot-modal-pool-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-h);
+}
+
+.today-slot-modal-pool-hint {
+  font-size: 0.82rem;
+}
+
+.today-slot-modal-pool-empty {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.today-slot-modal-pool-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.55rem;
+  align-items: stretch;
+}
+
+.today-slot-modal-piece-chip {
+  font: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  padding: 0.4rem 0.55rem;
+  min-width: 4.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.today-slot-modal-piece-chip:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.today-slot-modal-piece-chip.is-placed {
+  opacity: 0.88;
+  border-style: dashed;
+}
+
+.today-slot-modal-piece-main {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.today-slot-modal-piece-meta {
+  font-size: 0.72rem;
+  opacity: 0.82;
+  line-height: 1.25;
+}
+
+.today-slot-modal-piece-slot {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #1d4ed8;
+  margin-top: 0.1rem;
+}
+
 .today-slot-modal-two-col-wrap {
-  margin-top: 0.5rem;
-  max-height: min(62vh, 560px);
+  margin-top: 0.75rem;
+  max-height: min(52vh, 480px);
   overflow: auto;
 }
 
@@ -478,6 +561,57 @@
   box-sizing: border-box;
   background: var(--bg);
   color: var(--text-h);
+}
+
+.today-slot-modal-slot-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.today-slot-modal-slot-btn {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.today-slot-modal-slot-btn:hover {
+  border-color: var(--accent-border);
+}
+
+.today-slot-modal-slot-btn.is-active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.today-slot-modal-slot-num {
+  font-size: 0.78rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.today-slot-modal-slot-val {
+  font-size: 0.88rem;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.today-slot-modal-slot-clear {
+  flex-shrink: 0;
+  padding: 0.35rem 0.45rem !important;
+  font-size: 0.78rem !important;
 }
 
 .home-case-studies h2 {

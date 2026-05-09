@@ -78,6 +78,23 @@ function grindLogsForUnit(logs, unitIdx) {
   })
 }
 
+/** 今日处理展开后：用于排序弹窗的件号池（与列表件号列一致） */
+function buildTodaySlotPiecePool(expandedBands) {
+  return expandedBands.map((row) => {
+    const it = row.it
+    const label = String(row.unitLabel ?? '').trim() || '—'
+    const key = `${it.id}-${row.unitIndex}`
+    const orderNo = String(it.order_no ?? '').trim()
+    return {
+      key,
+      label,
+      orderNo,
+      detailId: it.id,
+      unitIndex: row.unitIndex,
+    }
+  })
+}
+
 /** 今日处理折叠行：件号显示首件 + 省略，如 A1… */
 function todayClusterPieceLabelShort(clusterBands) {
   const codes = clusterBands
@@ -217,6 +234,8 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   const [todaySlotOrder, setTodaySlotOrder] = useState(() => loadTodaySlotOrder())
   const [slotOrderModalOpen, setSlotOrderModalOpen] = useState(false)
   const [slotOrderDraft, setSlotOrderDraft] = useState(() => Array(10).fill(''))
+  /** 编辑排序：当前选中的排（0～9），点击件号填入该排 */
+  const [slotOrderActiveSlot, setSlotOrderActiveSlot] = useState(0)
   const headerSelectRef = useRef(null)
 
   const listStatusCategory = useMemo(
@@ -659,6 +678,11 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     })
   }, [todayQueueRows])
 
+  const todaySlotPiecePool = useMemo(
+    () => buildTodaySlotPiecePool(todayQueueExpandedBands),
+    [todayQueueExpandedBands],
+  )
+
   /** 今日处理：按订单编号分簇（同一订单号多件可聚合为一行展示） */
   const todayQueueClusters = useMemo(() => {
     const flat = todayQueueExpandedBands
@@ -810,8 +834,37 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   }
 
   function openSlotOrderModal() {
-    setSlotOrderDraft([...todaySlotOrder])
+    const draft = [...todaySlotOrder]
+    setSlotOrderDraft(draft)
+    const firstEmpty = draft.findIndex((s) => !String(s).trim())
+    setSlotOrderActiveSlot(firstEmpty === -1 ? 0 : firstEmpty)
     setSlotOrderModalOpen(true)
+  }
+
+  function assignSlotOrderPiece(pieceLabel) {
+    const raw = String(pieceLabel ?? '').trim()
+    if (!raw) return
+    const slot = slotOrderActiveSlot
+    if (slot < 0 || slot > 9) return
+    setSlotOrderDraft((prev) => {
+      const next = [...prev]
+      const dedupe = raw !== '—'
+      if (dedupe) {
+        for (let j = 0; j < 10; j += 1) {
+          if (j !== slot && String(next[j]).trim() === raw) next[j] = ''
+        }
+      }
+      next[slot] = raw
+      return next
+    })
+  }
+
+  function clearSlotOrderRow(i) {
+    setSlotOrderDraft((prev) => {
+      const next = [...prev]
+      next[i] = ''
+      return next
+    })
   }
 
   function saveSlotOrderModal() {
@@ -1467,7 +1520,9 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                       </div>
                     </div>
                   ) : (
-                    <p className="muted today-slot-order-empty">尚未填写；点击「编辑排序」在第1～10排填入件号（如 A1）。</p>
+                    <p className="muted today-slot-order-empty">
+                      尚未填写；点击「编辑排序」，先选排再点件号填入。
+                    </p>
                   )}
                 </div>
               </section>
@@ -2319,49 +2374,104 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
           >
             <h2 id="slot-order-modal-title">今日件号排序</h2>
             <p className="muted" style={{ marginTop: '-0.35rem' }}>
-              与加工生产单一致：左列第1～6排、右列第7～10排；最右窄列为车间占位（11～13，仅占位）。保存后上方预览并用于「打印排序生产单」。
+              先点选一排（高亮），再点上方的件号填入该排；与加工生产单左1～6、右7～10排一致，保存后用于「打印排序生产单」。
             </p>
+            <section className="today-slot-modal-pool" aria-label="今日处理件号">
+              <div className="today-slot-modal-pool-head">
+                <span className="today-slot-modal-pool-title">可选件号</span>
+                <span className="muted today-slot-modal-pool-hint">
+                  当前选中：第{slotOrderActiveSlot + 1}排
+                </span>
+              </div>
+              {todaySlotPiecePool.length === 0 ? (
+                <p className="muted today-slot-modal-pool-empty">暂无今日处理明细，无法排序</p>
+              ) : (
+                <div className="today-slot-modal-pool-chips">
+                  {todaySlotPiecePool.map((p) => {
+                    const dedupeLabel = p.label !== '—'
+                    const placedAt = dedupeLabel
+                      ? slotOrderDraft.findIndex((s) => String(s).trim() === p.label)
+                      : -1
+                    const isPlaced = placedAt >= 0
+                    return (
+                      <button
+                        key={p.key}
+                        type="button"
+                        className={`today-slot-modal-piece-chip ${isPlaced ? 'is-placed' : ''}`}
+                        onClick={() => assignSlotOrderPiece(p.label)}
+                      >
+                        <span className="today-slot-modal-piece-main">
+                          {p.label === '—' ? '未编号' : p.label}
+                        </span>
+                        <span className="today-slot-modal-piece-meta">
+                          {p.orderNo || `明细${p.detailId}`} · 第{p.unitIndex + 1}件
+                        </span>
+                        {isPlaced ? (
+                          <span className="today-slot-modal-piece-slot">第{placedAt + 1}排</span>
+                        ) : null}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
             <div className="today-slot-modal-two-col-wrap">
               <div className="today-slot-modal-two-col">
                 <div className="today-slot-modal-col">
-                  <span className="today-slot-modal-col-title muted">第1～6排</span>
-                  {[0, 1, 2, 3, 4, 5].map((i) => (
-                    <label key={i} className="today-slot-modal-field">
-                      <span className="today-slot-modal-field-label">{`第${i + 1}排`}</span>
-                      <input
-                        type="text"
-                        className="today-slot-modal-input"
-                        value={slotOrderDraft[i]}
-                        placeholder="如 A1"
-                        aria-label={`第${i + 1}排件号`}
-                        onChange={(e) => {
-                          const next = [...slotOrderDraft]
-                          next[i] = e.target.value
-                          setSlotOrderDraft(next)
-                        }}
-                      />
-                    </label>
-                  ))}
+                  <span className="today-slot-modal-col-title muted">第1～6排（点选）</span>
+                  {[0, 1, 2, 3, 4, 5].map((i) => {
+                    const val = String(slotOrderDraft[i] ?? '').trim()
+                    return (
+                      <div key={i} className="today-slot-modal-slot-row">
+                        <button
+                          type="button"
+                          className={`today-slot-modal-slot-btn ${slotOrderActiveSlot === i ? 'is-active' : ''}`}
+                          aria-pressed={slotOrderActiveSlot === i}
+                          onClick={() => setSlotOrderActiveSlot(i)}
+                        >
+                          <span className="today-slot-modal-slot-num">{`第${i + 1}排`}</span>
+                          <span className="today-slot-modal-slot-val">{val || '空'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost today-slot-modal-slot-clear"
+                          aria-label={`清空第${i + 1}排`}
+                          disabled={!val}
+                          onClick={() => clearSlotOrderRow(i)}
+                        >
+                          清空
+                        </button>
+                      </div>
+                    )
+                  })}
                 </div>
                 <div className="today-slot-modal-col">
-                  <span className="today-slot-modal-col-title muted">第7～10排</span>
-                  {[6, 7, 8, 9].map((i) => (
-                    <label key={i} className="today-slot-modal-field">
-                      <span className="today-slot-modal-field-label">{`第${i + 1}排`}</span>
-                      <input
-                        type="text"
-                        className="today-slot-modal-input"
-                        value={slotOrderDraft[i]}
-                        placeholder="如 A1"
-                        aria-label={`第${i + 1}排件号`}
-                        onChange={(e) => {
-                          const next = [...slotOrderDraft]
-                          next[i] = e.target.value
-                          setSlotOrderDraft(next)
-                        }}
-                      />
-                    </label>
-                  ))}
+                  <span className="today-slot-modal-col-title muted">第7～10排（点选）</span>
+                  {[6, 7, 8, 9].map((i) => {
+                    const val = String(slotOrderDraft[i] ?? '').trim()
+                    return (
+                      <div key={i} className="today-slot-modal-slot-row">
+                        <button
+                          type="button"
+                          className={`today-slot-modal-slot-btn ${slotOrderActiveSlot === i ? 'is-active' : ''}`}
+                          aria-pressed={slotOrderActiveSlot === i}
+                          onClick={() => setSlotOrderActiveSlot(i)}
+                        >
+                          <span className="today-slot-modal-slot-num">{`第${i + 1}排`}</span>
+                          <span className="today-slot-modal-slot-val">{val || '空'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost today-slot-modal-slot-clear"
+                          aria-label={`清空第${i + 1}排`}
+                          disabled={!val}
+                          onClick={() => clearSlotOrderRow(i)}
+                        >
+                          清空
+                        </button>
+                      </div>
+                    )
+                  })}
                 </div>
                 <div className="today-slot-modal-col today-slot-modal-spacer-col" aria-hidden>
                   <span className="today-slot-modal-slot-spacer" />
@@ -2373,6 +2483,13 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
             <div className="form-actions" style={{ marginTop: '0.75rem' }}>
               <button type="button" className="btn" onClick={() => setSlotOrderModalOpen(false)}>
                 取消
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setSlotOrderDraft(Array(10).fill(''))}
+              >
+                清空全部排
               </button>
               <button type="button" className="btn btn-primary" onClick={saveSlotOrderModal}>
                 保存
