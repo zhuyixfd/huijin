@@ -202,17 +202,160 @@
   align-items: stretch;
 }
 
-.task-queue-panel-title {
-  display: block;
+.task-queue-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
   width: 100%;
   box-sizing: border-box;
-  margin: 0;
   padding: 0.55rem 0.85rem;
-  font-size: 0.92rem;
-  font-weight: 600;
   border-bottom: 1px solid var(--border);
   background: var(--social-bg);
   color: var(--text-h);
+}
+
+.task-queue-panel-head .task-queue-panel-title {
+  margin: 0;
+  padding: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.45;
+}
+
+.task-queue-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.task-queue-panel-toggle {
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+.task-panel-collapsed-hint {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.9rem;
+}
+
+.task-id-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  vertical-align: middle;
+}
+
+.task-case-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.12rem 0.38rem;
+  border-radius: 6px;
+  background: rgba(59, 130, 246, 0.14);
+  color: #1d4ed8;
+}
+
+.task-case-add-btn {
+  font-size: 0.78rem !important;
+  padding: 0.15rem 0.45rem !important;
+}
+
+.home-case-studies h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.home-case-studies-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.home-case-studies-meta {
+  font-size: 0.88rem;
+}
+
+.home-case-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.home-case-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  background: var(--bg);
+}
+
+.home-case-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+}
+
+.home-case-card-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.home-case-card-time {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.home-case-card-sub {
+  margin: 0.35rem 0 0;
+  font-size: 0.86rem;
+}
+
+.home-case-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.92rem;
+  white-space: pre-wrap;
+}
+
+.home-case-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.home-case-img-link {
+  display: block;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  max-width: 12rem;
+}
+
+.home-case-img-link img {
+  display: block;
+  width: 100%;
+  height: auto;
+  vertical-align: top;
+}
+
+.home-case-pagination {
+  margin-top: 1rem;
+  margin-bottom: 0;
 }
 
 .task-queue-panel-inner {

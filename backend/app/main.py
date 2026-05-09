@@ -7,12 +7,14 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.bootstrap import init_db
 from app.database import engine
 from app.routers import auth as auth_router
+from app.routers import case_studies as case_studies_router
 from app.routers import customers as customers_router
 from app.routers import dashboard as dashboard_router
 from app.routers import meta as meta_router
@@ -29,6 +31,10 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="汇金特材 API", lifespan=lifespan)
+
+_UPLOAD_ROOT = Path(__file__).resolve().parent.parent / "uploads"
+_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(_UPLOAD_ROOT)), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,6 +54,7 @@ app.include_router(orders_router.router, prefix="/api/orders", tags=["orders"])
 app.include_router(order_items_router.router, prefix="/api/order-items", tags=["order-items"])
 app.include_router(tasks_router.router, prefix="/api/tasks", tags=["tasks"])
 app.include_router(dashboard_router.router, prefix="/api/dashboard", tags=["dashboard"])
+app.include_router(case_studies_router.router, prefix="/api/case-studies", tags=["case-studies"])
 app.include_router(meta_router.router, prefix="/api/meta", tags=["meta"])
 
 

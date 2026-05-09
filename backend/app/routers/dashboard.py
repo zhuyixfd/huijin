@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import Customer, OrderItem
+from app.models import CaseStudy, Customer, OrderItem
 from app.models import User as UserModel
 from app.schemas_business import DashboardSummary
 
@@ -27,9 +27,12 @@ def summary(
     ).all()
     status_counts = {str(r[0]): int(r[1]) for r in rows}
 
+    case_study_count = int(db.scalar(select(func.count(CaseStudy.id))) or 0)
+
     return DashboardSummary(
         customer_count=int(customer_count),
         order_count=int(order_count),
         item_count=int(item_count),
         status_counts=status_counts,
+        case_study_count=case_study_count,
     )

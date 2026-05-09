@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import Customer, OrderItem
+from app.models import CaseStudy, Customer, OrderItem
 from app.models import User as UserModel
 from app.order_number import generate_next_order_no
 from app.processing_codes import count_processing_piece_strip, ensure_processing_codes_batch
@@ -169,6 +169,23 @@ def list_task_items(
         .limit(limit)
     )
     rows = db.execute(stmt).all()
+    item_ids = [item.id for item, _ in rows]
+    case_total: dict[int, int] = {}
+    case_by_unit: dict[int, dict[str, int]] = {}
+    if item_ids:
+        agg = db.execute(
+            select(CaseStudy.order_item_id, CaseStudy.unit_index, func.count(CaseStudy.id))
+            .where(CaseStudy.order_item_id.in_(item_ids))
+            .group_by(CaseStudy.order_item_id, CaseStudy.unit_index)
+        ).all()
+        for oid, uidx, cnt in agg:
+            oid = int(oid)
+            n = int(cnt)
+            case_total[oid] = case_total.get(oid, 0) + n
+            uk = "0" if uidx is None else str(int(uidx))
+            inner = case_by_unit.setdefault(oid, {})
+            inner[uk] = inner.get(uk, 0) + n
+
     proc_items = [
         item for item, _ in rows if item.production_status not in ("未入库", "已发回")
     ]
@@ -181,12 +198,15 @@ def list_task_items(
     out: list[TaskItemOut] = []
     for item, cust_name in rows:
         base = OrderItemOut.model_validate(item).model_dump()
+        oid = item.id
         out.append(
             TaskItemOut(
                 **base,
                 customer_name=cust_name,
                 order_created_at=item.created_at,
                 order_status=_single_row_order_status(item),
+                case_study_count=case_total.get(oid, 0),
+                case_study_by_unit=dict(case_by_unit.get(oid, {})),
             )
         )
     return TaskItemListOut(items=out, total=total)
@@ -239,6 +259,8 @@ def create_work_order(
         customer_name=cust.name,
         order_created_at=row.created_at,
         order_status=_single_row_order_status(row),
+        case_study_count=0,
+        case_study_by_unit={},
     )
 
 

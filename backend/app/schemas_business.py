@@ -243,6 +243,14 @@ class TaskItemOut(OrderItemOut):
         default="",
         description="与订单列表一致的聚合状态（一单一条来料时等同该行状态）",
     )
+    case_study_count: int = Field(
+        default=0,
+        description="关联的生产案例条数（用于列表徽标）",
+    )
+    case_study_by_unit: dict[str, int] = Field(
+        default_factory=dict,
+        description="按支点（件序号 0 起）的案例条数；键为字符串形式的 unit_index",
+    )
 
 
 class TaskItemListOut(BaseModel):
@@ -278,6 +286,27 @@ class DashboardSummary(BaseModel):
     order_count: int
     item_count: int
     status_counts: dict[str, int]
+    case_study_count: int = Field(default=0, description="案例总数")
+
+
+class CaseStudyRow(BaseModel):
+    """首页案例列表 / 新建响应"""
+
+    model_config = {"from_attributes": True}
+
+    id: int
+    order_item_id: int
+    order_no: str
+    customer_name: str
+    unit_index: int | None = None
+    note: str | None = None
+    images: list[str] = Field(default_factory=list, description="可访问的相对路径，如 /uploads/cases/xxx.png")
+    created_at: datetime
+
+
+class CaseStudyListOut(BaseModel):
+    items: list[CaseStudyRow]
+    total: int
 
 
 class ReorderItemsBody(BaseModel):

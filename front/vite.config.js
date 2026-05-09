@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 
 const apiProxy = {
   '/api': 'http://127.0.0.1:8000',
+  '/uploads': 'http://127.0.0.1:8000',
 }
 
 // https://vite.dev/config/

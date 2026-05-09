@@ -20,6 +20,14 @@ export function postJson(path, body) {
   }).then(parseJsonOrThrow)
 }
 
+/** multipart/form-data（不传 Content-Type，由浏览器带 boundary） */
+export function postFormData(path, formData) {
+  return authFetch(path, {
+    method: 'POST',
+    body: formData,
+  }).then(parseJsonOrThrow)
+}
+
 export function patchJson(path, body) {
   return authFetch(path, {
     method: 'PATCH',

@@ -80,6 +80,27 @@ class OrderItem(Base):
         cascade="all, delete-orphan",
         order_by="GrindLog.created_at",
     )
+    case_studies: Mapped[list["CaseStudy"]] = relationship(
+        back_populates="item",
+        cascade="all, delete-orphan",
+    )
+
+
+class CaseStudy(Base):
+    """生产案例（文字 + 图片），可在首页展示"""
+
+    __tablename__ = "case_studies"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    order_item_id: Mapped[int] = mapped_column(
+        ForeignKey("order_items.id", ondelete="CASCADE"), index=True
+    )
+    unit_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    images: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    item: Mapped["OrderItem"] = relationship(back_populates="case_studies")
 
 
 class GrindLog(Base):

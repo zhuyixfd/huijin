@@ -62,8 +62,13 @@ def patch_order_item(
     if st in ("未入库", "已发回"):
         row.in_today_queue = False
         data.pop("in_today_queue", None)
+    had_explicit_production_status = "production_status" in data
     for k, v in data.items():
         setattr(row, k, v)
+    # 列入今日处理且未指定状态时：仅将「已入库/未入库」视为待下车间，默认锻造中（避免覆盖修磨中等工序）
+    if data.get("in_today_queue") is True and not had_explicit_production_status:
+        if row.production_status in ("已入库", "未入库"):
+            row.production_status = "锻造中"
     if row.production_status in ("未入库", "已发回"):
         row.processing_unit_codes = None
     else:

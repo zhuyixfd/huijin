@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './Pages.css'
-import { deleteReq, getJson, patchJson, postJson } from './api.js'
+import { deleteReq, getJson, patchJson, postFormData, postJson } from './api.js'
 import { openPrint } from './printSlip.js'
+import { openWorkshopProductionPreview } from './workshopSheetPrint.js'
 
 const emptyItemForm = () => ({
   incoming_no: '',
@@ -52,6 +53,18 @@ function fmtCuttingDate(v) {
 function fmtNum(v) {
   if (v === null || v === undefined || v === '') return '—'
   return String(v)
+}
+
+/** 列表行「案例」徽标：折叠摘要看整单条数；展开按件看 case_study_by_unit */
+function caseStudyBadgeCount(it, todayExpand) {
+  if (todayExpand?.groupSummary) {
+    return Number(it.case_study_count) || 0
+  }
+  if (todayExpand && typeof todayExpand.unitIndex === 'number') {
+    const m = it.case_study_by_unit ?? {}
+    return Number(m[String(todayExpand.unitIndex)]) || 0
+  }
+  return Number(it.case_study_count) || 0
 }
 
 /** 明细页按件：未指定件的记录挂在第 1 件展示（兼容旧数据） */
@@ -176,6 +189,12 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   const [lastBatchUndo, setLastBatchUndo] = useState(null)
   /** 今日处理：同一明细多件折叠后只显示一行（按 order_items.id） */
   const [collapsedTodayItemIds, setCollapsedTodayItemIds] = useState(() => new Set())
+  const [todayPanelOpen, setTodayPanelOpen] = useState(true)
+  const [restPanelOpen, setRestPanelOpen] = useState(true)
+  const [caseModal, setCaseModal] = useState(null)
+  const [caseNote, setCaseNote] = useState('')
+  const [caseFiles, setCaseFiles] = useState([])
+  const [caseSubmitting, setCaseSubmitting] = useState(false)
   const headerSelectRef = useRef(null)
 
   function toggleTodayItemCollapse(itemId) {
@@ -222,6 +241,8 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       setBulkSelectColumnVisible(false)
       setBatchProductionExpanded(false)
       setCollapsedTodayItemIds(new Set())
+      setTodayPanelOpen(true)
+      setRestPanelOpen(true)
     })
   }, [tasksPreset])
 
@@ -412,7 +433,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     try {
       await postJson('/api/order-items/batch-production-status', {
         item_ids: ids,
-        production_status: '已入库',
+        production_status: '锻造中',
         in_today_queue: true,
       })
       setLastBatchUndo(snap)
@@ -549,7 +570,10 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     const snap = captureUndoSnapshot(ids)
     try {
       for (const id of ids) {
-        await patchJson(`/api/order-items/${id}`, { in_today_queue: true })
+        await patchJson(`/api/order-items/${id}`, {
+          in_today_queue: true,
+          production_status: '锻造中',
+        })
       }
       setLastBatchUndo(snap)
       setSelectedIds([])
@@ -621,6 +645,18 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     return clusters
   }, [todayQueueExpandedBands])
 
+  /** 多件明细：折叠/展开组数（用于标题；折叠行内订单状态不再显示 0/1 式文案） */
+  const todayMultiFoldStats = useMemo(() => {
+    let multi = 0
+    let collapsed = 0
+    for (const c of todayQueueClusters) {
+      if (c.length <= 1) continue
+      multi += 1
+      if (collapsedTodayItemIds.has(c[0].it.id)) collapsed += 1
+    }
+    return { multi, collapsed, expanded: multi - collapsed }
+  }, [todayQueueClusters, collapsedTodayItemIds])
+
   const todayQueueVisibleRowCount = useMemo(() => {
     let n = 0
     for (const cluster of todayQueueClusters) {
@@ -653,6 +689,41 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     })
   }, [restProcessingRows])
 
+  const showCaseStudyUi = tasksPreset === 'processing'
+
+  function openCaseStudy(it, unitIndex, unitLabel) {
+    setCaseModal({ it, unitIndex, unitLabel })
+    setCaseNote('')
+    setCaseFiles([])
+    setErr(null)
+  }
+
+  async function submitCaseStudy(e) {
+    e.preventDefault()
+    if (!caseModal) return
+    setErr(null)
+    setCaseSubmitting(true)
+    try {
+      const fd = new FormData()
+      fd.append('order_item_id', String(caseModal.it.id))
+      fd.append('note', caseNote)
+      if (caseModal.unitIndex !== null && caseModal.unitIndex !== undefined) {
+        fd.append('unit_index', String(caseModal.unitIndex))
+      }
+      for (const f of caseFiles) {
+        fd.append('files', f)
+      }
+      await postFormData('/api/case-studies', fd)
+      setCaseModal(null)
+      loadTasks()
+      onTasksMutated?.()
+    } catch (err) {
+      setErr(err instanceof Error ? err.message : '保存失败')
+    } finally {
+      setCaseSubmitting(false)
+    }
+  }
+
   const renderTaskRow = (it, rowOptions = {}) => {
     const { orderBand, todayExpand } = rowOptions
     const groupSummary = Boolean(todayExpand?.groupSummary)
@@ -681,6 +752,11 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
         : it.quantity
     const todayRowToggleExpand =
       groupSummary || Boolean(todayExpand?.todayGroupClickToggle)
+    const badgeN = caseStudyBadgeCount(it, todayExpand)
+    const statusLabel =
+      todayExpand?.orderStatusOverride !== undefined
+        ? todayExpand.orderStatusOverride
+        : it.order_status
     return (
     <tr
       key={rowKey}
@@ -718,7 +794,38 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
           ) : null}
         </td>
       ) : null}
-      <td className="cell-nowrap">{it.id}</td>
+      <td className="cell-nowrap">
+        <span className="task-id-cell">
+          {badgeN > 0 ? (
+            <span className="task-case-badge" title={`${badgeN} 条案例`}>
+              案例
+            </span>
+          ) : null}
+          {it.id}
+          {showCaseStudyUi ? (
+            <button
+              type="button"
+              className="btn btn-ghost task-case-add-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                const uidx =
+                  todayExpand &&
+                  !groupSummary &&
+                  typeof todayExpand.unitIndex === 'number'
+                    ? todayExpand.unitIndex
+                    : null
+                const ulab =
+                  todayExpand && !groupSummary
+                    ? todayExpand.unitLabel ?? `第${(todayExpand.unitIndex ?? 0) + 1}件`
+                    : '整单'
+                openCaseStudy(it, uidx, ulab)
+              }}
+            >
+              ＋案例
+            </button>
+          ) : null}
+        </span>
+      </td>
       {showProcessingUnitCol ? (
         <td className="cell-nowrap task-unit-code">{unitLabel ?? '—'}</td>
       ) : null}
@@ -735,7 +842,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       <td>{fmtNum(it.customer_name)}</td>
       <td className="cell-nowrap">{fmtDateTime(it.order_created_at)}</td>
       <td>
-        <span className="tag tag-status">{it.order_status}</span>
+        <span className="tag tag-status">{statusLabel}</span>
       </td>
       <td className="text-cell">{fmtNum(it.order_remark)}</td>
       <td className={GS}>{fmtNum(it.incoming_no)}</td>
@@ -1212,10 +1319,38 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
               className="task-queue-panel card"
               style={{ width: '100%', minWidth: 0, flexShrink: 0 }}
             >
-              <h3 id="task-queue-today-heading" className="task-queue-panel-title">
-                今日处理 · {todayQueueRows.length} 条 · 合计 {todayQueueQtySum} 件 · 当前{' '}
-                {todayQueueVisibleRowCount} 行
-              </h3>
+              <div className="task-queue-panel-head">
+                <h3 id="task-queue-today-heading" className="task-queue-panel-title">
+                  今日处理 · {todayQueueRows.length} 条 · 合计 {todayQueueQtySum} 件 · 当前{' '}
+                  {todayQueueVisibleRowCount} 行
+                  {todayMultiFoldStats.multi > 0 ? (
+                    <>
+                      {' '}
+                      · 多件明细：已展开 {todayMultiFoldStats.expanded} · 已折叠{' '}
+                      {todayMultiFoldStats.collapsed}
+                    </>
+                  ) : null}
+                </h3>
+                <div className="task-queue-panel-actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={todayQueueRows.length === 0}
+                    onClick={() => openWorkshopProductionPreview(todayQueueRows)}
+                  >
+                    加工生产单预览
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost task-queue-panel-toggle"
+                    aria-expanded={todayPanelOpen}
+                    onClick={() => setTodayPanelOpen((v) => !v)}
+                  >
+                    {todayPanelOpen ? '折叠' : '展开'}
+                  </button>
+                </div>
+              </div>
+              {todayPanelOpen ? (
               <div className="data-table-wrap task-queue-panel-inner">
                 <table className="data-table task-mega-table">
                   {renderMegaThead(true)}
@@ -1240,6 +1375,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                                 groupSummary: true,
                                 summaryPieceCount: cluster.length,
                                 summaryLabelShort,
+                                orderStatusOverride: `折叠 · ${cluster.length}件`,
                               },
                             }),
                           ]
@@ -1262,6 +1398,9 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   </tbody>
                 </table>
               </div>
+              ) : (
+                <p className="muted task-panel-collapsed-hint">列表已折叠</p>
+              )}
             </div>
             <div
               role="region"
@@ -1269,9 +1408,20 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
               className="task-queue-panel card"
               style={{ width: '100%', minWidth: 0, flexShrink: 0 }}
             >
-              <h3 id="task-queue-rest-heading" className="task-queue-panel-title">
-                待完成
-              </h3>
+              <div className="task-queue-panel-head">
+                <h3 id="task-queue-rest-heading" className="task-queue-panel-title">
+                  待完成 · {restProcessingRows.length} 条
+                </h3>
+                <button
+                  type="button"
+                  className="btn btn-ghost task-queue-panel-toggle"
+                  aria-expanded={restPanelOpen}
+                  onClick={() => setRestPanelOpen((v) => !v)}
+                >
+                  {restPanelOpen ? '折叠' : '展开'}
+                </button>
+              </div>
+              {restPanelOpen ? (
               <div className="data-table-wrap task-queue-panel-inner">
                 <table className="data-table task-mega-table">
                   {renderMegaThead(false)}
@@ -1290,6 +1440,9 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   </tbody>
                 </table>
               </div>
+              ) : (
+                <p className="muted task-panel-collapsed-hint">列表已折叠</p>
+              )}
             </div>
           </div>
           </>
@@ -1823,6 +1976,49 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 </button>
                 <button type="submit" className="btn btn-primary">
                   保存
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {caseModal ? (
+        <div className="modal-backdrop" onClick={() => setCaseModal(null)} role="presentation">
+          <div className="modal-card wide" onClick={(e) => e.stopPropagation()} role="dialog">
+            <h2>添加生产案例</h2>
+            <p className="muted">
+              明细 {caseModal.it.id} · {caseModal.it.order_no}
+              {caseModal.unitLabel ? ` · ${caseModal.unitLabel}` : ''}
+            </p>
+            <form className="form-grid" onSubmit={submitCaseStudy}>
+              <label className="full">
+                文字备注
+                <textarea
+                  value={caseNote}
+                  onChange={(e) => setCaseNote(e.target.value)}
+                  placeholder="可与图片同时填写；若不上传图片则需填写备注"
+                />
+              </label>
+              <label className="full">
+                图片（可多选）
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => setCaseFiles(Array.from(e.target.files || []))}
+                />
+              </label>
+              {caseFiles.length > 0 ? (
+                <p className="muted full">已选 {caseFiles.length} 个文件</p>
+              ) : null}
+              {err ? <p className="err full">{err}</p> : null}
+              <div className="form-actions full">
+                <button type="button" className="btn" onClick={() => setCaseModal(null)}>
+                  取消
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={caseSubmitting}>
+                  {caseSubmitting ? '提交中…' : '保存'}
                 </button>
               </div>
             </form>
