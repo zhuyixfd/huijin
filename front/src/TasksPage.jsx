@@ -145,7 +145,9 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   const [itemForm, setItemForm] = useState(emptyItemForm)
 
   const [selectedIds, setSelectedIds] = useState([])
-  const [batchStatusModal, setBatchStatusModal] = useState(false)
+  const [todayBulkExpanded, setTodayBulkExpanded] = useState(false)
+  const [todayBulkAction, setTodayBulkAction] = useState('')
+  const [batchProductionExpanded, setBatchProductionExpanded] = useState(false)
   const [batchTargetStatus, setBatchTargetStatus] = useState('')
   const [batchSubmitting, setBatchSubmitting] = useState(false)
   const [lastBatchUndo, setLastBatchUndo] = useState(null)
@@ -180,6 +182,14 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     }
   }, [tasksPreset])
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setTodayBulkExpanded(false)
+      setBatchProductionExpanded(false)
+      setTodayBulkAction('')
+    })
+  }, [tasksPreset])
 
   const showBulkCheckboxCol =
     tasksPreset === 'processing' ||
@@ -343,6 +353,26 @@ export default function TasksPage({ tasksPreset = 'all' }) {
       loadTasks()
     } catch (err) {
       setErr(err instanceof Error ? err.message : '操作失败')
+    } finally {
+      setBatchSubmitting(false)
+    }
+  }
+
+  async function executeTodayBulkMark() {
+    if (!todayBulkAction || selectedIds.length === 0) return
+    const mark = todayBulkAction === 'mark'
+    setErr(null)
+    setBatchSubmitting(true)
+    const snap = captureUndoSnapshot(selectedIds)
+    try {
+      for (const id of selectedIds) {
+        await patchJson(`/api/order-items/${id}`, { in_today_queue: mark })
+      }
+      setLastBatchUndo(snap)
+      setSelectedIds([])
+      loadTasks()
+    } catch (err) {
+      setErr(err instanceof Error ? err.message : '更新失败')
     } finally {
       setBatchSubmitting(false)
     }
@@ -599,8 +629,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     </thead>
   )
 
-  async function submitBatchStatus(e) {
-    e.preventDefault()
+  async function submitBatchProductionConfirm() {
     if (selectedIds.length === 0 || !batchTargetStatus) return
     setErr(null)
     const snap = captureUndoSnapshot(selectedIds)
@@ -611,8 +640,8 @@ export default function TasksPage({ tasksPreset = 'all' }) {
         production_status: batchTargetStatus,
       })
       setLastBatchUndo(snap)
-      setBatchStatusModal(false)
       setBatchTargetStatus('')
+      setBatchProductionExpanded(false)
       setSelectedIds([])
       loadTasks()
     } catch (err) {
@@ -647,77 +676,136 @@ export default function TasksPage({ tasksPreset = 'all' }) {
       </header>
 
       {view === 'list' ? (
-        <div className="toolbar orders-toolbar">
-          <select value={cid} onChange={(e) => setCid(e.target.value)}>
-            <option value="">全部客户</option>
-            {customers.map((c) => (
-              <option key={c.id} value={String(c.id)}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="search"
-            placeholder="客户名称（模糊）"
-            value={customerNameQ}
-            onChange={(e) => setCustomerNameQ(e.target.value)}
-          />
-          <input
-            type="date"
-            aria-label="下单时间起"
-            value={createdFrom}
-            onChange={(e) => setCreatedFrom(e.target.value)}
-          />
-          <input
-            type="date"
-            aria-label="下单时间止"
-            value={createdTo}
-            onChange={(e) => setCreatedTo(e.target.value)}
-          />
-          {showProductionStatusFilter ? (
-            <select
-              className="select-production-status"
-              aria-label="按生产状态筛选"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="">全部生产状态</option>
-              {statuses.map((s) => (
-                <option key={s} value={s}>
-                  {s === '待发回' ? '待发回（待出库）' : s}
+        <>
+          <div className="toolbar orders-toolbar">
+            <select value={cid} onChange={(e) => setCid(e.target.value)}>
+              <option value="">全部客户</option>
+              {customers.map((c) => (
+                <option key={c.id} value={String(c.id)}>
+                  {c.name}
                 </option>
               ))}
             </select>
-          ) : null}
-          <input
-            type="search"
-            placeholder="订单号 / 生产编号 / 来料编号"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          {showNewWorkOrder ? (
-            <button type="button" className="btn btn-primary" onClick={() => setWorkOrderModal(true)}>
-              新建来料订单
-            </button>
-          ) : null}
-          {showBulkCheckboxCol ? (
-            <>
+            <input
+              type="search"
+              placeholder="客户名称（模糊）"
+              value={customerNameQ}
+              onChange={(e) => setCustomerNameQ(e.target.value)}
+            />
+            <input
+              type="date"
+              aria-label="下单时间起"
+              value={createdFrom}
+              onChange={(e) => setCreatedFrom(e.target.value)}
+            />
+            <input
+              type="date"
+              aria-label="下单时间止"
+              value={createdTo}
+              onChange={(e) => setCreatedTo(e.target.value)}
+            />
+            {showProductionStatusFilter ? (
+              <select
+                className="select-production-status"
+                aria-label="按生产状态筛选"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="">全部生产状态</option>
+                {statuses.map((s) => (
+                  <option key={s} value={s}>
+                    {s === '待发回' ? '待发回（待出库）' : s}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            <input
+              type="search"
+              placeholder="订单号 / 生产编号 / 来料编号"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            {showNewWorkOrder ? (
+              <button type="button" className="btn btn-primary" onClick={() => setWorkOrderModal(true)}>
+                新建来料订单
+              </button>
+            ) : null}
+            {showBulkCheckboxCol ? (
+              <>
+                {showTodayCol ? (
+                  <button
+                    type="button"
+                    className={`btn ${todayBulkExpanded ? 'is-pressed' : ''}`}
+                    aria-pressed={todayBulkExpanded}
+                    onClick={() => {
+                      setErr(null)
+                      setTodayBulkExpanded((v) => !v)
+                    }}
+                  >
+                    今日处理
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className={`btn ${batchProductionExpanded ? 'is-pressed' : ''}`}
+                  aria-pressed={batchProductionExpanded}
+                  onClick={() => {
+                    setErr(null)
+                    setBatchProductionExpanded((v) => {
+                      const next = !v
+                      if (!next) setBatchTargetStatus('')
+                      return next
+                    })
+                  }}
+                >
+                  批量修改生产状态
+                </button>
+                {lastBatchUndo?.length ? (
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={batchSubmitting}
+                    onClick={() => {
+                      void undoLastBatch()
+                    }}
+                  >
+                    撤回最近一次批量
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+          {showBulkCheckboxCol && showTodayCol && todayBulkExpanded ? (
+            <div className="toolbar toolbar-secondary toolbar-today-bulk">
+              <span className="toolbar-secondary-label">今日批量</span>
+              <select
+                className="toolbar-batch-select"
+                value={todayBulkAction}
+                onChange={(e) => setTodayBulkAction(e.target.value)}
+                aria-label="今日批量操作"
+              >
+                <option value="">请选择操作</option>
+                <option value="mark">标记所选为今日</option>
+                <option value="unmark">取消所选今日标记</option>
+              </select>
               <button
                 type="button"
-                className="btn"
-                disabled={selectedIds.length === 0}
+                className="btn btn-primary"
+                disabled={
+                  batchSubmitting ||
+                  !todayBulkAction ||
+                  selectedIds.length === 0
+                }
                 onClick={() => {
-                  setErr(null)
-                  setBatchTargetStatus('')
-                  setBatchStatusModal(true)
+                  void executeTodayBulkMark()
                 }}
               >
-                批量修改生产状态
+                执行
               </button>
               {tasksPreset === 'pending' ? (
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="btn"
                   disabled={
                     batchSubmitting ||
                     selectedIds.filter(
@@ -732,21 +820,68 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                   开始处理（今日）
                 </button>
               ) : null}
-              {lastBatchUndo?.length ? (
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={batchSubmitting}
-                  onClick={() => {
-                    void undoLastBatch()
-                  }}
-                >
-                  撤回最近一次批量
-                </button>
-              ) : null}
-            </>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  setTodayBulkExpanded(false)
+                  setTodayBulkAction('')
+                }}
+              >
+                收起
+              </button>
+            </div>
           ) : null}
-        </div>
+          {showBulkCheckboxCol && batchProductionExpanded ? (
+            <div className="toolbar toolbar-secondary toolbar-batch-production">
+              <select
+                className="toolbar-batch-select"
+                value={batchTargetStatus}
+                onChange={(e) => setBatchTargetStatus(e.target.value)}
+                aria-label="目标生产状态"
+              >
+                <option value="">请选择生产状态</option>
+                {statuses.map((s) => (
+                  <option key={s} value={s}>
+                    {s === '待发回' ? '待发回（待出库）' : s}
+                  </option>
+                ))}
+              </select>
+              <span className="toolbar-secondary-label">生产状态</span>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={
+                  batchSubmitting ||
+                  selectedIds.length === 0 ||
+                  !batchTargetStatus
+                }
+                onClick={() => {
+                  void submitBatchProductionConfirm()
+                }}
+              >
+                {batchSubmitting ? '提交中…' : '确认一键修改'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={batchSubmitting}
+                onClick={() => {
+                  setBatchProductionExpanded(false)
+                  setBatchTargetStatus('')
+                }}
+              >
+                收起
+              </button>
+              <span className="muted toolbar-secondary-meta">
+                已选 {selectedIds.length} 条
+                {lastBatchUndo?.length ? (
+                  <> · 可通过「撤回最近一次批量」还原</>
+                ) : null}
+              </span>
+            </div>
+          ) : null}
+        </>
       ) : (
         <div className="order-detail-nav">
           <button type="button" className="btn" onClick={backToList}>
@@ -1277,57 +1412,6 @@ export default function TasksPage({ tasksPreset = 'all' }) {
                   保存
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
-
-      {batchStatusModal ? (
-        <div
-          className="modal-backdrop"
-          onClick={() => !batchSubmitting && setBatchStatusModal(false)}
-          role="presentation"
-        >
-          <div className="modal-card batch-status-modal" onClick={(e) => e.stopPropagation()} role="dialog">
-            <h2 style={{ marginTop: 0 }}>批量修改生产状态</h2>
-            <p className="muted">已选择 {selectedIds.length} 条明细</p>
-            <form onSubmit={submitBatchStatus}>
-              <div className="batch-status-modal-row">
-                <select
-                  className="batch-status-modal-select"
-                  value={batchTargetStatus}
-                  onChange={(e) => setBatchTargetStatus(e.target.value)}
-                  required
-                  aria-label="目标生产状态"
-                >
-                  <option value="">请选择</option>
-                  {statuses.map((s) => (
-                    <option key={s} value={s}>
-                      {s === '待发回' ? '待发回（待出库）' : s}
-                    </option>
-                  ))}
-                </select>
-                <span className="batch-status-modal-status-label">生产状态</span>
-                <div className="batch-status-modal-actions">
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={batchSubmitting}
-                    onClick={() => setBatchStatusModal(false)}
-                  >
-                    取消
-                  </button>
-                  <button type="submit" className="btn btn-primary" disabled={batchSubmitting}>
-                    {batchSubmitting ? '提交中…' : '确认一键修改'}
-                  </button>
-                </div>
-              </div>
-              {err ? <p className="err">{err}</p> : null}
-              {lastBatchUndo?.length ? (
-                <p className="muted batch-status-modal-hint">
-                  提示：列表工具栏可点击「撤回最近一次批量」恢复上一次批量修改前的生产状态与今日标记。
-                </p>
-              ) : null}
             </form>
           </div>
         </div>
