@@ -309,20 +309,57 @@
   font-weight: 600;
 }
 
-button.task-order-group-toggle {
-  font: inherit;
-  margin-right: 0.35rem;
-  padding: 0 0.25rem;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--text-h);
-  opacity: 0.85;
-  vertical-align: baseline;
+/* 处理中页顶部：件号轮回字母件数 */
+.tasks-processing-strip-card {
+  padding: 0.65rem 1rem 0.85rem;
+  margin-bottom: 1rem;
 }
 
-button.task-order-group-toggle:hover {
-  opacity: 1;
+.tasks-processing-strip-head {
+  margin-bottom: 0.45rem;
+}
+
+.tasks-processing-strip-title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-h);
+  opacity: 0.92;
+}
+
+.tasks-processing-piece-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.35rem;
+  align-items: flex-start;
+}
+
+.tasks-processing-piece-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 1.1rem;
+  font-size: 0.65rem;
+  line-height: 1.12;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+.tasks-processing-piece-letter {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 0.72rem;
+  color: var(--text-h);
+}
+
+.tasks-processing-piece-num {
+  font-size: 0.58rem;
+  opacity: 0.92;
+}
+
+.tasks-processing-piece-cell.is-muted .tasks-processing-piece-letter,
+.tasks-processing-piece-cell.is-muted .tasks-processing-piece-num {
+  opacity: 0.35;
+  color: var(--text);
 }
 
 .order-detail-unit-head {

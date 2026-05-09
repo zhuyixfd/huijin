@@ -115,6 +115,7 @@ export default function App() {
         <TasksPage
           tasksPreset={tasksPresetFromNav(resolvedNav)}
           onTasksMutated={refreshTaskNavCounts}
+          taskNavCounts={taskNavCounts}
         />
       )
     }

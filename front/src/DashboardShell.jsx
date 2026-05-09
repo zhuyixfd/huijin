@@ -8,7 +8,7 @@ const NAV = [
     primaryNav: { key: 'tasks-all', label: '全部订单' },
     children: [
       { key: 'tasks-pending', label: '未处理' },
-      { key: 'tasks-processing', label: '处理中 · 待完成' },
+      { key: 'tasks-processing', label: '处理中' },
       { key: 'tasks-ready-outbound', label: '待出库' },
       { key: 'tasks-done', label: '已完成' },
     ],
@@ -63,24 +63,6 @@ export default function DashboardShell({
                     {n.primaryNav.label}
                     <NavCountBadge counts={taskNavCounts} k="all" />
                   </button>
-                  {Array.isArray(taskNavCounts?.processing_piece_strip) &&
-                  taskNavCounts.processing_piece_strip.length > 0 ? (
-                    <div
-                      className="dashboard-nav-piece-strip"
-                      aria-label="处理中件号首字母件数"
-                    >
-                      {taskNavCounts.processing_piece_strip.map(({ letter, count }) => (
-                        <span
-                          key={letter}
-                          className={`dashboard-nav-piece-cell ${count === 0 ? 'is-muted' : ''}`}
-                          title={`${letter}：${count}件`}
-                        >
-                          <span className="dashboard-nav-piece-letter">{letter}</span>
-                          <span className="dashboard-nav-piece-num">{count}</span>
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
                   <div className="dashboard-nav-sub">
                     {n.children.map((c) => {
                       const ck =
