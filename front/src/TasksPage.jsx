@@ -252,6 +252,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
     if (customerNameQ.trim()) p.set('customer_q', customerNameQ.trim())
     if (createdFrom) p.set('created_from', createdFrom)
     if (createdTo) p.set('created_to', createdTo)
+    if (tasksPreset === 'all') p.set('exclude_completed', 'true')
     p.set('skip', String((page - 1) * pageSize))
     p.set('limit', String(pageSize))
     const qs = p.toString()
@@ -274,6 +275,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
     createdTo,
     page,
     pageSize,
+    tasksPreset,
     onTasksMutated,
   ])
 
@@ -470,7 +472,23 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
     tasksPreset === 'all' || tasksPreset === 'processing'
   const showNewWorkOrder = tasksPreset === 'all' || tasksPreset === 'pending'
   const showBulkSelectCol = showBulkCheckboxCol && bulkSelectColumnVisible
-  const listColSpan = COL_COUNT + (showBulkSelectCol ? 1 : 0)
+  /** 列表 mega 表列显隐（进入详情改状态；部分预设去掉列减轻干扰） */
+  const showTaskActionsCol = !(
+    tasksPreset === 'all' ||
+    tasksPreset === 'pending' ||
+    tasksPreset === 'processing' ||
+    tasksPreset === 'ready_outbound' ||
+    tasksPreset === 'done'
+  )
+  const showCuttingReturnDateCols = tasksPreset !== 'pending'
+  const showProductionStatusCol =
+    tasksPreset !== 'ready_outbound' && tasksPreset !== 'done'
+  const dataColCount =
+    COL_COUNT -
+    (showTaskActionsCol ? 0 : 1) -
+    (showCuttingReturnDateCols ? 0 : 2) -
+    (showProductionStatusCol ? 0 : 1)
+  const listColSpan = dataColCount + (showBulkSelectCol ? 1 : 0)
   const totalPages = Math.max(1, Math.ceil(listTotal / pageSize))
 
   const { todayQueueRows, restProcessingRows } = useMemo(() => {
@@ -486,13 +504,34 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
     return { todayQueueRows: t, restProcessingRows: r }
   }, [rows, tasksPreset])
 
+  async function submitAddToTodayFromProcessing() {
+    const restIds = new Set(restProcessingRows.map((r) => r.id))
+    const ids = selectedIds.filter((id) => restIds.has(id))
+    if (ids.length === 0) return
+    setErr(null)
+    setBatchSubmitting(true)
+    const snap = captureUndoSnapshot(ids)
+    try {
+      for (const id of ids) {
+        await patchJson(`/api/order-items/${id}`, { in_today_queue: true })
+      }
+      setLastBatchUndo(snap)
+      setSelectedIds([])
+      loadTasks()
+    } catch (err) {
+      setErr(err instanceof Error ? err.message : '操作失败')
+    } finally {
+      setBatchSubmitting(false)
+    }
+  }
+
   const todayQueueQtySum = useMemo(
     () => todayQueueRows.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
     [todayQueueRows],
   )
 
-  /** 今日处理：按订单号归类并排在一起，组间交替底色（orderBand） */
-  const todayQueueSortedBands = useMemo(() => {
+  /** 今日处理：按订单号排序 → 按个数展开（每件一行）→ 同订单号仅首行显示订单编号 → 组间交替底色 */
+  const todayQueueExpandedBands = useMemo(() => {
     const sorted = [...todayQueueRows].sort((a, b) => {
       const ao = String(a.order_no ?? '')
       const bo = String(b.order_no ?? '')
@@ -500,47 +539,71 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
       if (cmp !== 0) return cmp
       return a.id - b.id
     })
-    const groupIdxAtRow = []
-    let g = 0
-    for (let idx = 0; idx < sorted.length; idx += 1) {
-      if (idx > 0 && sorted[idx - 1].order_no !== sorted[idx].order_no) g += 1
-      groupIdxAtRow.push(g)
+    const flat = []
+    for (const it of sorted) {
+      const rawQ = Number(it.quantity)
+      const units = Number.isFinite(rawQ) && rawQ >= 1 ? Math.floor(rawQ) : 1
+      for (let u = 0; u < units; u += 1) {
+        flat.push({ it, unitIndex: u, unitsTotal: units })
+      }
     }
-    return sorted.map((it, idx) => ({
-      it,
-      orderBand: groupIdxAtRow[idx] % 2 === 0 ? 'a' : 'b',
-    }))
+    let g = 0
+    return flat.map((row, i) => {
+      const ono = String(row.it.order_no ?? '')
+      const prevOno = i > 0 ? String(flat[i - 1].it.order_no ?? '') : '\x00'
+      if (i > 0 && ono !== prevOno) g += 1
+      return {
+        ...row,
+        orderBand: g % 2 === 0 ? 'a' : 'b',
+        showOrderNo: i === 0 || ono !== prevOno,
+      }
+    })
   }, [todayQueueRows])
 
   const renderTaskRow = (it, rowOptions = {}) => {
+    const { orderBand, todayExpand } = rowOptions
     const bandClass =
-      rowOptions.orderBand === 'a'
+      orderBand === 'a'
         ? 'task-order-group-a'
-        : rowOptions.orderBand === 'b'
+        : orderBand === 'b'
           ? 'task-order-group-b'
           : ''
+    const showChrome = !todayExpand || todayExpand.unitIndex === 0
+    const showOrderNoCell = !todayExpand || todayExpand.showOrderNo
+    const rowKey = todayExpand ? `${it.id}-u${todayExpand.unitIndex}` : it.id
     return (
     <tr
-      key={it.id}
+      key={rowKey}
       className={['clickable', bandClass].filter(Boolean).join(' ')}
       onClick={() => enterDetail(it)}
     >
       {showBulkSelectCol ? (
         <td className="task-select-cell" onClick={(e) => e.stopPropagation()}>
-          <input
-            type="checkbox"
-            aria-label={`选择明细 ${it.id}`}
-            checked={selectedIds.includes(it.id)}
-            onChange={() =>
-              setSelectedIds((prev) =>
-                prev.includes(it.id) ? prev.filter((x) => x !== it.id) : [...prev, it.id],
-              )
-            }
-          />
+          {showChrome ? (
+            <input
+              type="checkbox"
+              aria-label={`选择明细 ${it.id}`}
+              checked={selectedIds.includes(it.id)}
+              onChange={() =>
+                setSelectedIds((prev) =>
+                  prev.includes(it.id) ? prev.filter((x) => x !== it.id) : [...prev, it.id],
+                )
+              }
+            />
+          ) : null}
         </td>
       ) : null}
       <td className="cell-nowrap">{it.id}</td>
-      <td className="cell-nowrap">{it.order_no}</td>
+      <td
+        className={[
+          'cell-nowrap',
+          !showOrderNoCell ? 'task-order-no-merged' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        {showOrderNoCell ? it.order_no : '\u00a0'}
+      </td>
       <td>{fmtNum(it.customer_name)}</td>
       <td className="cell-nowrap">{fmtDateTime(it.order_created_at)}</td>
       <td>
@@ -552,54 +615,66 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
       <td>{fmtNum(it.material_grade)}</td>
       <td className="text-cell">{fmtNum(it.spec_incoming)}</td>
       <td>{fmtNum(it.weight_incoming)}</td>
-      <td>{it.quantity}</td>
+      <td>{todayExpand ? 1 : it.quantity}</td>
       <td className={GS}>{fmtNum(it.weight_return)}</td>
       <td className="text-cell">{fmtNum(it.formed_size)}</td>
       <td className={`text-cell ${GS}`}>{fmtNum(it.forging_requirements)}</td>
       <td className="text-cell">{fmtNum(it.production_process)}</td>
       <td className="text-cell">{fmtNum(it.remark)}</td>
       <td className={GS}>{fmtDate(it.incoming_date)}</td>
-      <td>{fmtCuttingDate(it.cutting_time)}</td>
-      <td>{fmtDate(it.return_date)}</td>
-      <td className={GS} onClick={(e) => e.stopPropagation()}>
-        <select
-          value={it.production_status}
-          onChange={(e) => patchStatus(it, e.target.value)}
-        >
-          {statuses.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </td>
-      <td className={`row-actions cell-actions ${GS}`} onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="btn btn-ghost" onClick={() => patchStatus(it, '锻造中')}>
-          →锻造
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={() => patchStatus(it, '待发回')}>
-          →待发回
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => openPrint('production', taskToPrintPayload(it))}
-        >
-          打印生产单
-        </button>
-        {it.production_status === '修磨中' ? (
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => {
-              setGrindItem(it)
-              setGrindNote('')
-            }}
-          >
-            修磨记录
-          </button>
-        ) : null}
-      </td>
+      {showCuttingReturnDateCols ? (
+        <td>{fmtCuttingDate(it.cutting_time)}</td>
+      ) : null}
+      {showCuttingReturnDateCols ? <td>{fmtDate(it.return_date)}</td> : null}
+      {showProductionStatusCol ? (
+        <td className={GS} onClick={(e) => e.stopPropagation()}>
+          {showChrome ? (
+            <select
+              value={it.production_status}
+              onChange={(e) => patchStatus(it, e.target.value)}
+            >
+              {statuses.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          ) : null}
+        </td>
+      ) : null}
+      {showTaskActionsCol ? (
+        <td className={`row-actions cell-actions ${GS}`} onClick={(e) => e.stopPropagation()}>
+          {showChrome ? (
+            <>
+              <button type="button" className="btn btn-ghost" onClick={() => patchStatus(it, '锻造中')}>
+                →锻造
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={() => patchStatus(it, '待发回')}>
+                →待发回
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => openPrint('production', taskToPrintPayload(it))}
+              >
+                打印生产单
+              </button>
+              {it.production_status === '修磨中' ? (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setGrindItem(it)
+                    setGrindNote('')
+                  }}
+                >
+                  修磨记录
+                </button>
+              ) : null}
+            </>
+          ) : null}
+        </td>
+      ) : null}
     </tr>
     )
   }
@@ -648,10 +723,10 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
         <th>生产过程</th>
         <th>备注</th>
         <th className={GS}>来料日期</th>
-        <th>下料日期</th>
-        <th>发回日期</th>
-        <th className={GS}>生产状态</th>
-        <th className={GS}>操作</th>
+        {showCuttingReturnDateCols ? <th>下料日期</th> : null}
+        {showCuttingReturnDateCols ? <th>发回日期</th> : null}
+        {showProductionStatusCol ? <th className={GS}>生产状态</th> : null}
+        {showTaskActionsCol ? <th className={GS}>操作</th> : null}
       </tr>
     </thead>
   )
@@ -798,6 +873,24 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
                     onClick={() => {
                       setErr(null)
                       void submitStartProcessingToday()
+                    }}
+                  >
+                    开始处理（今日）
+                  </button>
+                ) : null}
+                {tasksPreset === 'processing' ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={
+                      batchSubmitting ||
+                      selectedIds.filter((id) =>
+                        restProcessingRows.some((r) => r.id === id),
+                      ).length === 0
+                    }
+                    onClick={() => {
+                      setErr(null)
+                      void submitAddToTodayFromProcessing()
                     }}
                   >
                     开始处理（今日）
@@ -963,7 +1056,8 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
               style={{ width: '100%', minWidth: 0, flexShrink: 0 }}
             >
               <h3 id="task-queue-today-heading" className="task-queue-panel-title">
-                今日处理 · {todayQueueRows.length} 条 · 合计 {todayQueueQtySum} 件
+                今日处理 · {todayQueueRows.length} 条 · 合计 {todayQueueQtySum} 件 · 展开{' '}
+                {todayQueueExpandedBands.length} 行
               </h3>
               <div className="data-table-wrap task-queue-panel-inner">
                 <table className="data-table task-mega-table">
@@ -976,8 +1070,11 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
                         </td>
                       </tr>
                     ) : (
-                      todayQueueSortedBands.map(({ it, orderBand }) =>
-                        renderTaskRow(it, { orderBand }),
+                      todayQueueExpandedBands.map(({ it, orderBand, unitIndex, unitsTotal, showOrderNo }) =>
+                        renderTaskRow(it, {
+                          orderBand,
+                          todayExpand: { unitIndex, unitsTotal, showOrderNo },
+                        }),
                       )
                     )}
                   </tbody>

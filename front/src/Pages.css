@@ -299,6 +299,11 @@
   }
 }
 
+/* 今日处理按件展开：同一订单号后续行的订单编号列留白（视觉合并） */
+.task-mega-table td.task-order-no-merged {
+  user-select: none;
+}
+
 .btn {
   font: inherit;
   padding: 0.45rem 0.85rem;

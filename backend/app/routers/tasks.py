@@ -36,8 +36,11 @@ def _task_filter_conditions(
     status_category: str | None,
     created_from: date | None,
     created_to: date | None,
+    exclude_completed: bool = False,
 ) -> list:
     conds: list = []
+    if exclude_completed:
+        conds.append(OrderItem.production_status != "已发回")
     if status_filter:
         conds.append(OrderItem.production_status == status_filter)
     if customer_id is not None:
@@ -83,7 +86,10 @@ def task_nav_counts(
     db: Session = Depends(get_db),
 ):
     """侧栏「全部订单 / 未处理 / …」数量（全库汇总，不含列表搜索框条件）。"""
-    all_n = db.scalar(select(func.count(OrderItem.id))) or 0
+    # 「全部订单」与列表 exclude_completed 一致：不含已完成（已发回）
+    all_n = db.scalar(
+        select(func.count(OrderItem.id)).where(OrderItem.production_status != "已发回")
+    ) or 0
     pending_n = db.scalar(
         select(func.count(OrderItem.id)).where(OrderItem.production_status == "未入库")
     ) or 0
@@ -122,6 +128,10 @@ def list_task_items(
     ),
     created_from: date | None = Query(None),
     created_to: date | None = Query(None),
+    exclude_completed: bool = Query(
+        False,
+        description="为 True 时排除生产状态「已发回」（用于全部订单列表）",
+    ),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
 ):
@@ -133,6 +143,7 @@ def list_task_items(
         status_category=status_category,
         created_from=created_from,
         created_to=created_to,
+        exclude_completed=exclude_completed,
     )
 
     count_stmt = (
