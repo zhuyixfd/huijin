@@ -145,6 +145,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   const [itemForm, setItemForm] = useState(emptyItemForm)
 
   const [selectedIds, setSelectedIds] = useState([])
+  const [bulkSelectColumnVisible, setBulkSelectColumnVisible] = useState(false)
   const [todayBulkExpanded, setTodayBulkExpanded] = useState(false)
   const [todayBulkAction, setTodayBulkAction] = useState('')
   const [batchProductionExpanded, setBatchProductionExpanded] = useState(false)
@@ -185,11 +186,18 @@ export default function TasksPage({ tasksPreset = 'all' }) {
 
   useEffect(() => {
     queueMicrotask(() => {
+      setBulkSelectColumnVisible(false)
       setTodayBulkExpanded(false)
       setBatchProductionExpanded(false)
       setTodayBulkAction('')
     })
   }, [tasksPreset])
+
+  useEffect(() => {
+    if (!bulkSelectColumnVisible) {
+      queueMicrotask(() => setSelectedIds([]))
+    }
+  }, [bulkSelectColumnVisible])
 
   const showBulkCheckboxCol =
     tasksPreset === 'processing' ||
@@ -205,11 +213,11 @@ export default function TasksPage({ tasksPreset = 'all' }) {
 
   useEffect(() => {
     const el = headerSelectRef.current
-    if (!el || !showBulkCheckboxCol) return
+    if (!el || !showBulkCheckboxCol || !bulkSelectColumnVisible) return
     const onPage = rows.map((r) => r.id)
     const nSel = onPage.filter((id) => selectedIds.includes(id)).length
     el.indeterminate = onPage.length > 0 && nSel > 0 && nSel < onPage.length
-  }, [showBulkCheckboxCol, rows, selectedIds])
+  }, [showBulkCheckboxCol, bulkSelectColumnVisible, rows, selectedIds])
 
   const loadMeta = useCallback(() => {
     getJson('/api/meta/production-statuses').then((d) => setStatuses(d.statuses ?? []))
@@ -456,8 +464,9 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   const showProductionStatusFilter =
     tasksPreset === 'all' || tasksPreset === 'processing'
   const showNewWorkOrder = tasksPreset === 'all' || tasksPreset === 'pending'
+  const showBulkSelectCol = showBulkCheckboxCol && bulkSelectColumnVisible
   const listColSpan =
-    COL_COUNT + (showBulkCheckboxCol ? 1 : 0) + (showTodayCol ? 1 : 0)
+    COL_COUNT + (showBulkSelectCol ? 1 : 0) + (showTodayCol ? 1 : 0)
 
   const { todayQueueRows, restProcessingRows } = useMemo(() => {
     if (tasksPreset !== 'processing') {
@@ -474,7 +483,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
 
   const renderTaskRow = (it) => (
     <tr key={it.id} className="clickable" onClick={() => enterDetail(it)}>
-      {showBulkCheckboxCol ? (
+      {showBulkSelectCol ? (
         <td className="task-select-cell" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
@@ -568,7 +577,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   const renderMegaThead = (bulkControls) => (
     <thead>
       <tr>
-        {showBulkCheckboxCol ? (
+        {showBulkSelectCol ? (
           <th className="task-select-cell">
             {bulkControls ? (
               <input
@@ -732,6 +741,17 @@ export default function TasksPage({ tasksPreset = 'all' }) {
             ) : null}
             {showBulkCheckboxCol ? (
               <>
+                <button
+                  type="button"
+                  className={`btn ${bulkSelectColumnVisible ? 'is-pressed' : ''}`}
+                  aria-pressed={bulkSelectColumnVisible}
+                  onClick={() => {
+                    setErr(null)
+                    setBulkSelectColumnVisible((v) => !v)
+                  }}
+                >
+                  多选
+                </button>
                 {showTodayCol ? (
                   <button
                     type="button"
