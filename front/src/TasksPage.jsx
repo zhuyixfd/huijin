@@ -622,6 +622,11 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     [todayQueueRows],
   )
 
+  const restQueueQtySum = useMemo(
+    () => restProcessingRows.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
+    [restProcessingRows],
+  )
+
   /** 今日处理：按订单号排序 → 按个数展开（每件一行）→ 同订单号仅首行显示订单编号 → 组间交替底色 */
   const todayQueueExpandedBands = useMemo(() => {
     const sorted = [...todayQueueRows].sort((a, b) => {
@@ -690,17 +695,6 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     return { multi, aggregated, expanded: multi - aggregated }
   }, [todayQueueClusters, collapsedTodayOrderNos])
 
-  const todayQueueVisibleRowCount = useMemo(() => {
-    let n = 0
-    for (const cluster of todayQueueClusters) {
-      const multi = cluster.length > 1
-      const ono = String(cluster[0].it.order_no ?? '')
-      if (multi && collapsedTodayOrderNos.has(ono)) n += 1
-      else n += cluster.length
-    }
-    return n
-  }, [todayQueueClusters, collapsedTodayOrderNos])
-
   /** 待完成：按订单号排序 → 按件展开 → 同订单号分簇（与今日处理一致） */
   const restProcessingExpandedBands = useMemo(() => {
     const sorted = [...restProcessingRows].sort((a, b) => {
@@ -765,17 +759,6 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       if (collapsedRestOrderNos.has(ono)) aggregated += 1
     }
     return { multi, aggregated, expanded: multi - aggregated }
-  }, [restProcessingClusters, collapsedRestOrderNos])
-
-  const restVisibleRowCount = useMemo(() => {
-    let n = 0
-    for (const cluster of restProcessingClusters) {
-      const multi = cluster.length > 1
-      const ono = String(cluster[0].it.order_no ?? '')
-      if (multi && collapsedRestOrderNos.has(ono)) n += 1
-      else n += cluster.length
-    }
-    return n
   }, [restProcessingClusters, collapsedRestOrderNos])
 
   function toggleTodayFoldAll() {
@@ -1511,15 +1494,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
             >
               <div className="task-queue-panel-head">
                 <h3 id="task-queue-today-heading" className="task-queue-panel-title">
-                  今日处理 · {todayQueueRows.length} 条 · 合计 {todayQueueQtySum} 件 · 当前{' '}
-                  {todayQueueVisibleRowCount} 行
-                  {todayMultiFoldStats.multi > 0 ? (
-                    <>
-                      {' '}
-                      · 同订单号多件：逐件展开 {todayMultiFoldStats.expanded} · 按单聚合{' '}
-                      {todayMultiFoldStats.aggregated}
-                    </>
-                  ) : null}
+                  今日处理 · {todayQueueRows.length}个订单，{todayQueueQtySum}件
                 </h3>
                 <div className="task-queue-panel-actions">
                   {todayMultiFoldStats.multi > 0 ? (
@@ -1606,14 +1581,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
             >
               <div className="task-queue-panel-head">
                 <h3 id="task-queue-rest-heading" className="task-queue-panel-title">
-                  待完成 · {restProcessingRows.length} 条 · 当前 {restVisibleRowCount} 行
-                  {restMultiFoldStats.multi > 0 ? (
-                    <>
-                      {' '}
-                      · 同订单号多件：逐件展开 {restMultiFoldStats.expanded} · 按单聚合{' '}
-                      {restMultiFoldStats.aggregated}
-                    </>
-                  ) : null}
+                  待完成 · {restProcessingRows.length}个订单，{restQueueQtySum}件
                 </h3>
                 <div className="task-queue-panel-actions">
                   {restMultiFoldStats.multi > 0 ? (

@@ -89,61 +89,46 @@ export function splitForgingAndByStatus(expanded) {
   return { forging, byStatus }
 }
 
-const MID_GAP = '<td colspan="3" class="mid"></td>'
+/** 与下方明细表对齐共 9 列：1、5 列为「第x排」；2～4、6～9 列合并为空白/件号区 */
+const MID34 = '<td colspan="3" class="mid"></td>'
+const MID69 = '<td colspan="4" class="mid"></td>'
 
 /**
- * 排位置嵌套表：左列第1～6排，右列第7～10排（前四行左右对齐）；第5～6行仅左列排号，右列为占位；
- * 末列及末行占位对应车间 11～13 格（无文字仅占格）。空白件号格与带件号版列结构一致。
+ * 排位置嵌套表（9 列）：第 1、5 列显示排号；第 2～4、6～9 列为合并格。
+ * 前四行：左 1～4 排、右 7～10 排对齐；第 5～6 行仅左侧 5～6 排，第 5 列为占位，右区合并；
+ * 末行占位。
  */
 function buildPositionInnerTableRows() {
-  const emptySlot = '<td class="pos-slot-empty">&nbsp;</td>'
-  const blankVal = '<td class="pos-slot-label">&nbsp;</td>'
-  const mid = MID_GAP
+  const empty5 = '<td class="pos-slot-empty">&nbsp;</td>'
   let html = ''
   for (let r = 0; r < 4; r += 1) {
     html += `<tr class="pos-row">
       <td>${esc(`第${r + 1}排`)}</td>
-      ${mid}
-      ${blankVal}
-      ${mid}
+      ${MID34}
       <td>${esc(`第${r + 7}排`)}</td>
-      ${mid}
-      ${blankVal}
-      ${mid}
-      ${emptySlot}
+      ${MID69}
     </tr>`
   }
   for (let r = 4; r < 6; r += 1) {
     html += `<tr class="pos-row">
       <td>${esc(`第${r + 1}排`)}</td>
-      ${mid}
-      ${blankVal}
-      ${mid}
-      ${emptySlot}
-      ${mid}
-      ${blankVal}
-      ${mid}
-      ${emptySlot}
+      ${MID34}
+      ${empty5}
+      ${MID69}
     </tr>`
   }
   html += `<tr class="pos-row">
       <td class="pos-left-placeholder">&nbsp;</td>
-      ${mid}
-      ${blankVal}
-      ${mid}
-      ${emptySlot}
-      ${mid}
-      ${blankVal}
-      ${mid}
-      ${emptySlot}
+      ${MID34}
+      ${empty5}
+      ${MID69}
     </tr>`
   return html
 }
 
-/** 第1～10排：左 1～6、右 7～10，与 TasksPage 今日件号排序一致 */
+/** 第1～10排件号写入合并格（与 TasksPage 排序一致） */
 function buildPositionInnerTableRowsSlotLabels(labels) {
-  const emptySlot = '<td class="pos-slot-empty">&nbsp;</td>'
-  const mid = MID_GAP
+  const empty5 = '<td class="pos-slot-empty">&nbsp;</td>'
   let html = ''
   for (let r = 0; r < 4; r += 1) {
     const rawL = String(labels[r] ?? '').trim()
@@ -152,14 +137,9 @@ function buildPositionInnerTableRowsSlotLabels(labels) {
     const showR = rawR ? esc(rawR) : '&nbsp;'
     html += `<tr class="pos-row">
       <td>${esc(`第${r + 1}排`)}</td>
-      ${mid}
-      <td class="pos-slot-label">${showL}</td>
-      ${mid}
+      <td colspan="3" class="pos-slot-label mid">${showL}</td>
       <td>${esc(`第${r + 7}排`)}</td>
-      ${mid}
-      <td class="pos-slot-label">${showR}</td>
-      ${mid}
-      ${emptySlot}
+      <td colspan="4" class="pos-slot-label mid">${showR}</td>
     </tr>`
   }
   for (let r = 4; r < 6; r += 1) {
@@ -167,26 +147,16 @@ function buildPositionInnerTableRowsSlotLabels(labels) {
     const showL = rawL ? esc(rawL) : '&nbsp;'
     html += `<tr class="pos-row">
       <td>${esc(`第${r + 1}排`)}</td>
-      ${mid}
-      <td class="pos-slot-label">${showL}</td>
-      ${mid}
-      ${emptySlot}
-      ${mid}
-      <td class="pos-slot-label">&nbsp;</td>
-      ${mid}
-      ${emptySlot}
+      <td colspan="3" class="pos-slot-label mid">${showL}</td>
+      ${empty5}
+      <td colspan="4" class="mid">&nbsp;</td>
     </tr>`
   }
   html += `<tr class="pos-row">
       <td class="pos-left-placeholder">&nbsp;</td>
-      ${mid}
-      <td class="pos-slot-label">&nbsp;</td>
-      ${mid}
-      ${emptySlot}
-      ${mid}
-      <td class="pos-slot-label">&nbsp;</td>
-      ${mid}
-      ${emptySlot}
+      <td colspan="3" class="pos-slot-label mid">&nbsp;</td>
+      ${empty5}
+      <td colspan="4" class="mid">&nbsp;</td>
     </tr>`
   return html
 }
