@@ -60,6 +60,61 @@
   font-variant-numeric: tabular-nums;
 }
 
+.nav-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  margin-left: 0.35rem;
+  padding: 0.08rem 0.42rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  border-radius: 999px;
+  background: var(--accent-bg);
+  color: var(--text-h);
+  vertical-align: middle;
+}
+
+.dashboard-nav-piece-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.2rem;
+  padding: 0.35rem 0.15rem 0.55rem;
+  margin: 0 0 0.15rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.dashboard-nav-piece-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 1rem;
+  font-size: 0.62rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+.dashboard-nav-piece-letter {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-weight: 600;
+  font-size: 0.68rem;
+  color: var(--text-h);
+}
+
+.dashboard-nav-piece-num {
+  font-size: 0.58rem;
+  opacity: 0.92;
+}
+
+.dashboard-nav-piece-cell.is-muted .dashboard-nav-piece-letter,
+.dashboard-nav-piece-cell.is-muted .dashboard-nav-piece-num {
+  opacity: 0.35;
+  color: var(--text);
+}
+
 .dashboard-nav-section {
   display: flex;
   flex-direction: column;

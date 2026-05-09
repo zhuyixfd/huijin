@@ -84,6 +84,7 @@ def list_orders(
             stmt = stmt.where(
                 OrderItem.production_status != "未入库",
                 OrderItem.production_status != "已发回",
+                OrderItem.production_status != "待发回",
             )
         else:
             raise HTTPException(status_code=400, detail="无效的 status_category")

@@ -252,6 +252,13 @@ class TaskItemListOut(BaseModel):
     total: int
 
 
+class ProcessingLetterPieceCount(BaseModel):
+    """侧栏件号轮回字母对应的在制件数"""
+
+    letter: str = Field(..., min_length=1, max_length=1)
+    count: int = Field(ge=0)
+
+
 class TaskNavCountsOut(BaseModel):
     """侧栏订单分组数量（不受列表搜索条件影响）。"""
 
@@ -260,6 +267,10 @@ class TaskNavCountsOut(BaseModel):
     processing: int
     ready_outbound: int
     done: int
+    processing_piece_strip: list[ProcessingLetterPieceCount] = Field(
+        default_factory=list,
+        description="处理中（不含待发回）按件号首字母统计，顺序与轮回表一致",
+    )
 
 
 class DashboardSummary(BaseModel):

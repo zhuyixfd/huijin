@@ -14,6 +14,32 @@ from app.models import OrderItem
 DAY_CODE_CYCLE = "ABCDEFGXYZabcdefHIJKLMNOPQRSTU"
 
 
+def count_processing_piece_strip(db: Session) -> list[tuple[str, int]]:
+    """当前「处理中」且不含待出库的明细：按件号首字母累计件数（仅已有 processing_unit_codes 的件）。"""
+    rows = db.scalars(
+        select(OrderItem.processing_unit_codes).where(
+            OrderItem.production_status != "未入库",
+            OrderItem.production_status != "已发回",
+            OrderItem.production_status != "待发回",
+            OrderItem.processing_unit_codes.isnot(None),
+        )
+    ).all()
+    tallies: dict[str, int] = {c: 0 for c in DAY_CODE_CYCLE}
+    for raw in rows:
+        if not raw or not isinstance(raw, list):
+            continue
+        for s in raw:
+            if not isinstance(s, str):
+                continue
+            t = s.strip()
+            if not t:
+                continue
+            ch = t[0]
+            if ch in tallies:
+                tallies[ch] += 1
+    return [(letter, tallies[letter]) for letter in DAY_CODE_CYCLE]
+
+
 def day_code_char(ref: date | None = None) -> str:
     d = ref or date.today()
     return DAY_CODE_CYCLE[d.toordinal() % len(DAY_CODE_CYCLE)]

@@ -10,11 +10,12 @@ from app.deps import get_current_user
 from app.models import Customer, OrderItem
 from app.models import User as UserModel
 from app.order_number import generate_next_order_no
-from app.processing_codes import ensure_processing_codes_batch
+from app.processing_codes import count_processing_piece_strip, ensure_processing_codes_batch
 from app.order_status import format_single_line_item_order_status
 from app.schemas_business import (
     OrderItemCreate,
     OrderItemOut,
+    ProcessingLetterPieceCount,
     TaskItemListOut,
     TaskItemOut,
     TaskNavCountsOut,
@@ -75,6 +76,7 @@ def _task_filter_conditions(
         elif cat == "in_progress":
             conds.append(OrderItem.production_status != "未入库")
             conds.append(OrderItem.production_status != "已发回")
+            conds.append(OrderItem.production_status != "待发回")
         else:
             raise HTTPException(status_code=400, detail="无效的 status_category")
 
@@ -87,10 +89,6 @@ def task_nav_counts(
     db: Session = Depends(get_db),
 ):
     """侧栏「全部订单 / 未处理 / …」数量（全库汇总，不含列表搜索框条件）。"""
-    # 「全部订单」与列表 exclude_completed 一致：不含已完成（已发回）
-    all_n = db.scalar(
-        select(func.count(OrderItem.id)).where(OrderItem.production_status != "已发回")
-    ) or 0
     pending_n = db.scalar(
         select(func.count(OrderItem.id)).where(OrderItem.production_status == "未入库")
     ) or 0
@@ -98,20 +96,28 @@ def task_nav_counts(
         select(func.count(OrderItem.id)).where(
             OrderItem.production_status != "未入库",
             OrderItem.production_status != "已发回",
+            OrderItem.production_status != "待发回",
         )
     ) or 0
     ready_n = db.scalar(
         select(func.count(OrderItem.id)).where(OrderItem.production_status == "待发回")
     ) or 0
+    # 全部订单（未完成）= 未处理 + 处理中 + 待出库（三者互斥）
+    all_n = int(pending_n) + int(processing_n) + int(ready_n)
     done_n = db.scalar(
         select(func.count(OrderItem.id)).where(OrderItem.production_status == "已发回")
     ) or 0
+    strip_tuples = count_processing_piece_strip(db)
+    piece_strip = [
+        ProcessingLetterPieceCount(letter=letter, count=cnt) for letter, cnt in strip_tuples
+    ]
     return TaskNavCountsOut(
         all=int(all_n),
         pending=int(pending_n),
         processing=int(processing_n),
         ready_outbound=int(ready_n),
         done=int(done_n),
+        processing_piece_strip=piece_strip,
     )
 
 

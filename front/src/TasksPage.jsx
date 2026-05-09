@@ -115,7 +115,7 @@ function listPageTitle(preset) {
     case 'pending':
       return '未处理'
     case 'processing':
-      return '处理中'
+      return '处理中 · 待完成'
     case 'ready_outbound':
       return '待出库'
     case 'done':
@@ -164,7 +164,18 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
   const [batchTargetStatus, setBatchTargetStatus] = useState('')
   const [batchSubmitting, setBatchSubmitting] = useState(false)
   const [lastBatchUndo, setLastBatchUndo] = useState(null)
+  /** 今日处理：同一明细多件折叠后只显示一行（按 order_items.id） */
+  const [collapsedTodayItemIds, setCollapsedTodayItemIds] = useState(() => new Set())
   const headerSelectRef = useRef(null)
+
+  function toggleTodayItemCollapse(itemId) {
+    setCollapsedTodayItemIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(itemId)) next.delete(itemId)
+      else next.add(itemId)
+      return next
+    })
+  }
 
   /* 侧栏切换预设时同步列表筛选参数 */
   /* eslint-disable react-hooks/set-state-in-effect -- 预设来自路由，需同步本地筛选状态 */
@@ -200,6 +211,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
     queueMicrotask(() => {
       setBulkSelectColumnVisible(false)
       setBatchProductionExpanded(false)
+      setCollapsedTodayItemIds(new Set())
     })
   }, [tasksPreset])
 
@@ -579,8 +591,39 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
     })
   }, [todayQueueRows])
 
-  /** 处理中 · 下方「处理中」表：按件展开 + 件号 */
-  const restProcessingExpandedBands = useMemo(() => {
+  /** 今日处理：按明细 id 分簇（同一订单号即同一行明细的多件） */
+  const todayQueueClusters = useMemo(() => {
+    const flat = todayQueueExpandedBands
+    const clusters = []
+    let cur = []
+    let curId = null
+    for (const row of flat) {
+      const id = row.it.id
+      if (id !== curId) {
+        if (cur.length) clusters.push(cur)
+        cur = [row]
+        curId = id
+      } else {
+        cur.push(row)
+      }
+    }
+    if (cur.length) clusters.push(cur)
+    return clusters
+  }, [todayQueueExpandedBands])
+
+  const todayQueueVisibleRowCount = useMemo(() => {
+    let n = 0
+    for (const cluster of todayQueueClusters) {
+      const multi = cluster.length > 1
+      const id = cluster[0].it.id
+      if (multi && collapsedTodayItemIds.has(id)) n += 1
+      else n += cluster.length
+    }
+    return n
+  }, [todayQueueClusters, collapsedTodayItemIds])
+
+  /** 下方「处理中」：单行不展开，仅交替底色 */
+  const restProcessingSortedBands = useMemo(() => {
     const sorted = [...restProcessingRows].sort((a, b) => {
       const ao = String(a.order_no ?? '')
       const bo = String(b.order_no ?? '')
@@ -588,48 +631,44 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
       if (cmp !== 0) return cmp
       return a.id - b.id
     })
-    const flat = []
-    for (const it of sorted) {
-      const rawQ = Number(it.quantity)
-      const units = Number.isFinite(rawQ) && rawQ >= 1 ? Math.floor(rawQ) : 1
-      for (let u = 0; u < units; u += 1) {
-        flat.push({ it, unitIndex: u, unitsTotal: units })
-      }
-    }
     let g = 0
-    return flat.map((row, i) => {
-      const ono = String(row.it.order_no ?? '')
-      const prevOno = i > 0 ? String(flat[i - 1].it.order_no ?? '') : '\x00'
-      if (i > 0 && ono !== prevOno) g += 1
-      const codes = Array.isArray(row.it.processing_unit_codes)
-        ? row.it.processing_unit_codes
-        : []
-      const unitLabel = codes[row.unitIndex] ?? '—'
-      return {
-        ...row,
-        orderBand: g % 2 === 0 ? 'a' : 'b',
-        showOrderNo: i === 0 || ono !== prevOno,
-        unitLabel,
+    return sorted.map((it, idx) => {
+      if (
+        idx > 0 &&
+        String(sorted[idx - 1].order_no ?? '') !== String(sorted[idx].order_no ?? '')
+      ) {
+        g += 1
       }
+      return { it, orderBand: g % 2 === 0 ? 'a' : 'b' }
     })
   }, [restProcessingRows])
 
   const renderTaskRow = (it, rowOptions = {}) => {
-    const { orderBand, todayExpand, processingExpand } = rowOptions
-    const rowExpand = todayExpand || processingExpand
+    const { orderBand, todayExpand } = rowOptions
+    const groupSummary = Boolean(todayExpand?.groupSummary)
+    const rowExpand = Boolean(todayExpand) && !groupSummary
     const bandClass =
       orderBand === 'a'
         ? 'task-order-group-a'
         : orderBand === 'b'
           ? 'task-order-group-b'
           : ''
-    const showChrome = !rowExpand || rowExpand.unitIndex === 0
-    const showOrderNoCell = !rowExpand || rowExpand.showOrderNo
-    const rowKey = rowExpand ? `${it.id}-u${rowExpand.unitIndex}` : it.id
-    const unitLabel =
-      todayExpand?.unitLabel ??
-      processingExpand?.unitLabel ??
-      (showProcessingUnitCol ? '—' : null)
+    const showChrome = groupSummary || !todayExpand || todayExpand.unitIndex === 0
+    const showOrderNoCell =
+      groupSummary || !todayExpand || todayExpand.showOrderNo
+    const rowKey = groupSummary
+      ? `sum-${it.id}`
+      : rowExpand
+        ? `${it.id}-u${todayExpand.unitIndex}`
+        : it.id
+    const unitLabel = groupSummary
+      ? todayExpand.summaryLabelLine
+      : todayExpand?.unitLabel ?? (showProcessingUnitCol ? '—' : null)
+    const qtyDisplay = groupSummary
+      ? todayExpand.summaryPieceCount
+      : rowExpand
+        ? 1
+        : it.quantity
     return (
     <tr
       key={rowKey}
@@ -664,7 +703,41 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
           .filter(Boolean)
           .join(' ')}
       >
-        {showOrderNoCell ? it.order_no : '\u00a0'}
+        {showOrderNoCell ? (
+          <>
+            {todayExpand?.collapseControl === 'collapse' ? (
+              <button
+                type="button"
+                className="task-order-group-toggle"
+                aria-expanded
+                title="折叠同订单号（多件）"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleTodayItemCollapse(it.id)
+                }}
+              >
+                ▼
+              </button>
+            ) : null}
+            {todayExpand?.collapseControl === 'expand' ? (
+              <button
+                type="button"
+                className="task-order-group-toggle"
+                aria-expanded={false}
+                title="展开同订单号（多件）"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleTodayItemCollapse(it.id)
+                }}
+              >
+                ▶
+              </button>
+            ) : null}
+            {it.order_no}
+          </>
+        ) : (
+          '\u00a0'
+        )}
       </td>
       <td>{fmtNum(it.customer_name)}</td>
       <td className="cell-nowrap">{fmtDateTime(it.order_created_at)}</td>
@@ -677,7 +750,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
       <td>{fmtNum(it.material_grade)}</td>
       <td className="text-cell">{fmtNum(it.spec_incoming)}</td>
       <td>{fmtNum(it.weight_incoming)}</td>
-      <td>{rowExpand ? 1 : it.quantity}</td>
+      <td>{qtyDisplay}</td>
       <td className={GS}>{fmtNum(it.weight_return)}</td>
       <td className="text-cell">{fmtNum(it.formed_size)}</td>
       <td className={`text-cell ${GS}`}>{fmtNum(it.forging_requirements)}</td>
@@ -1123,8 +1196,8 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
               style={{ width: '100%', minWidth: 0, flexShrink: 0 }}
             >
               <h3 id="task-queue-today-heading" className="task-queue-panel-title">
-                今日处理 · {todayQueueRows.length} 条 · 合计 {todayQueueQtySum} 件 · 展开{' '}
-                {todayQueueExpandedBands.length} 行
+                今日处理 · {todayQueueRows.length} 条 · 合计 {todayQueueQtySum} 件 · 当前{' '}
+                {todayQueueVisibleRowCount} 行
               </h3>
               <div className="data-table-wrap task-queue-panel-inner">
                 <table className="data-table task-mega-table">
@@ -1137,13 +1210,42 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
                         </td>
                       </tr>
                     ) : (
-                      todayQueueExpandedBands.map(
-                        ({ it, orderBand, unitIndex, unitsTotal, showOrderNo, unitLabel }) =>
-                          renderTaskRow(it, {
-                            orderBand,
-                            todayExpand: { unitIndex, unitsTotal, showOrderNo, unitLabel },
+                      todayQueueClusters.flatMap((cluster) => {
+                        const it0 = cluster[0].it
+                        const multi = cluster.length > 1
+                        const collapsed = multi && collapsedTodayItemIds.has(it0.id)
+                        const summaryLabelLine =
+                          cluster
+                            .map((r) => r.unitLabel)
+                            .filter((x) => x && x !== '—')
+                            .join('、') || '—'
+                        if (multi && collapsed) {
+                          return [
+                            renderTaskRow(it0, {
+                              orderBand: cluster[0].orderBand,
+                              todayExpand: {
+                                groupSummary: true,
+                                summaryPieceCount: cluster.length,
+                                summaryLabelLine,
+                                collapseControl: 'expand',
+                              },
+                            }),
+                          ]
+                        }
+                        return cluster.map((row) =>
+                          renderTaskRow(row.it, {
+                            orderBand: row.orderBand,
+                            todayExpand: {
+                              unitIndex: row.unitIndex,
+                              unitsTotal: row.unitsTotal,
+                              showOrderNo: row.showOrderNo,
+                              unitLabel: row.unitLabel,
+                              collapseControl:
+                                multi && row.unitIndex === 0 ? 'collapse' : undefined,
+                            },
                           }),
-                      )
+                        )
+                      })
                     )}
                   </tbody>
                 </table>
@@ -1156,7 +1258,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
               style={{ width: '100%', minWidth: 0, flexShrink: 0 }}
             >
               <h3 id="task-queue-rest-heading" className="task-queue-panel-title">
-                处理中
+                待完成
               </h3>
               <div className="data-table-wrap task-queue-panel-inner">
                 <table className="data-table task-mega-table">
@@ -1165,28 +1267,12 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
                     {restProcessingRows.length === 0 ? (
                       <tr>
                         <td colSpan={listColSpan} className="muted">
-                          暂无其他处理中单
+                          暂无待完成明细
                         </td>
                       </tr>
                     ) : (
-                      restProcessingExpandedBands.map(
-                        ({
-                          it,
-                          orderBand,
-                          unitIndex,
-                          unitsTotal,
-                          showOrderNo,
-                          unitLabel,
-                        }) =>
-                          renderTaskRow(it, {
-                            orderBand,
-                            processingExpand: {
-                              unitIndex,
-                              unitsTotal,
-                              showOrderNo,
-                              unitLabel,
-                            },
-                          }),
+                      restProcessingSortedBands.map(({ it, orderBand }) =>
+                        renderTaskRow(it, { orderBand }),
                       )
                     )}
                   </tbody>

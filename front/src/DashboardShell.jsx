@@ -8,7 +8,7 @@ const NAV = [
     primaryNav: { key: 'tasks-all', label: '全部订单' },
     children: [
       { key: 'tasks-pending', label: '未处理' },
-      { key: 'tasks-processing', label: '处理中' },
+      { key: 'tasks-processing', label: '处理中 · 待完成' },
       { key: 'tasks-ready-outbound', label: '待出库' },
       { key: 'tasks-done', label: '已完成' },
     ],
@@ -25,6 +25,11 @@ function ordersSectionActive(activeNav) {
 function navCountLabel(counts, key) {
   if (!counts || typeof counts[key] !== 'number') return '…'
   return String(counts[key])
+}
+
+function NavCountBadge({ counts, k }) {
+  const raw = navCountLabel(counts, k)
+  return <span className="nav-count-badge">{raw}</span>
 }
 
 export default function DashboardShell({
@@ -55,11 +60,27 @@ export default function DashboardShell({
                     className={`dashboard-nav-item ${activeNav === n.primaryNav.key ? 'is-active' : ''}`}
                     onClick={() => onNavChange(n.primaryNav.key)}
                   >
-                    {n.primaryNav.label}{' '}
-                    <span className="dashboard-nav-count">
-                      ({navCountLabel(taskNavCounts, 'all')})
-                    </span>
+                    {n.primaryNav.label}
+                    <NavCountBadge counts={taskNavCounts} k="all" />
                   </button>
+                  {Array.isArray(taskNavCounts?.processing_piece_strip) &&
+                  taskNavCounts.processing_piece_strip.length > 0 ? (
+                    <div
+                      className="dashboard-nav-piece-strip"
+                      aria-label="处理中件号首字母件数"
+                    >
+                      {taskNavCounts.processing_piece_strip.map(({ letter, count }) => (
+                        <span
+                          key={letter}
+                          className={`dashboard-nav-piece-cell ${count === 0 ? 'is-muted' : ''}`}
+                          title={`${letter}：${count}件`}
+                        >
+                          <span className="dashboard-nav-piece-letter">{letter}</span>
+                          <span className="dashboard-nav-piece-num">{count}</span>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="dashboard-nav-sub">
                     {n.children.map((c) => {
                       const ck =
@@ -79,12 +100,8 @@ export default function DashboardShell({
                           className={`dashboard-nav-item dashboard-nav-sub-item ${activeNav === c.key ? 'is-active' : ''}`}
                           onClick={() => onNavChange(c.key)}
                         >
-                          {c.label}{' '}
-                          {ck ? (
-                            <span className="dashboard-nav-count">
-                              ({navCountLabel(taskNavCounts, ck)})
-                            </span>
-                          ) : null}
+                          {c.label}
+                          {ck ? <NavCountBadge counts={taskNavCounts} k={ck} /> : null}
                         </button>
                       )
                     })}
