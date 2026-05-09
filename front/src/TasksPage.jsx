@@ -150,12 +150,28 @@ function listPageTitle(preset) {
   }
 }
 
+/** 与侧栏预设同步传给 API 的 status_category；勿用异步 effect 写单独 state，否则切换预设时首轮请求仍沿用上一次 category，列表会串页（例如待出库短暂显示已完成）。 */
+function statusCategoryFromPreset(preset) {
+  switch (preset) {
+    case 'pending':
+      return 'waiting_inbound'
+    case 'processing':
+      return 'in_progress'
+    case 'ready_outbound':
+      return 'ready_outbound'
+    case 'done':
+      return 'completed'
+    case 'all':
+    default:
+      return 'all'
+  }
+}
+
 export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNavCounts }) {
   const [customers, setCustomers] = useState([])
   const [statuses, setStatuses] = useState([])
 
   const [statusFilter, setStatusFilter] = useState('')
-  const [statusCategory, setStatusCategory] = useState('all')
   const [cid, setCid] = useState('')
   const [customerNameQ, setCustomerNameQ] = useState('')
   const [createdFrom, setCreatedFrom] = useState('')
@@ -203,6 +219,16 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   const [slotOrderDraft, setSlotOrderDraft] = useState(() => Array(10).fill(''))
   const headerSelectRef = useRef(null)
 
+  const listStatusCategory = useMemo(
+    () => statusCategoryFromPreset(tasksPreset),
+    [tasksPreset],
+  )
+
+  /* 侧栏切换预设时清空「按生产状态筛选」，避免与新区间的列表条件叠加 */
+  useEffect(() => {
+    queueMicrotask(() => setStatusFilter(''))
+  }, [tasksPreset])
+
   function toggleTodayOrderCollapse(orderNo) {
     const key = String(orderNo ?? '')
     setCollapsedTodayOrderNos((prev) => {
@@ -223,36 +249,6 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     })
   }
 
-  /* 侧栏切换预设时同步列表筛选参数 */
-  /* eslint-disable react-hooks/set-state-in-effect -- 预设来自路由，需同步本地筛选状态 */
-  useEffect(() => {
-    switch (tasksPreset) {
-      case 'all':
-        setStatusCategory('all')
-        setStatusFilter('')
-        break
-      case 'pending':
-        setStatusCategory('waiting_inbound')
-        setStatusFilter('')
-        break
-      case 'processing':
-        setStatusCategory('in_progress')
-        setStatusFilter('')
-        break
-      case 'ready_outbound':
-        setStatusCategory('ready_outbound')
-        setStatusFilter('')
-        break
-      case 'done':
-        setStatusCategory('completed')
-        setStatusFilter('')
-        break
-      default:
-        break
-    }
-  }, [tasksPreset])
-  /* eslint-enable react-hooks/set-state-in-effect */
-
   useEffect(() => {
     queueMicrotask(() => {
       setBulkSelectColumnVisible(false)
@@ -267,7 +263,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   }, [
     tasksPreset,
     statusFilter,
-    statusCategory,
+    listStatusCategory,
     cid,
     q,
     customerNameQ,
@@ -317,7 +313,8 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     if (statusFilter) p.set('status', statusFilter)
     if (q.trim()) p.set('q', q.trim())
     if (cid) p.set('customer_id', cid)
-    if (statusCategory && statusCategory !== 'all') p.set('status_category', statusCategory)
+    if (listStatusCategory && listStatusCategory !== 'all')
+      p.set('status_category', listStatusCategory)
     if (customerNameQ.trim()) p.set('customer_q', customerNameQ.trim())
     if (createdFrom) p.set('created_from', createdFrom)
     if (createdTo) p.set('created_to', createdTo)
@@ -338,7 +335,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     statusFilter,
     q,
     cid,
-    statusCategory,
+    listStatusCategory,
     customerNameQ,
     createdFrom,
     createdTo,
