@@ -149,10 +149,18 @@ class OrderItemOut(BaseModel):
     return_date: date | None = None
     incoming_date: date | None = None
     cutting_time: datetime | None = None
+    processing_unit_codes: list[str] | None = Field(
+        default=None,
+        description="处理中单件编号（与个数等长），生成后永久保留",
+    )
 
 
 class GrindLogCreate(BaseModel):
     note: str | None = None
+    unit_index: int | None = Field(
+        default=None,
+        description="对应展开后的第几件（0 起）；不传表示整条明细共用（旧数据）",
+    )
 
 
 class GrindLogOut(BaseModel):
@@ -161,6 +169,7 @@ class GrindLogOut(BaseModel):
     id: int
     order_item_id: int
     note: str | None = None
+    unit_index: int | None = None
     created_at: datetime | None = None
 
 
@@ -172,6 +181,7 @@ class OrderGrindLogRow(BaseModel):
     production_no: str | None = None
     incoming_no: str | None = None
     note: str | None = None
+    unit_index: int | None = None
     created_at: datetime | None = None
 
 

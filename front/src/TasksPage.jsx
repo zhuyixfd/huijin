@@ -54,6 +54,15 @@ function fmtNum(v) {
   return String(v)
 }
 
+/** 明细页按件：未指定件的记录挂在第 1 件展示（兼容旧数据） */
+function grindLogsForUnit(logs, unitIdx) {
+  return logs.filter((log) => {
+    const ix = log.unit_index
+    if (ix === null || ix === undefined) return unitIdx === 0
+    return ix === unitIdx
+  })
+}
+
 function normalizeItemPayload(form) {
   const q = parseInt(String(form.quantity), 10)
   let cutting = null
@@ -141,6 +150,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
   const [detailLoading, setDetailLoading] = useState(false)
   const [grindItem, setGrindItem] = useState(null)
   const [grindNote, setGrindNote] = useState('')
+  const [grindUnitIndex, setGrindUnitIndex] = useState(null)
 
   const [workOrderModal, setWorkOrderModal] = useState(false)
   const [newWork, setNewWork] = useState(emptyWorkOrderForm)
@@ -400,9 +410,11 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
     try {
       await postJson(`/api/order-items/${grindItem.id}/grind-logs`, {
         note: grindNote || null,
+        unit_index: grindUnitIndex,
       })
       setGrindItem(null)
       setGrindNote('')
+      setGrindUnitIndex(null)
       loadTasks()
       if (detail && detail.id === grindItem.id) await refreshDetail(detail.id)
     } catch (e) {
@@ -483,11 +495,13 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
   const showCuttingReturnDateCols = tasksPreset !== 'pending'
   const showProductionStatusCol =
     tasksPreset !== 'ready_outbound' && tasksPreset !== 'done'
+  const showProcessingUnitCol = tasksPreset === 'processing'
   const dataColCount =
     COL_COUNT -
     (showTaskActionsCol ? 0 : 1) -
     (showCuttingReturnDateCols ? 0 : 2) -
-    (showProductionStatusCol ? 0 : 1)
+    (showProductionStatusCol ? 0 : 1) +
+    (showProcessingUnitCol ? 1 : 0)
   const listColSpan = dataColCount + (showBulkSelectCol ? 1 : 0)
   const totalPages = Math.max(1, Math.ceil(listTotal / pageSize))
 
@@ -552,25 +566,70 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
       const ono = String(row.it.order_no ?? '')
       const prevOno = i > 0 ? String(flat[i - 1].it.order_no ?? '') : '\x00'
       if (i > 0 && ono !== prevOno) g += 1
+      const codes = Array.isArray(row.it.processing_unit_codes)
+        ? row.it.processing_unit_codes
+        : []
+      const unitLabel = codes[row.unitIndex] ?? '—'
       return {
         ...row,
         orderBand: g % 2 === 0 ? 'a' : 'b',
         showOrderNo: i === 0 || ono !== prevOno,
+        unitLabel,
       }
     })
   }, [todayQueueRows])
 
+  /** 处理中 · 下方「处理中」表：按件展开 + 件号 */
+  const restProcessingExpandedBands = useMemo(() => {
+    const sorted = [...restProcessingRows].sort((a, b) => {
+      const ao = String(a.order_no ?? '')
+      const bo = String(b.order_no ?? '')
+      const cmp = ao.localeCompare(bo, 'zh-CN')
+      if (cmp !== 0) return cmp
+      return a.id - b.id
+    })
+    const flat = []
+    for (const it of sorted) {
+      const rawQ = Number(it.quantity)
+      const units = Number.isFinite(rawQ) && rawQ >= 1 ? Math.floor(rawQ) : 1
+      for (let u = 0; u < units; u += 1) {
+        flat.push({ it, unitIndex: u, unitsTotal: units })
+      }
+    }
+    let g = 0
+    return flat.map((row, i) => {
+      const ono = String(row.it.order_no ?? '')
+      const prevOno = i > 0 ? String(flat[i - 1].it.order_no ?? '') : '\x00'
+      if (i > 0 && ono !== prevOno) g += 1
+      const codes = Array.isArray(row.it.processing_unit_codes)
+        ? row.it.processing_unit_codes
+        : []
+      const unitLabel = codes[row.unitIndex] ?? '—'
+      return {
+        ...row,
+        orderBand: g % 2 === 0 ? 'a' : 'b',
+        showOrderNo: i === 0 || ono !== prevOno,
+        unitLabel,
+      }
+    })
+  }, [restProcessingRows])
+
   const renderTaskRow = (it, rowOptions = {}) => {
-    const { orderBand, todayExpand } = rowOptions
+    const { orderBand, todayExpand, processingExpand } = rowOptions
+    const rowExpand = todayExpand || processingExpand
     const bandClass =
       orderBand === 'a'
         ? 'task-order-group-a'
         : orderBand === 'b'
           ? 'task-order-group-b'
           : ''
-    const showChrome = !todayExpand || todayExpand.unitIndex === 0
-    const showOrderNoCell = !todayExpand || todayExpand.showOrderNo
-    const rowKey = todayExpand ? `${it.id}-u${todayExpand.unitIndex}` : it.id
+    const showChrome = !rowExpand || rowExpand.unitIndex === 0
+    const showOrderNoCell = !rowExpand || rowExpand.showOrderNo
+    const rowKey = rowExpand ? `${it.id}-u${rowExpand.unitIndex}` : it.id
+    const unitLabel =
+      todayExpand?.unitLabel ??
+      processingExpand?.unitLabel ??
+      (showProcessingUnitCol ? '—' : null)
     return (
     <tr
       key={rowKey}
@@ -594,6 +653,9 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
         </td>
       ) : null}
       <td className="cell-nowrap">{it.id}</td>
+      {showProcessingUnitCol ? (
+        <td className="cell-nowrap task-unit-code">{unitLabel ?? '—'}</td>
+      ) : null}
       <td
         className={[
           'cell-nowrap',
@@ -615,7 +677,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
       <td>{fmtNum(it.material_grade)}</td>
       <td className="text-cell">{fmtNum(it.spec_incoming)}</td>
       <td>{fmtNum(it.weight_incoming)}</td>
-      <td>{todayExpand ? 1 : it.quantity}</td>
+      <td>{rowExpand ? 1 : it.quantity}</td>
       <td className={GS}>{fmtNum(it.weight_return)}</td>
       <td className="text-cell">{fmtNum(it.formed_size)}</td>
       <td className={`text-cell ${GS}`}>{fmtNum(it.forging_requirements)}</td>
@@ -666,6 +728,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
                   onClick={() => {
                     setGrindItem(it)
                     setGrindNote('')
+                    setGrindUnitIndex(null)
                   }}
                 >
                   修磨记录
@@ -706,6 +769,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
           </th>
         ) : null}
         <th className="cell-nowrap">明细ID</th>
+        {showProcessingUnitCol ? <th className="cell-nowrap">件号</th> : null}
         <th className="cell-nowrap">订单编号</th>
         <th>客户</th>
         <th className="cell-nowrap">下单时间</th>
@@ -853,6 +917,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
                     setErr(null)
                     setBatchProductionExpanded((v) => {
                       const next = !v
+                      if (next) setBulkSelectColumnVisible(true)
                       if (!next) setBatchTargetStatus('')
                       return next
                     })
@@ -872,6 +937,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
                     }
                     onClick={() => {
                       setErr(null)
+                      setBulkSelectColumnVisible(true)
                       void submitStartProcessingToday()
                     }}
                   >
@@ -890,6 +956,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
                     }
                     onClick={() => {
                       setErr(null)
+                      setBulkSelectColumnVisible(true)
                       void submitAddToTodayFromProcessing()
                     }}
                   >
@@ -1070,11 +1137,12 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
                         </td>
                       </tr>
                     ) : (
-                      todayQueueExpandedBands.map(({ it, orderBand, unitIndex, unitsTotal, showOrderNo }) =>
-                        renderTaskRow(it, {
-                          orderBand,
-                          todayExpand: { unitIndex, unitsTotal, showOrderNo },
-                        }),
+                      todayQueueExpandedBands.map(
+                        ({ it, orderBand, unitIndex, unitsTotal, showOrderNo, unitLabel }) =>
+                          renderTaskRow(it, {
+                            orderBand,
+                            todayExpand: { unitIndex, unitsTotal, showOrderNo, unitLabel },
+                          }),
                       )
                     )}
                   </tbody>
@@ -1101,7 +1169,25 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
                         </td>
                       </tr>
                     ) : (
-                      restProcessingRows.map(renderTaskRow)
+                      restProcessingExpandedBands.map(
+                        ({
+                          it,
+                          orderBand,
+                          unitIndex,
+                          unitsTotal,
+                          showOrderNo,
+                          unitLabel,
+                        }) =>
+                          renderTaskRow(it, {
+                            orderBand,
+                            processingExpand: {
+                              unitIndex,
+                              unitsTotal,
+                              showOrderNo,
+                              unitLabel,
+                            },
+                          }),
+                      )
                     )}
                   </tbody>
                 </table>
@@ -1138,92 +1224,197 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
                 </div>
               </section>
 
-              <section className="card order-section">
-                <h2 className="order-section-title">来料信息</h2>
-                <div className="data-table-wrap order-items-wide">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>生产编号</th>
-                        <th>来料编号</th>
-                        <th>材质</th>
-                        <th>来料规格</th>
-                        <th>来料重</th>
-                        <th>个数</th>
-                        <th>成型尺寸</th>
-                        <th>状态</th>
-                        <th style={{ minWidth: '6rem' }}>操作</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(detail.items ?? []).map((it) => (
-                        <tr key={it.id}>
-                          <td>{it.production_no}</td>
-                          <td>{it.incoming_no}</td>
-                          <td>{it.material_grade}</td>
-                          <td className="text-cell">{it.spec_incoming ?? '—'}</td>
-                          <td>{it.weight_incoming ?? '—'}</td>
-                          <td>{it.quantity}</td>
-                          <td className="text-cell">{it.formed_size ?? '—'}</td>
-                          <td>
-                            <span className="tag">{it.production_status}</span>
-                          </td>
-                          <td className="row-actions">
-                            <button
-                              type="button"
-                              className="btn btn-ghost"
-                              onClick={() => openEditItem(it)}
-                            >
-                              编辑
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {detail.items?.length === 0 ? (
-                  <p className="muted order-slip-empty" style={{ marginTop: '0.75rem' }}>
-                    暂无来料数据。
-                  </p>
-                ) : null}
-              </section>
-
-              <section className="card order-section">
-                <h2 className="order-section-title">操作记录</h2>
-                <p className="muted order-section-desc">修磨等环节登记</p>
-                <div className="data-table-wrap">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>时间</th>
-                        <th>生产编号</th>
-                        <th>来料编号</th>
-                        <th>备注</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {grindLogs.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="muted">
-                            暂无操作记录
-                          </td>
-                        </tr>
-                      ) : (
-                        grindLogs.map((log) => (
-                          <tr key={log.id}>
-                            <td className="cell-nowrap">{fmtDateTime(log.created_at)}</td>
-                            <td>{log.production_no ?? '—'}</td>
-                            <td>{log.incoming_no ?? '—'}</td>
-                            <td className="text-cell">{log.note ?? '—'}</td>
+              {detail.items?.[0]?.in_today_queue ? (
+                <>
+                  <section className="card order-section">
+                    <h2 className="order-section-title">来料信息</h2>
+                    <div className="data-table-wrap order-items-wide">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>生产编号</th>
+                            <th>来料编号</th>
+                            <th>材质</th>
+                            <th>来料规格</th>
+                            <th>来料重</th>
+                            <th>个数</th>
+                            <th>成型尺寸</th>
+                            <th>状态</th>
+                            <th style={{ minWidth: '6rem' }}>操作</th>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
+                        </thead>
+                        <tbody>
+                          {(detail.items ?? []).map((it) => (
+                            <tr key={it.id}>
+                              <td>{it.production_no}</td>
+                              <td>{it.incoming_no}</td>
+                              <td>{it.material_grade}</td>
+                              <td className="text-cell">{it.spec_incoming ?? '—'}</td>
+                              <td>{it.weight_incoming ?? '—'}</td>
+                              <td>{it.quantity}</td>
+                              <td className="text-cell">{it.formed_size ?? '—'}</td>
+                              <td>
+                                <span className="tag">{it.production_status}</span>
+                              </td>
+                              <td className="row-actions">
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost"
+                                  onClick={() => openEditItem(it)}
+                                >
+                                  编辑
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {detail.items?.length === 0 ? (
+                      <p className="muted order-slip-empty" style={{ marginTop: '0.75rem' }}>
+                        暂无来料数据。
+                      </p>
+                    ) : null}
+                  </section>
+
+                  <section className="card order-section">
+                    <h2 className="order-section-title">操作记录</h2>
+                    <p className="muted order-section-desc">修磨等环节登记</p>
+                    <div className="data-table-wrap">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>时间</th>
+                            <th>生产编号</th>
+                            <th>来料编号</th>
+                            <th>备注</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {grindLogs.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="muted">
+                                暂无操作记录
+                              </td>
+                            </tr>
+                          ) : (
+                            grindLogs.map((log) => (
+                              <tr key={log.id}>
+                                <td className="cell-nowrap">{fmtDateTime(log.created_at)}</td>
+                                <td>{log.production_no ?? '—'}</td>
+                                <td>{log.incoming_no ?? '—'}</td>
+                                <td className="text-cell">{log.note ?? '—'}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                </>
+              ) : detail.items?.[0] ? (
+                <section className="card order-section">
+                  <div className="order-detail-unit-head">
+                    <h2 className="order-section-title">来料信息（按件）</h2>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => openEditItem(detail.items[0])}
+                    >
+                      编辑来料
+                    </button>
+                  </div>
+                  <p className="muted order-section-desc">
+                    未列入「今日处理」时按个数展开；处理中单件编号持久保留。旧记录未指定件号时挂在第 1 件。
+                  </p>
+                  {Array.from(
+                    { length: Math.max(1, Number(detail.items[0].quantity) || 1) },
+                    (_, u) => {
+                      const it = detail.items[0]
+                      const codes = it.processing_unit_codes
+                      const isProc =
+                        it.production_status !== '未入库' && it.production_status !== '已发回'
+                      const pieceLabel =
+                        isProc && Array.isArray(codes) && codes[u]
+                          ? codes[u]
+                          : `第${u + 1}件`
+                      const unitLogs = grindLogsForUnit(grindLogs, u)
+                      return (
+                        <div key={u} className={'order-unit-expand-card' + (u === 0 ? '' : ' order-unit-expand-follow')}>
+                          <h3 className="order-unit-expand-title">件号 {pieceLabel}</h3>
+                          <div className="data-table-wrap">
+                            <table className="data-table order-unit-meta-table">
+                              <tbody>
+                                <tr>
+                                  <th scope="row">生产编号</th>
+                                  <td>{it.production_no ?? '—'}</td>
+                                  <th scope="row">来料编号</th>
+                                  <td>{it.incoming_no ?? '—'}</td>
+                                </tr>
+                                <tr>
+                                  <th scope="row">材质</th>
+                                  <td>{it.material_grade ?? '—'}</td>
+                                  <th scope="row">状态</th>
+                                  <td>
+                                    <span className="tag">{it.production_status}</span>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                          <h4 className="order-unit-logs-heading">处理记录</h4>
+                          <div className="data-table-wrap">
+                            <table className="data-table">
+                              <thead>
+                                <tr>
+                                  <th>时间</th>
+                                  <th>备注</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {unitLogs.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={2} className="muted">
+                                      暂无本条记录
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  unitLogs.map((log) => (
+                                    <tr key={log.id}>
+                                      <td className="cell-nowrap">{fmtDateTime(log.created_at)}</td>
+                                      <td className="text-cell">{log.note ?? '—'}</td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                          {it.production_status === '修磨中' ? (
+                            <div className="row-actions order-unit-grind-actions">
+                              <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => {
+                                  setGrindItem(it)
+                                  setGrindUnitIndex(u)
+                                  setGrindNote('')
+                                }}
+                              >
+                                登记修磨（本件）
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      )
+                    },
+                  )}
+                </section>
+              ) : (
+                <section className="card order-section">
+                  <p className="muted">暂无来料数据。</p>
+                </section>
+              )}
             </>
           ) : null}
         </>
@@ -1541,11 +1732,21 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
       ) : null}
 
       {grindItem ? (
-        <div className="modal-backdrop" onClick={() => setGrindItem(null)} role="presentation">
+        <div
+          className="modal-backdrop"
+          onClick={() => {
+            setGrindItem(null)
+            setGrindUnitIndex(null)
+          }}
+          role="presentation"
+        >
           <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog">
             <h2>修磨记录</h2>
             <p className="muted">
               订单 {grindItem.order_no} · 生产编号 {grindItem.production_no ?? '—'}
+              {grindUnitIndex !== null && grindUnitIndex !== undefined
+                ? ` · 第 ${grindUnitIndex + 1} 件`
+                : ''}
             </p>
             <form className="form-grid" onSubmit={submitGrind}>
               <label className="full">
@@ -1558,7 +1759,14 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated }) {
               </label>
               {err ? <p className="err">{err}</p> : null}
               <div className="form-actions">
-                <button type="button" className="btn" onClick={() => setGrindItem(null)}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    setGrindItem(null)
+                    setGrindUnitIndex(null)
+                  }}
+                >
                   取消
                 </button>
                 <button type="submit" className="btn btn-primary">

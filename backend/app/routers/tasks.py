@@ -10,6 +10,7 @@ from app.deps import get_current_user
 from app.models import Customer, OrderItem
 from app.models import User as UserModel
 from app.order_number import generate_next_order_no
+from app.processing_codes import ensure_processing_codes_batch
 from app.order_status import format_single_line_item_order_status
 from app.schemas_business import (
     OrderItemCreate,
@@ -162,6 +163,15 @@ def list_task_items(
         .limit(limit)
     )
     rows = db.execute(stmt).all()
+    proc_items = [
+        item for item, _ in rows if item.production_status not in ("未入库", "已发回")
+    ]
+    if proc_items:
+        ensure_processing_codes_batch(db, proc_items)
+        db.commit()
+        for item in proc_items:
+            db.refresh(item)
+
     out: list[TaskItemOut] = []
     for item, cust_name in rows:
         base = OrderItemOut.model_validate(item).model_dump()

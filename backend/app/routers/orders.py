@@ -11,6 +11,7 @@ from app.models import Customer, GrindLog, OrderItem
 from app.models import User as UserModel
 from app.order_number import generate_next_order_no
 from app.order_status import format_single_line_item_order_status
+from app.processing_codes import ensure_order_item_processing_codes
 from app.schemas_business import (
     CustomerOut,
     OrderCreate,
@@ -177,6 +178,7 @@ def list_order_grind_logs(
                 production_no=prod_no,
                 incoming_no=inc_no,
                 note=log.note,
+                unit_index=log.unit_index,
                 created_at=log.created_at,
             )
         )
@@ -192,6 +194,10 @@ def get_order(
     item = db.get(OrderItem, item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="订单不存在")
+    if not item.in_today_queue:
+        ensure_order_item_processing_codes(db, item)
+        db.commit()
+        db.refresh(item)
     return _detail_out(db, item)
 
 

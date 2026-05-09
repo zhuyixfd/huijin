@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -69,6 +69,7 @@ class OrderItem(Base):
     in_today_queue: Mapped[bool] = mapped_column(
         Boolean(), server_default="0", default=False
     )
+    processing_unit_codes: Mapped[list | None] = mapped_column(JSON, nullable=True)
     return_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     incoming_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     cutting_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -91,6 +92,7 @@ class GrindLog(Base):
         ForeignKey("order_items.id", ondelete="CASCADE"), index=True
     )
     note: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    unit_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     item: Mapped["OrderItem"] = relationship(back_populates="grind_logs")

@@ -12,6 +12,10 @@ from app.schemas_business import (
     OrderItemBatchProductionStatus,
     OrderItemUpdate,
 )
+from app.processing_codes import (
+    ensure_order_item_processing_codes,
+    sync_processing_codes_length,
+)
 from app.schemas_business import OrderItemOut as OrderItemOutSchema
 
 router = APIRouter()
@@ -30,6 +34,7 @@ def batch_set_production_status(
     update_vals: dict = {"production_status": st}
     if st in ("未入库", "已发回"):
         update_vals["in_today_queue"] = False
+        update_vals["processing_unit_codes"] = None
     elif body.in_today_queue is not None:
         update_vals["in_today_queue"] = bool(body.in_today_queue)
     result = db.execute(
@@ -59,6 +64,11 @@ def patch_order_item(
         data.pop("in_today_queue", None)
     for k, v in data.items():
         setattr(row, k, v)
+    if row.production_status in ("未入库", "已发回"):
+        row.processing_unit_codes = None
+    else:
+        sync_processing_codes_length(row)
+        ensure_order_item_processing_codes(db, row)
     db.commit()
     db.refresh(row)
     return row
@@ -92,7 +102,11 @@ def add_grind_log(
     row = db.get(OrderItem, item_id)
     if row is None:
         raise HTTPException(status_code=404, detail="明细不存在")
-    log = GrindLog(order_item_id=item_id, note=body.note)
+    log = GrindLog(
+        order_item_id=item_id,
+        note=body.note,
+        unit_index=body.unit_index,
+    )
     db.add(log)
     db.commit()
     db.refresh(log)

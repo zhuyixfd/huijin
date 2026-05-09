@@ -19,6 +19,33 @@ def ensure_user_profile_columns() -> None:
             conn.execute(text("ALTER TABLE users ADD COLUMN last_login_at DATETIME NULL"))
 
 
+def ensure_order_item_processing_unit_codes_col() -> None:
+    """order_items.processing_unit_codes：处理中单件折叠编号 JSON 数组"""
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_items")}
+    if "processing_unit_codes" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE order_items ADD COLUMN processing_unit_codes JSON NULL"
+            )
+        )
+
+
+def ensure_grind_log_unit_index() -> None:
+    inspector = inspect(engine)
+    if "grind_logs" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("grind_logs")}
+    if "unit_index" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE grind_logs ADD COLUMN unit_index INT NULL"))
+
+
 def ensure_order_item_in_today_queue() -> None:
     """order_items.in_today_queue：处理中视图「今日处理」区块勾选"""
     inspector = inspect(engine)
@@ -101,6 +128,8 @@ def init_db() -> None:
     ensure_users_role_column()
     ensure_user_profile_columns()
     ensure_customer_abbr_column()
+    ensure_order_item_processing_unit_codes_col()
+    ensure_grind_log_unit_index()
     ensure_order_item_in_today_queue()
     db = SessionLocal()
     try:
