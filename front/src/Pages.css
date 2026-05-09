@@ -90,6 +90,54 @@
   line-height: 1.35;
 }
 
+.batch-status-modal-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.batch-status-modal-select {
+  flex: 1 1 12rem;
+  min-width: min(100%, 14rem);
+  max-width: 22rem;
+  font: inherit;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.batch-status-modal-status-label {
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--text-h);
+  white-space: nowrap;
+}
+
+.batch-status-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-left: auto;
+}
+
+.batch-status-modal-hint {
+  font-size: 0.85rem;
+  margin-top: 0.75rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 560px) {
+  .batch-status-modal-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
 .task-select-cell {
   width: 2.75rem;
   text-align: center;

@@ -90,6 +90,7 @@ class OrderItemBatchProductionStatus(BaseModel):
 
     item_ids: list[int] = Field(min_length=1, max_length=500)
     production_status: str
+    in_today_queue: bool | None = None
 
     @field_validator("production_status")
     @classmethod

@@ -148,8 +148,11 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   const [batchStatusModal, setBatchStatusModal] = useState(false)
   const [batchTargetStatus, setBatchTargetStatus] = useState('')
   const [batchSubmitting, setBatchSubmitting] = useState(false)
+  const [lastBatchUndo, setLastBatchUndo] = useState(null)
   const headerSelectRef = useRef(null)
 
+  /* 侧栏切换预设时同步列表筛选参数 */
+  /* eslint-disable react-hooks/set-state-in-effect -- 预设来自路由，需同步本地筛选状态 */
   useEffect(() => {
     switch (tasksPreset) {
       case 'all':
@@ -176,18 +179,27 @@ export default function TasksPage({ tasksPreset = 'all' }) {
         break
     }
   }, [tasksPreset])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const showBulkCheckboxCol =
+    tasksPreset === 'processing' ||
+    tasksPreset === 'pending' ||
+    tasksPreset === 'ready_outbound'
+  const showTodayCol = tasksPreset === 'processing' || tasksPreset === 'pending'
 
   useEffect(() => {
-    if (tasksPreset !== 'processing') setSelectedIds([])
-  }, [tasksPreset])
+    if (!showBulkCheckboxCol) {
+      queueMicrotask(() => setSelectedIds([]))
+    }
+  }, [showBulkCheckboxCol])
 
   useEffect(() => {
     const el = headerSelectRef.current
-    if (!el || tasksPreset !== 'processing') return
+    if (!el || !showBulkCheckboxCol) return
     const onPage = rows.map((r) => r.id)
     const nSel = onPage.filter((id) => selectedIds.includes(id)).length
     el.indeterminate = onPage.length > 0 && nSel > 0 && nSel < onPage.length
-  }, [tasksPreset, rows, selectedIds])
+  }, [showBulkCheckboxCol, rows, selectedIds])
 
   const loadMeta = useCallback(() => {
     getJson('/api/meta/production-statuses').then((d) => setStatuses(d.statuses ?? []))
@@ -273,6 +285,69 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     }
   }
 
+  function captureUndoSnapshot(ids) {
+    const out = []
+    for (const id of ids) {
+      const r = rows.find((x) => x.id === id)
+      if (r) {
+        out.push({
+          id,
+          production_status: r.production_status,
+          in_today_queue: Boolean(r.in_today_queue),
+        })
+      }
+    }
+    return out
+  }
+
+  async function undoLastBatch() {
+    if (!lastBatchUndo?.length) return
+    setErr(null)
+    setBatchSubmitting(true)
+    try {
+      for (const u of lastBatchUndo) {
+        await patchJson(`/api/order-items/${u.id}`, {
+          production_status: u.production_status,
+          in_today_queue: u.in_today_queue,
+        })
+      }
+      setLastBatchUndo(null)
+      setSelectedIds([])
+      loadTasks()
+      if (view === 'detail' && detail?.id) {
+        await refreshDetail(detail.id)
+      }
+    } catch (err) {
+      setErr(err instanceof Error ? err.message : '撤回失败')
+    } finally {
+      setBatchSubmitting(false)
+    }
+  }
+
+  async function submitStartProcessingToday() {
+    const ids = selectedIds.filter(
+      (id) => rows.find((r) => r.id === id)?.production_status === '未入库',
+    )
+    if (ids.length === 0) return
+    setErr(null)
+    setBatchSubmitting(true)
+    const snap = captureUndoSnapshot(ids)
+    try {
+      await postJson('/api/order-items/batch-production-status', {
+        item_ids: ids,
+        production_status: '已入库',
+        in_today_queue: true,
+      })
+      setLastBatchUndo(snap)
+      setSelectedIds([])
+      loadTasks()
+    } catch (err) {
+      setErr(err instanceof Error ? err.message : '操作失败')
+    } finally {
+      setBatchSubmitting(false)
+    }
+  }
+
   async function submitGrind(e) {
     e.preventDefault()
     if (!grindItem) return
@@ -351,8 +426,8 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   const showProductionStatusFilter =
     tasksPreset === 'all' || tasksPreset === 'processing'
   const showNewWorkOrder = tasksPreset === 'all' || tasksPreset === 'pending'
-  const isProcessingWorkQueue = tasksPreset === 'processing'
-  const listColSpan = COL_COUNT + (isProcessingWorkQueue ? 2 : 0)
+  const listColSpan =
+    COL_COUNT + (showBulkCheckboxCol ? 1 : 0) + (showTodayCol ? 1 : 0)
 
   const { todayQueueRows, restProcessingRows } = useMemo(() => {
     if (tasksPreset !== 'processing') {
@@ -369,7 +444,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
 
   const renderTaskRow = (it) => (
     <tr key={it.id} className="clickable" onClick={() => enterDetail(it)}>
-      {isProcessingWorkQueue ? (
+      {showBulkCheckboxCol ? (
         <td className="task-select-cell" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
@@ -383,7 +458,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
           />
         </td>
       ) : null}
-      {isProcessingWorkQueue ? (
+      {showTodayCol ? (
         <td className="task-today-cell" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
@@ -463,7 +538,7 @@ export default function TasksPage({ tasksPreset = 'all' }) {
   const renderMegaThead = (bulkControls) => (
     <thead>
       <tr>
-        {isProcessingWorkQueue ? (
+        {showBulkCheckboxCol ? (
           <th className="task-select-cell">
             {bulkControls ? (
               <input
@@ -486,8 +561,15 @@ export default function TasksPage({ tasksPreset = 'all' }) {
             )}
           </th>
         ) : null}
-        {isProcessingWorkQueue ? (
-          <th className="task-today-cell-head" title="勾选后归入上方「今日处理」">
+        {showTodayCol ? (
+          <th
+            className="task-today-cell-head"
+            title={
+              tasksPreset === 'pending'
+                ? '勾选标记今日处理；可与「开始处理（今日）」配合进入处理中今日区块'
+                : '勾选后归入上方「今日处理」'
+            }
+          >
             今日
           </th>
         ) : null}
@@ -521,12 +603,14 @@ export default function TasksPage({ tasksPreset = 'all' }) {
     e.preventDefault()
     if (selectedIds.length === 0 || !batchTargetStatus) return
     setErr(null)
+    const snap = captureUndoSnapshot(selectedIds)
     setBatchSubmitting(true)
     try {
       await postJson('/api/order-items/batch-production-status', {
         item_ids: selectedIds,
         production_status: batchTargetStatus,
       })
+      setLastBatchUndo(snap)
       setBatchStatusModal(false)
       setBatchTargetStatus('')
       setSelectedIds([])
@@ -616,19 +700,51 @@ export default function TasksPage({ tasksPreset = 'all' }) {
               新建来料订单
             </button>
           ) : null}
-          {isProcessingWorkQueue ? (
-            <button
-              type="button"
-              className="btn"
-              disabled={selectedIds.length === 0}
-              onClick={() => {
-                setErr(null)
-                setBatchTargetStatus('')
-                setBatchStatusModal(true)
-              }}
-            >
-              批量修改生产状态
-            </button>
+          {showBulkCheckboxCol ? (
+            <>
+              <button
+                type="button"
+                className="btn"
+                disabled={selectedIds.length === 0}
+                onClick={() => {
+                  setErr(null)
+                  setBatchTargetStatus('')
+                  setBatchStatusModal(true)
+                }}
+              >
+                批量修改生产状态
+              </button>
+              {tasksPreset === 'pending' ? (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={
+                    batchSubmitting ||
+                    selectedIds.filter(
+                      (id) => rows.find((r) => r.id === id)?.production_status === '未入库',
+                    ).length === 0
+                  }
+                  onClick={() => {
+                    setErr(null)
+                    void submitStartProcessingToday()
+                  }}
+                >
+                  开始处理（今日）
+                </button>
+              ) : null}
+              {lastBatchUndo?.length ? (
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={batchSubmitting}
+                  onClick={() => {
+                    void undoLastBatch()
+                  }}
+                >
+                  撤回最近一次批量
+                </button>
+              ) : null}
+            </>
           ) : null}
         </div>
       ) : (
@@ -1172,40 +1288,46 @@ export default function TasksPage({ tasksPreset = 'all' }) {
           onClick={() => !batchSubmitting && setBatchStatusModal(false)}
           role="presentation"
         >
-          <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog">
+          <div className="modal-card batch-status-modal" onClick={(e) => e.stopPropagation()} role="dialog">
             <h2 style={{ marginTop: 0 }}>批量修改生产状态</h2>
             <p className="muted">已选择 {selectedIds.length} 条明细</p>
-            <form className="form-grid" onSubmit={submitBatchStatus}>
-              <label className="full">
-                修改为
+            <form onSubmit={submitBatchStatus}>
+              <div className="batch-status-modal-row">
                 <select
+                  className="batch-status-modal-select"
                   value={batchTargetStatus}
                   onChange={(e) => setBatchTargetStatus(e.target.value)}
                   required
                   aria-label="目标生产状态"
                 >
-                  <option value="">请选择生产状态</option>
+                  <option value="">请选择</option>
                   {statuses.map((s) => (
                     <option key={s} value={s}>
                       {s === '待发回' ? '待发回（待出库）' : s}
                     </option>
                   ))}
                 </select>
-              </label>
-              {err ? <p className="err">{err}</p> : null}
-              <div className="form-actions">
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={batchSubmitting}
-                  onClick={() => setBatchStatusModal(false)}
-                >
-                  取消
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={batchSubmitting}>
-                  {batchSubmitting ? '提交中…' : '确定'}
-                </button>
+                <span className="batch-status-modal-status-label">生产状态</span>
+                <div className="batch-status-modal-actions">
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={batchSubmitting}
+                    onClick={() => setBatchStatusModal(false)}
+                  >
+                    取消
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={batchSubmitting}>
+                    {batchSubmitting ? '提交中…' : '确认一键修改'}
+                  </button>
+                </div>
               </div>
+              {err ? <p className="err">{err}</p> : null}
+              {lastBatchUndo?.length ? (
+                <p className="muted batch-status-modal-hint">
+                  提示：列表工具栏可点击「撤回最近一次批量」恢复上一次批量修改前的生产状态与今日标记。
+                </p>
+              ) : null}
             </form>
           </div>
         </div>

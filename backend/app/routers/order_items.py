@@ -27,10 +27,13 @@ def batch_set_production_status(
     if not ids:
         raise HTTPException(status_code=400, detail="请至少选择一条明细")
     st = body.production_status
+    update_vals: dict = {"production_status": st}
+    if st in ("未入库", "已发回"):
+        update_vals["in_today_queue"] = False
+    elif body.in_today_queue is not None:
+        update_vals["in_today_queue"] = bool(body.in_today_queue)
     result = db.execute(
-        update(OrderItem)
-        .where(OrderItem.id.in_(ids))
-        .values(production_status=st)
+        update(OrderItem).where(OrderItem.id.in_(ids)).values(**update_vals)
     )
     db.commit()
     n = int(result.rowcount or 0)
