@@ -19,6 +19,7 @@ def count_processing_piece_strip(db: Session) -> list[tuple[str, int]]:
     rows = db.scalars(
         select(OrderItem.processing_unit_codes).where(
             OrderItem.production_status != "未入库",
+            OrderItem.production_status != "已入库",
             OrderItem.production_status != "已发回",
             OrderItem.production_status != "待发回",
             OrderItem.production_status != "出库中",
@@ -89,7 +90,7 @@ def _normalize_codes_list(raw: object | None, qty: int) -> list[str | None]:
 
 def ensure_order_item_processing_codes(db: Session, row: OrderItem) -> None:
     """保证 processing_unit_codes 长度与 quantity 一致，空位按当日字母 + 递增后缀补齐。"""
-    if row.production_status in ("未入库", "已发回"):
+    if row.production_status in ("未入库", "已发回", "已入库"):
         return
 
     qty = max(1, int(row.quantity or 1))
@@ -109,7 +110,7 @@ def ensure_order_item_processing_codes(db: Session, row: OrderItem) -> None:
 
 def ensure_processing_codes_batch(db: Session, items: list[OrderItem]) -> None:
     """同一事务内批量分配，后缀连续递增。"""
-    rows = [r for r in items if r.production_status not in ("未入库", "已发回")]
+    rows = [r for r in items if r.production_status not in ("未入库", "已发回", "已入库")]
     if not rows:
         return
     next_n = _max_numeric_suffix_db(db) + 1

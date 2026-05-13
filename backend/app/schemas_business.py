@@ -72,6 +72,7 @@ class OrderItemCreate(BaseModel):
     formed_size: str | None = None
     forging_requirements: str | None = None
     remark: str | None = None
+    remark_images: list[str] | None = None
     production_status: str = "未入库"
     return_date: date | None = None
     incoming_date: date | None = None
@@ -106,6 +107,7 @@ class OrderItemUpdate(BaseModel):
     formed_size: str | None = None
     forging_requirements: str | None = None
     remark: str | None = None
+    remark_images: list[str] | None = None
     production_status: str | None = None
     in_today_queue: bool | None = None
     return_date: date | None = None
@@ -138,6 +140,7 @@ class OrderItemOut(BaseModel):
     formed_size: str | None = None
     forging_requirements: str | None = None
     remark: str | None = None
+    remark_images: list[str] | None = None
     production_status: str
     in_today_queue: bool = False
     return_date: date | None = None

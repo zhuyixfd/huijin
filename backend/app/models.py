@@ -19,6 +19,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(
         String(32), server_default="employee", default="employee"
     )
+    permission_codes: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -61,6 +62,7 @@ class OrderItem(Base):
     formed_size: Mapped[str | None] = mapped_column(String(256), nullable=True)
     forging_requirements: Mapped[str | None] = mapped_column(Text(), nullable=True)
     remark: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    remark_images: Mapped[list | None] = mapped_column(JSON, nullable=True)
     production_status: Mapped[str] = mapped_column(
         String(32), server_default="未入库", index=True
     )

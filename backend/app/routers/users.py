@@ -6,7 +6,12 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import require_admin
 from app.models import User
-from app.schemas import EmployeeCreate, EmployeePasswordSet, UserOut
+from app.schemas import (
+    EmployeeCreate,
+    EmployeePasswordSet,
+    EmployeePermissionsUpdate,
+    UserOut,
+)
 from app.security import hash_password
 
 router = APIRouter()
@@ -29,6 +34,7 @@ def create_employee(
         password_hash=hash_password(body.password),
         display_name=dn,
         role="employee",
+        permission_codes=body.permission_codes,
     )
     db.add(user)
     try:
@@ -60,6 +66,27 @@ def set_employee_password(
             detail="仅可修改员工账号的密码",
         )
     u.password_hash = hash_password(body.password)
+    db.commit()
+    db.refresh(u)
+    return u
+
+
+@router.patch("/{user_id}/permissions", response_model=UserOut)
+def set_employee_permissions(
+    user_id: int,
+    body: EmployeePermissionsUpdate,
+    _admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    u = db.get(User, user_id)
+    if u is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="用户不存在")
+    if u.role != "employee":
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="仅可配置员工账号的权限",
+        )
+    u.permission_codes = body.permission_codes
     db.commit()
     db.refresh(u)
     return u

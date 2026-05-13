@@ -8,6 +8,13 @@ import Login from './Login.jsx'
 import TasksPage from './TasksPage.jsx'
 import { authFetch, clearToken, getToken } from './auth.js'
 import { getJson } from './api.js'
+import {
+  canAnyOrderNav,
+  canNavDone,
+  canNavPending,
+  canNavProcessing,
+  canNavReadyOutbound,
+} from './permissions.js'
 
 export default function App() {
   const [sessionChecked, setSessionChecked] = useState(false)
@@ -108,6 +115,20 @@ export default function App() {
         : activeNav
   const showAccounts = user.role === 'admin' && resolvedNav === 'accounts'
 
+  useEffect(() => {
+    if (!user) return
+    if (user.role === 'admin') return
+    let deny = false
+    if ((resolvedNav === 'tasks' || resolvedNav === 'tasks-all') && !canAnyOrderNav(user)) {
+      deny = true
+    }
+    if (resolvedNav === 'tasks-pending' && !canNavPending(user)) deny = true
+    if (resolvedNav === 'tasks-processing' && !canNavProcessing(user)) deny = true
+    if (resolvedNav === 'tasks-ready-outbound' && !canNavReadyOutbound(user)) deny = true
+    if (resolvedNav === 'tasks-done' && !canNavDone(user)) deny = true
+    if (deny) setActiveNav('home')
+  }, [user, resolvedNav])
+
   function renderMain() {
     if (showAccounts) return <EmployeeAdmin />
     if (TASKS_PAGE_KEYS.has(resolvedNav)) {
@@ -116,6 +137,7 @@ export default function App() {
           tasksPreset={tasksPresetFromNav(resolvedNav)}
           onTasksMutated={refreshTaskNavCounts}
           taskNavCounts={taskNavCounts}
+          user={user}
         />
       )
     }

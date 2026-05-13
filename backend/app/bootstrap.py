@@ -46,6 +46,28 @@ def ensure_grind_log_unit_index() -> None:
         conn.execute(text("ALTER TABLE grind_logs ADD COLUMN unit_index INT NULL"))
 
 
+def ensure_user_permission_codes_column() -> None:
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("users")}
+    if "permission_codes" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN permission_codes JSON NULL"))
+
+
+def ensure_order_item_remark_images() -> None:
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_items")}
+    if "remark_images" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE order_items ADD COLUMN remark_images JSON NULL"))
+
+
 def drop_order_item_legacy_production_columns() -> None:
     """移除已废弃字段 production_no、production_process（ORM 已删除）。"""
     inspector = inspect(engine)
@@ -149,6 +171,8 @@ def init_db() -> None:
     ensure_grind_log_unit_index()
     ensure_order_item_in_today_queue()
     drop_order_item_legacy_production_columns()
+    ensure_user_permission_codes_column()
+    ensure_order_item_remark_images()
     db = SessionLocal()
     try:
         seed_admin(db)

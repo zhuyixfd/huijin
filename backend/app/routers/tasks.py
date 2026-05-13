@@ -6,7 +6,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_permission
+from app.permissions import PERM_ORDER_CREATE, PERM_ORDER_PROCESS
 from app.models import CaseStudy, Customer, OrderItem
 from app.models import User as UserModel
 from app.order_number import generate_next_order_no
@@ -69,11 +70,17 @@ def _task_filter_conditions(
         if cat == "placed":
             conds.append(OrderItem.id == -1)
         elif cat == "waiting_inbound":
-            conds.append(OrderItem.production_status == "未入库")
+            conds.append(
+                or_(
+                    OrderItem.production_status == "未入库",
+                    OrderItem.production_status == "已入库",
+                )
+            )
         elif cat == "completed":
             conds.append(OrderItem.production_status == "已发回")
         elif cat == "in_progress":
             conds.append(OrderItem.production_status != "未入库")
+            conds.append(OrderItem.production_status != "已入库")
             conds.append(OrderItem.production_status != "已发回")
             conds.append(OrderItem.production_status != "待发回")
             conds.append(OrderItem.production_status != "出库中")
@@ -97,11 +104,17 @@ def task_nav_counts(
 ):
     """侧栏「全部订单 / 未处理 / …」数量（全库汇总，不含列表搜索框条件）。"""
     pending_n = db.scalar(
-        select(func.count(OrderItem.id)).where(OrderItem.production_status == "未入库")
+        select(func.count(OrderItem.id)).where(
+            or_(
+                OrderItem.production_status == "未入库",
+                OrderItem.production_status == "已入库",
+            )
+        )
     ) or 0
     processing_n = db.scalar(
         select(func.count(OrderItem.id)).where(
             OrderItem.production_status != "未入库",
+            OrderItem.production_status != "已入库",
             OrderItem.production_status != "已发回",
             OrderItem.production_status != "待发回",
             OrderItem.production_status != "出库中",
@@ -200,7 +213,9 @@ def list_task_items(
             inner[uk] = inner.get(uk, 0) + n
 
     proc_items = [
-        item for item, _ in rows if item.production_status not in ("未入库", "已发回")
+        item
+        for item, _ in rows
+        if item.production_status not in ("未入库", "已入库", "已发回")
     ]
     if proc_items:
         ensure_processing_codes_batch(db, proc_items)
@@ -228,7 +243,7 @@ def list_task_items(
 @router.post("/work-orders", response_model=TaskItemOut, status_code=status.HTTP_201_CREATED)
 def create_work_order(
     body: WorkOrderCreate,
-    _: UserModel = Depends(get_current_user),
+    _: UserModel = Depends(require_permission(PERM_ORDER_CREATE)),
     db: Session = Depends(get_db),
 ):
     """新建一单一条来料（单行 order_items）。"""
@@ -282,7 +297,7 @@ def create_work_order(
 @router.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_task_item(
     item_id: int,
-    _: UserModel = Depends(get_current_user),
+    _: UserModel = Depends(require_permission(PERM_ORDER_PROCESS)),
     db: Session = Depends(get_db),
 ):
     """删除该来料订单行（一单一行）。"""

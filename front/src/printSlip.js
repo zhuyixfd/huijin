@@ -27,6 +27,11 @@ function row(label, value) {
   return `<tr><th>${esc(label)}</th><td>${esc(value)}</td></tr>`
 }
 
+function rowRemarkImage(url) {
+  const u = esc(url)
+  return `<tr><th>备注配图</th><td><img src="${u}" alt="" style="max-height:220px;max-width:100%;" /></td></tr>`
+}
+
 export function buildSlipHtml(kind, { order, customer, item }) {
   const cname = customer?.name ?? ''
   const ono = order?.order_no ?? ''
@@ -52,7 +57,11 @@ export function buildSlipHtml(kind, { order, customer, item }) {
     kind === 'outbound'
       ? pairs.filter(([label]) => !outboundOmit.has(label))
       : pairs
-  const slipRows = rowsForKind.map(([label, value]) => row(label, value))
+  const imgRows =
+    kind !== 'outbound' && Array.isArray(item?.remark_images) && item.remark_images.length
+      ? item.remark_images.filter(Boolean).map((u) => rowRemarkImage(u))
+      : []
+  const slipRows = rowsForKind.map(([label, value]) => row(label, value)).concat(imgRows)
 
   const titles = {
     incoming: '来料单',

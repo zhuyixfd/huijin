@@ -11,6 +11,8 @@ import {
 } from './todaySlotOrderStorage.js'
 import { openDeliverySlipPreview } from './deliverySheetPrint.js'
 import { openWorkshopProductionPreview } from './workshopSheetPrint.js'
+import { apiUrl } from './config.js'
+import { can, PERM } from './permissions.js'
 
 function todayDateISO() {
   const d = new Date()
@@ -34,6 +36,7 @@ const emptyItemForm = () => ({
   formed_size: '',
   forging_requirements: '',
   remark: '',
+  remark_images: [],
   production_status: '未入库',
   return_date: '',
   incoming_date: todayDateISO(),
@@ -138,6 +141,10 @@ function normalizeItemPayload(form) {
     formed_size: form.formed_size || null,
     forging_requirements: form.forging_requirements || null,
     remark: form.remark || null,
+    remark_images:
+      Array.isArray(form.remark_images) && form.remark_images.length > 0
+        ? form.remark_images
+        : null,
     production_status: form.production_status || '未入库',
     return_date: form.return_date || null,
     incoming_date: form.incoming_date || null,
@@ -198,7 +205,12 @@ function statusCategoryFromPreset(preset) {
   }
 }
 
-export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNavCounts }) {
+export default function TasksPage({
+  tasksPreset = 'all',
+  onTasksMutated,
+  taskNavCounts,
+  user = null,
+}) {
   const [customers, setCustomers] = useState([])
   const [statuses, setStatuses] = useState([])
 
@@ -226,6 +238,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
 
   const [workOrderModal, setWorkOrderModal] = useState(false)
   const [newWork, setNewWork] = useState(emptyWorkOrderForm)
+  const [newWorkRemarkFiles, setNewWorkRemarkFiles] = useState([])
 
   const [itemModal, setItemModal] = useState(null)
   const [itemForm, setItemForm] = useState(emptyItemForm)
@@ -317,9 +330,10 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   }, [bulkSelectColumnVisible])
 
   const showBulkCheckboxCol =
-    tasksPreset === 'processing' ||
-    tasksPreset === 'pending' ||
-    tasksPreset === 'ready_outbound'
+    (tasksPreset === 'processing' && can(user, PERM.ORDER_PROCESS)) ||
+    (tasksPreset === 'pending' && can(user, PERM.ORDER_PROCESS)) ||
+    (tasksPreset === 'ready_outbound' &&
+      (can(user, PERM.ORDER_OUTBOUND) || can(user, PERM.ORDER_CONFIRM_SHIP)))
 
   useEffect(() => {
     if (!showBulkCheckboxCol) {
@@ -334,6 +348,14 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     const nSel = onPage.filter((id) => selectedIds.includes(id)).length
     el.indeterminate = onPage.length > 0 && nSel > 0 && nSel < onPage.length
   }, [showBulkCheckboxCol, bulkSelectColumnVisible, rows, selectedIds])
+
+  async function uploadRemarkImagesForItem(itemId, fileList) {
+    if (!itemId || !fileList?.length) return []
+    const fd = new FormData()
+    for (const f of fileList) fd.append('files', f)
+    const urls = await postFormData(`/api/order-items/${itemId}/remark-images`, fd)
+    return Array.isArray(urls) ? urls : []
+  }
 
   const loadMeta = useCallback(() => {
     getJson('/api/meta/production-statuses').then((d) => setStatuses(d.statuses ?? []))
@@ -476,9 +498,10 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   }
 
   async function submitStartProcessingToday() {
-    const ids = selectedIds.filter(
-      (id) => rows.find((r) => r.id === id)?.production_status === '未入库',
-    )
+    const ids = selectedIds.filter((id) => {
+      const st = rows.find((r) => r.id === id)?.production_status
+      return st === '未入库' || st === '已入库'
+    })
     if (ids.length === 0) return
     setErr(null)
     setBatchSubmitting(true)
@@ -528,8 +551,17 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
         ...normalizeItemPayload(newWork),
       }
       const created = await postJson('/api/tasks/work-orders', payload)
+      let mergedImages = Array.isArray(newWork.remark_images) ? [...newWork.remark_images] : []
+      if (newWorkRemarkFiles.length > 0) {
+        const up = await uploadRemarkImagesForItem(created.id, newWorkRemarkFiles)
+        mergedImages = [...mergedImages, ...up]
+        if (mergedImages.length > 0) {
+          await patchJson(`/api/order-items/${created.id}`, { remark_images: mergedImages })
+        }
+      }
       setWorkOrderModal(false)
       setNewWork(emptyWorkOrderForm())
+      setNewWorkRemarkFiles([])
       loadTasks()
       await refreshDetail(created.id)
       setView('detail')
@@ -549,6 +581,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       formed_size: it.formed_size ?? '',
       forging_requirements: it.forging_requirements ?? '',
       remark: it.remark ?? '',
+      remark_images: Array.isArray(it.remark_images) ? [...it.remark_images] : [],
       production_status: it.production_status ?? '未入库',
       return_date: it.return_date ? String(it.return_date).slice(0, 10) : '',
       incoming_date: it.incoming_date ? String(it.incoming_date).slice(0, 10) : todayDateISO(),
@@ -574,8 +607,25 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     }
   }
 
+  async function onItemRemarkFilesSelected(e) {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (!files.length || !itemModal?.itemId) return
+    setErr(null)
+    try {
+      const urls = await uploadRemarkImagesForItem(itemModal.itemId, files)
+      setItemForm((f) => ({
+        ...f,
+        remark_images: [...(Array.isArray(f.remark_images) ? f.remark_images : []), ...urls],
+      }))
+    } catch (err) {
+      setErr(err instanceof Error ? err.message : '图片上传失败')
+    }
+  }
+
   const showProductionStatusFilter = true
-  const showNewWorkOrder = tasksPreset === 'all' || tasksPreset === 'pending'
+  const showNewWorkOrder =
+    (tasksPreset === 'all' || tasksPreset === 'pending') && can(user, PERM.ORDER_CREATE)
   const showBulkSelectCol = showBulkCheckboxCol && bulkSelectColumnVisible
   const showReadyOutboundActionsCol = tasksPreset === 'ready_outbound'
   const customerColLabel = tasksPreset === 'ready_outbound' ? '收货单位' : '客户'
@@ -816,7 +866,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     setCollapsedRestOrderNos(allAgg ? new Set() : new Set(onos))
   }
 
-  const showCaseStudyUi = tasksPreset === 'processing'
+  const showCaseStudyUi = tasksPreset === 'processing' && can(user, PERM.ORDER_PROCESS)
 
   function openCaseStudy(it, unitIndex, unitLabel) {
     setCaseModal({ it, unitIndex, unitLabel })
@@ -909,6 +959,11 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
           ? 'task-order-group-b'
           : ''
     const showChrome = groupSummary || !todayExpand || todayExpand.unitIndex === 0
+    const canMutateStatus =
+      can(user, PERM.ORDER_PROCESS) ||
+      can(user, PERM.ORDER_OUTBOUND) ||
+      can(user, PERM.ORDER_CONFIRM_SHIP)
+    const showStatusSelect = showChrome && canMutateStatus
     const showOrderNoCell =
       groupSummary || !todayExpand || todayExpand.showOrderNo
     const rowKey = groupSummary
@@ -1038,7 +1093,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       {showCuttingReturnDateCols ? <td>{fmtDate(it.return_date)}</td> : null}
       {showProductionStatusCol ? (
         <td className={GS} onClick={(e) => e.stopPropagation()}>
-          {showChrome ? (
+          {showStatusSelect ? (
             <select
               value={it.production_status}
               onChange={(e) => patchStatus(it, e.target.value)}
@@ -1055,11 +1110,21 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       {showReadyOutboundActionsCol ? (
         <td className={`row-actions cell-actions ${GS}`} onClick={(e) => e.stopPropagation()}>
           {it.production_status === '待发回' ? (
-            <button type="button" className="btn btn-primary" onClick={() => patchStatus(it, '出库中')}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!can(user, PERM.ORDER_OUTBOUND)}
+              onClick={() => patchStatus(it, '出库中')}
+            >
               →出库中
             </button>
           ) : it.production_status === '出库中' ? (
-            <button type="button" className="btn btn-ghost" onClick={() => patchStatus(it, '待发回')}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={!can(user, PERM.ORDER_OUTBOUND)}
+              onClick={() => patchStatus(it, '待发回')}
+            >
               ←等待出库
             </button>
           ) : null}
@@ -1067,7 +1132,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       ) : null}
       {showTaskActionsCol ? (
         <td className={`row-actions cell-actions ${GS}`} onClick={(e) => e.stopPropagation()}>
-          {showChrome ? (
+          {showChrome && can(user, PERM.ORDER_PROCESS) ? (
             <>
               <button type="button" className="btn btn-ghost" onClick={() => patchStatus(it, '锻造中')}>
                 →锻造
@@ -1257,6 +1322,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 className="btn btn-primary"
                 onClick={() => {
                   setNewWork(emptyWorkOrderForm())
+                  setNewWorkRemarkFiles([])
                   setWorkOrderModal(true)
                 }}
               >
@@ -1298,9 +1364,10 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                     className="btn btn-primary"
                     disabled={
                       batchSubmitting ||
-                      selectedIds.filter(
-                        (id) => rows.find((r) => r.id === id)?.production_status === '未入库',
-                      ).length === 0
+                      selectedIds.filter((id) => {
+                        const st = rows.find((r) => r.id === id)?.production_status
+                        return st === '未入库' || st === '已入库'
+                      }).length === 0
                     }
                     onClick={() => {
                       setErr(null)
@@ -1507,7 +1574,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                     <button
                       type="button"
                       className="btn btn-ghost"
-                      disabled={todayQueueRows.length === 0}
+                      disabled={todayQueueRows.length === 0 || !can(user, PERM.ORDER_PROCESS)}
                       onClick={() =>
                         openWorkshopProductionPreview(todayQueueRows, {
                           slotLabels: todaySlotOrder,
@@ -1593,7 +1660,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    disabled={todayQueueRows.length === 0}
+                    disabled={todayQueueRows.length === 0 || !can(user, PERM.ORDER_PROCESS)}
                     onClick={() => openWorkshopProductionPreview(todayQueueRows)}
                   >
                     加工生产单预览
@@ -1758,7 +1825,9 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    disabled={shippingOutboundRows.length === 0}
+                    disabled={
+                      shippingOutboundRows.length === 0 || !can(user, PERM.ORDER_OUTBOUND)
+                    }
                     onClick={() => openDeliverySlipPreview(shippingOutboundRows)}
                   >
                     打印送货单（按收货单位分页）
@@ -1834,12 +1903,41 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                     </p>
                   </div>
                   <div className="row-actions">
-                    <button type="button" className="btn btn-danger" onClick={deleteWorkOrder}>
-                      删除订单
-                    </button>
+                    {can(user, PERM.ORDER_PROCESS) ? (
+                      <button type="button" className="btn btn-danger" onClick={deleteWorkOrder}>
+                        删除订单
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </section>
+
+              {detail.items?.[0] &&
+              (detail.items[0].remark ||
+                (Array.isArray(detail.items[0].remark_images) &&
+                  detail.items[0].remark_images.length > 0)) ? (
+                <section className="card order-section">
+                  <h2 className="order-section-title">来料备注</h2>
+                  <p className="text-cell">{detail.items[0].remark || '—'}</p>
+                  {Array.isArray(detail.items[0].remark_images) &&
+                  detail.items[0].remark_images.length > 0 ? (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '0.5rem',
+                        marginTop: '0.5rem',
+                      }}
+                    >
+                      {detail.items[0].remark_images.map((src) => (
+                        <a key={src} href={apiUrl(src)} target="_blank" rel="noreferrer">
+                          <img src={apiUrl(src)} alt="" style={{ maxHeight: 120, display: 'block' }} />
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
 
               {detail.items?.[0]?.in_today_queue ? (
                 <>
@@ -2136,6 +2234,26 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   onChange={(e) => setNewWork((o) => ({ ...o, remark: e.target.value }))}
                 />
               </label>
+              <label className="full">
+                备注配图（保存订单后上传）
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  onChange={(e) => {
+                    setNewWorkRemarkFiles((prev) => [...prev, ...Array.from(e.target.files || [])])
+                    e.target.value = ''
+                  }}
+                />
+                {newWorkRemarkFiles.length > 0 ? (
+                  <p className="muted" style={{ marginTop: '0.35rem' }}>
+                    已选 {newWorkRemarkFiles.length} 个文件 ·{' '}
+                    <button type="button" className="btn btn-ghost" onClick={() => setNewWorkRemarkFiles([])}>
+                      清除
+                    </button>
+                  </p>
+                ) : null}
+              </label>
               <label>
                 生产状态
                 <select
@@ -2263,6 +2381,58 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   onChange={(e) => setItemForm((f) => ({ ...f, remark: e.target.value }))}
                 />
               </label>
+              <div className="full" style={{ gridColumn: '1 / -1' }}>
+                <label>备注配图</label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  onChange={onItemRemarkFilesSelected}
+                />
+                {Array.isArray(itemForm.remark_images) && itemForm.remark_images.length > 0 ? (
+                  <ul
+                    style={{
+                      listStyle: 'none',
+                      padding: 0,
+                      margin: '0.5rem 0 0',
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    {itemForm.remark_images.map((src) => (
+                      <li
+                        key={src}
+                        style={{
+                          border: '1px solid var(--border, #ddd)',
+                          borderRadius: 8,
+                          padding: 4,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <a href={apiUrl(src)} target="_blank" rel="noreferrer">
+                          <img src={apiUrl(src)} alt="" style={{ maxHeight: 72, display: 'block' }} />
+                        </a>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() =>
+                            setItemForm((f) => ({
+                              ...f,
+                              remark_images: (f.remark_images || []).filter((x) => x !== src),
+                            }))
+                          }
+                        >
+                          移除
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
               <label>
                 生产状态
                 <select
