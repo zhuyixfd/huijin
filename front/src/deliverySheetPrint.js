@@ -1,5 +1,5 @@
 /**
- * 出库送货单：按收货单位（客户名称）拆分多页；页内预览 + 打印。
+ * 出库送货单：按收货单位（客户名称）拆分多页；模态框内可编辑后打印（不写入数据库）；支持导出 CSV（Excel 可打开）。
  */
 
 const slipCss = `
@@ -61,13 +61,14 @@ function buildOneSheet(consignee, items, sheetDateStr) {
       const q = Number(it.quantity)
       const n = Number.isFinite(q) && q >= 1 ? Math.floor(q) : 1
       qtySum += n
+      const forgeReq = it.forging_requirements ?? ''
       return `<tr>
       <td>${esc(it.material_grade)}</td>
       <td>${esc(it.spec_incoming)}</td>
       <td>${esc(it.formed_size)}</td>
       <td class="num">${n}</td>
       <td class="num">${esc(weightCell(it))}</td>
-      <td>${esc(it.remark)}</td>
+      <td>${esc(forgeReq)}</td>
     </tr>`
     })
     .join('')
@@ -87,8 +88,8 @@ function buildOneSheet(consignee, items, sheetDateStr) {
         <th>来料规格</th>
         <th>锻造规格</th>
         <th>数量</th>
-        <th>重量</th>
-        <th>备注</th>
+        <th>发回重量</th>
+        <th>锻造要求</th>
       </tr>
     </thead>
     <tbody>
@@ -118,6 +119,63 @@ export function buildDeliverySlipDocument(rows, options = {}) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>送货单</title><style>${slipCss}</style></head><body>${inner}</body></html>`
 }
 
+/** 从任务列表行得到可编辑送货单行（仅打印/导出用） */
+export function normalizeDeliveryDraftRow(r) {
+  return {
+    customer_name: r.customer_name ?? '',
+    material_grade: r.material_grade ?? '',
+    spec_incoming: r.spec_incoming ?? '',
+    formed_size: r.formed_size ?? '',
+    quantity: r.quantity ?? 1,
+    weight_return: r.weight_return ?? r.weight_incoming ?? '',
+    weight_incoming: r.weight_incoming,
+    forging_requirements: r.forging_requirements ?? '',
+  }
+}
+
+function csvEscape(v) {
+  const s = v === null || v === undefined ? '' : String(v)
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+  return s
+}
+
+/** @param {ReturnType<normalizeDeliveryDraftRow>[]} rows */
+export function exportDeliveryRowsToExcelCsv(rows) {
+  const headers = [
+    '收货单位',
+    '材质',
+    '来料规格',
+    '锻造规格',
+    '数量',
+    '发回重量',
+    '锻造要求',
+  ]
+  const lines = [headers.join(',')]
+  for (const r of rows) {
+    const w = r.weight_return ?? r.weight_incoming ?? ''
+    lines.push(
+      [
+        csvEscape(r.customer_name),
+        csvEscape(r.material_grade),
+        csvEscape(r.spec_incoming),
+        csvEscape(r.formed_size),
+        csvEscape(r.quantity),
+        csvEscape(w),
+        csvEscape(r.forging_requirements),
+      ].join(','),
+    )
+  }
+  const blob = new Blob(['\ufeff' + lines.join('\n')], {
+    type: 'text/csv;charset=utf-8;',
+  })
+  const a = document.createElement('a')
+  const url = URL.createObjectURL(blob)
+  a.href = url
+  a.download = `送货单_${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 const STYLE_ID = 'delivery-slip-modal-styles'
 
 function ensureModalStyles() {
@@ -126,13 +184,39 @@ function ensureModalStyles() {
   el.id = STYLE_ID
   el.textContent = `
 .delivery-print-modal-backdrop { position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; }
-.delivery-print-modal { background: #fff; border-radius: 10px; width: min(920px, 100%); max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,.25); overflow: hidden; }
-.delivery-print-toolbar { flex: 0 0 auto; padding: 10px 12px; border-bottom: 1px solid var(--border, #ddd); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.delivery-print-modal { background: #fff; border-radius: 10px; width: min(1100px, 100%); max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,.25); overflow: hidden; }
+.delivery-print-toolbar { flex: 0 0 auto; padding: 10px 12px; border-bottom: 1px solid var(--border, #ddd); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; align-items: center; }
 .delivery-print-toolbar .btn { font: inherit; padding: 0.45rem 0.9rem; border-radius: 8px; border: 1px solid #ccc; background: #f4f4f5; cursor: pointer; }
 .delivery-print-toolbar .delivery-print-btn-print { background: #2563eb; color: #fff; border-color: #1d4ed8; }
-.delivery-print-frame { flex: 1 1 auto; width: 100%; min-height: 280px; height: min(78vh, 880px); border: none; background: #fff; }
+.delivery-print-toolbar .delivery-print-hint { margin-right: auto; font-size: 13px; color: #555; }
+.delivery-edit-scroll { flex: 1 1 auto; overflow: auto; padding: 12px; min-height: 200px; }
+.delivery-edit-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.delivery-edit-table th, .delivery-edit-table td { border: 1px solid #ccc; padding: 4px 6px; vertical-align: middle; }
+.delivery-edit-table th { background: #f5f5f5; text-align: left; white-space: nowrap; }
+.delivery-edit-table input, .delivery-edit-table textarea { width: 100%; box-sizing: border-box; font: inherit; border: none; background: transparent; padding: 4px; }
+.delivery-edit-table textarea { min-height: 2.5rem; resize: vertical; }
+.delivery-print-frame { flex: 0 0 auto; width: 100%; height: 0; border: none; visibility: hidden; position: absolute; left: -9999px; }
 `
   document.head.appendChild(el)
+}
+
+function readDraftFromTable(tbody) {
+  const out = []
+  for (const tr of tbody.querySelectorAll('tr[data-delivery-row]')) {
+    const g = (name) => tr.querySelector(`[name="${name}"]`)?.value ?? ''
+    const qty = parseInt(String(g('quantity')), 10)
+    out.push({
+      customer_name: g('customer_name'),
+      material_grade: g('material_grade'),
+      spec_incoming: g('spec_incoming'),
+      formed_size: g('formed_size'),
+      quantity: Number.isFinite(qty) && qty >= 1 ? qty : 1,
+      weight_return: g('weight_return') || null,
+      weight_incoming: null,
+      forging_requirements: g('forging_requirements'),
+    })
+  }
+  return out
 }
 
 /** @param {Array<object>} outboundRows 出库中明细（任务列表行，含 customer_name） */
@@ -142,29 +226,80 @@ export function openDeliverySlipPreview(outboundRows) {
     return false
   }
   ensureModalStyles()
-  const docHtml = buildDeliverySlipDocument(outboundRows)
+  const draft = outboundRows.map(normalizeDeliveryDraftRow)
 
   const backdrop = document.createElement('div')
   backdrop.className = 'delivery-print-modal-backdrop'
   backdrop.setAttribute('role', 'dialog')
-  backdrop.setAttribute('aria-label', '送货单预览（按收货单位分页）')
+  backdrop.setAttribute('aria-label', '送货单预览与编辑')
   backdrop.innerHTML =
     '<div class="delivery-print-modal">' +
     '<div class="delivery-print-toolbar">' +
+    '<span class="delivery-print-hint">以下为打印预览数据，可直接修改；修改仅用于本次打印与导出，不会保存到系统。</span>' +
+    '<button type="button" class="btn delivery-print-btn-export">导出 Excel</button>' +
     '<button type="button" class="btn delivery-print-btn-print">打印</button>' +
     '<button type="button" class="btn delivery-print-btn-close">关闭</button>' +
     '</div>' +
-    '<iframe class="delivery-print-frame" title="送货单"></iframe>' +
+    '<div class="delivery-edit-scroll">' +
+    '<table class="delivery-edit-table"><thead><tr>' +
+    '<th>收货单位</th><th>材质</th><th>来料规格</th><th>锻造规格</th><th style="width:4rem">数量</th><th style="width:6rem">发回重量</th><th>锻造要求</th>' +
+    '</tr></thead><tbody class="delivery-edit-tbody"></tbody></table>' +
+    '</div>' +
+    '<iframe class="delivery-print-frame" title="送货单打印"></iframe>' +
     '</div>'
 
+  const tbody = backdrop.querySelector('.delivery-edit-tbody')
   const iframe = backdrop.querySelector('iframe')
+
+  for (let i = 0; i < draft.length; i += 1) {
+    const r = draft[i]
+    const tr = document.createElement('tr')
+    tr.dataset.deliveryRow = '1'
+    tr.innerHTML = `
+      <td><input type="text" name="customer_name" autocomplete="off" /></td>
+      <td><input type="text" name="material_grade" autocomplete="off" /></td>
+      <td><input type="text" name="spec_incoming" autocomplete="off" /></td>
+      <td><input type="text" name="formed_size" autocomplete="off" /></td>
+      <td><input type="number" name="quantity" min="1" step="1" /></td>
+      <td><input type="text" name="weight_return" autocomplete="off" /></td>
+      <td><textarea name="forging_requirements" rows="2"></textarea></td>
+    `
+    tr.querySelector('[name="customer_name"]').value = r.customer_name
+    tr.querySelector('[name="material_grade"]').value = r.material_grade
+    tr.querySelector('[name="spec_incoming"]').value = r.spec_incoming
+    tr.querySelector('[name="formed_size"]').value = r.formed_size
+    tr.querySelector('[name="quantity"]').value = String(r.quantity)
+    tr.querySelector('[name="weight_return"]').value =
+      r.weight_return === null || r.weight_return === undefined ? '' : String(r.weight_return)
+    tr.querySelector('[name="forging_requirements"]').value = r.forging_requirements
+    tbody.appendChild(tr)
+  }
+
   const close = () => {
     backdrop.remove()
   }
 
-  backdrop.querySelector('.delivery-print-btn-print').addEventListener('click', () => {
+  function printFromDraft() {
+    const rows = readDraftFromTable(tbody)
+    const docHtml = buildDeliverySlipDocument(rows)
+    const doc = iframe.contentDocument || iframe.contentWindow?.document
+    if (!doc) {
+      window.alert('打印窗口无法打开')
+      return
+    }
+    doc.open()
+    doc.write(docHtml)
+    doc.close()
     iframe.contentWindow?.focus()
     iframe.contentWindow?.print()
+  }
+
+  backdrop.querySelector('.delivery-print-btn-print').addEventListener('click', () => {
+    printFromDraft()
+  })
+  backdrop.querySelector('.delivery-print-btn-export').addEventListener('click', () => {
+    const rows = readDraftFromTable(tbody)
+    exportDeliveryRowsToExcelCsv(rows)
   })
   backdrop.querySelector('.delivery-print-btn-close').addEventListener('click', close)
   backdrop.addEventListener('click', (e) => {
@@ -172,16 +307,5 @@ export function openDeliverySlipPreview(outboundRows) {
   })
 
   document.body.appendChild(backdrop)
-
-  const doc = iframe.contentDocument || iframe.contentWindow?.document
-  if (!doc) {
-    backdrop.remove()
-    window.alert('预览无法打开，请刷新页面后重试')
-    return false
-  }
-  doc.open()
-  doc.write(docHtml)
-  doc.close()
-
   return true
 }

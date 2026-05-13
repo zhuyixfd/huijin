@@ -1,5 +1,7 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -31,20 +33,24 @@ def batch_set_production_status(
     if not ids:
         raise HTTPException(status_code=400, detail="请至少选择一条明细")
     st = body.production_status
-    update_vals: dict = {"production_status": st}
-    if st in ("未入库", "已发回"):
-        update_vals["in_today_queue"] = False
-        update_vals["processing_unit_codes"] = None
-    elif body.in_today_queue is not None:
-        update_vals["in_today_queue"] = bool(body.in_today_queue)
-    result = db.execute(
-        update(OrderItem).where(OrderItem.id.in_(ids)).values(**update_vals)
-    )
-    db.commit()
-    n = int(result.rowcount or 0)
-    if n == 0:
+    items = db.scalars(select(OrderItem).where(OrderItem.id.in_(ids))).all()
+    if len(items) != len(ids):
         raise HTTPException(status_code=404, detail="未找到所选明细")
-    return {"updated": n}
+    now_cut = datetime.now()
+    for row in items:
+        row.production_status = st
+        if st in ("未入库", "已发回"):
+            row.in_today_queue = False
+            row.processing_unit_codes = None
+        elif body.in_today_queue is not None:
+            row.in_today_queue = bool(body.in_today_queue)
+        if st == "锻造中" and body.in_today_queue is True and row.cutting_time is None:
+            row.cutting_time = now_cut
+        if st not in ("未入库", "已发回"):
+            sync_processing_codes_length(row)
+            ensure_order_item_processing_codes(db, row)
+    db.commit()
+    return {"updated": len(items)}
 
 
 @router.patch("/{item_id}", response_model=OrderItemOutSchema)
@@ -58,6 +64,7 @@ def patch_order_item(
     if row is None:
         raise HTTPException(status_code=404, detail="明细不存在")
     data = body.model_dump(exclude_unset=True)
+    old_ps = row.production_status
     st = data.get("production_status")
     if st in ("未入库", "已发回"):
         row.in_today_queue = False
@@ -69,6 +76,13 @@ def patch_order_item(
     if data.get("in_today_queue") is True and not had_explicit_production_status:
         if row.production_status in ("已入库", "未入库"):
             row.production_status = "锻造中"
+    if (
+        old_ps != "锻造中"
+        and row.production_status == "锻造中"
+        and row.cutting_time is None
+        and "cutting_time" not in data
+    ):
+        row.cutting_time = datetime.now()
     if row.production_status in ("未入库", "已发回"):
         row.processing_unit_codes = None
     else:

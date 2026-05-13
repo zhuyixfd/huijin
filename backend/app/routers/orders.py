@@ -166,18 +166,18 @@ def list_order_grind_logs(
     if item is None:
         raise HTTPException(status_code=404, detail="订单不存在")
     rows = db.execute(
-        select(GrindLog, OrderItem.production_no, OrderItem.incoming_no)
+        select(GrindLog, OrderItem.order_no, OrderItem.incoming_no)
         .join(OrderItem, GrindLog.order_item_id == OrderItem.id)
         .where(OrderItem.id == item_id)
         .order_by(GrindLog.created_at.desc())
     ).all()
     out: list[OrderGrindLogRow] = []
-    for log, prod_no, inc_no in rows:
+    for log, order_no, inc_no in rows:
         out.append(
             OrderGrindLogRow(
                 id=log.id,
                 order_item_id=log.order_item_id,
-                production_no=prod_no,
+                order_no=order_no,
                 incoming_no=inc_no,
                 note=log.note,
                 unit_index=log.unit_index,

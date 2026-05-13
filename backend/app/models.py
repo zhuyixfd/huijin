@@ -54,14 +54,12 @@ class OrderItem(Base):
 
     incoming_no: Mapped[str | None] = mapped_column(String(128), nullable=True)
     material_grade: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    production_no: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     spec_incoming: Mapped[str | None] = mapped_column(String(256), nullable=True)
     weight_incoming: Mapped[Decimal | None] = mapped_column(Numeric(18, 3), nullable=True)
     quantity: Mapped[int] = mapped_column(Integer, server_default="1")
     weight_return: Mapped[Decimal | None] = mapped_column(Numeric(18, 3), nullable=True)
     formed_size: Mapped[str | None] = mapped_column(String(256), nullable=True)
     forging_requirements: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    production_process: Mapped[str | None] = mapped_column(Text(), nullable=True)
     remark: Mapped[str | None] = mapped_column(Text(), nullable=True)
     production_status: Mapped[str] = mapped_column(
         String(32), server_default="未入库", index=True

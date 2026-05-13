@@ -30,25 +30,29 @@ function row(label, value) {
 export function buildSlipHtml(kind, { order, customer, item }) {
   const cname = customer?.name ?? ''
   const ono = order?.order_no ?? ''
-  const baseRows = [
-    row('订单编号', ono),
-    row('客户名称', cname),
-    row('来料编号', item?.incoming_no),
-    row('材质', item?.material_grade),
-    row('生产编号', item?.production_no),
-    row('来料规格', item?.spec_incoming),
-    row('来料重', item?.weight_incoming),
-    row('个数', item?.quantity),
-    row('发回重量', item?.weight_return),
-    row('成型尺寸', item?.formed_size),
-    row('锻造过程要求', item?.forging_requirements),
-    row('生产过程', item?.production_process),
-    row('备注', item?.remark),
-    row('生产状态', item?.production_status),
-    row('来料日期', item?.incoming_date),
-    row('发回日期', item?.return_date),
-    row('下料时间', item?.cutting_time),
+  const pairs = [
+    ['订单编号', ono],
+    ['客户名称', cname],
+    ['来料编号', item?.incoming_no],
+    ['材质', item?.material_grade],
+    ['来料规格', item?.spec_incoming],
+    ['来料重', item?.weight_incoming],
+    ['个数', item?.quantity],
+    ['发回重量', item?.weight_return],
+    ['成型尺寸', item?.formed_size],
+    ['锻造要求', item?.forging_requirements],
+    ['备注', item?.remark],
+    ['生产状态', item?.production_status],
+    ['来料日期', item?.incoming_date],
+    ['发回日期', item?.return_date],
+    ['下料/锻造时间', item?.cutting_time],
   ]
+  const outboundOmit = new Set(['备注', '生产状态', '来料日期', '发回日期'])
+  const rowsForKind =
+    kind === 'outbound'
+      ? pairs.filter(([label]) => !outboundOmit.has(label))
+      : pairs
+  const slipRows = rowsForKind.map(([label, value]) => row(label, value))
 
   const titles = {
     incoming: '来料单',
@@ -71,7 +75,7 @@ export function buildSlipHtml(kind, { order, customer, item }) {
     <p class="meta muted">${esc(note)} · 打印时间 ${esc(new Date().toLocaleString('zh-CN'))}</p>
     <table>
       <tbody>
-        ${baseRows.join('')}
+        ${slipRows.join('')}
       </tbody>
     </table>
   `

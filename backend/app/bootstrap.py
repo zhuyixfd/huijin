@@ -46,6 +46,23 @@ def ensure_grind_log_unit_index() -> None:
         conn.execute(text("ALTER TABLE grind_logs ADD COLUMN unit_index INT NULL"))
 
 
+def drop_order_item_legacy_production_columns() -> None:
+    """移除已废弃字段 production_no、production_process（ORM 已删除）。"""
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_items")}
+    drops: list[str] = []
+    if "production_no" in cols:
+        drops.append("DROP COLUMN production_no")
+    if "production_process" in cols:
+        drops.append("DROP COLUMN production_process")
+    if not drops:
+        return
+    with engine.begin() as conn:
+        conn.execute(text(f"ALTER TABLE order_items {', '.join(drops)}"))
+
+
 def ensure_order_item_in_today_queue() -> None:
     """order_items.in_today_queue：处理中视图「今日处理」区块勾选"""
     inspector = inspect(engine)
@@ -131,6 +148,7 @@ def init_db() -> None:
     ensure_order_item_processing_unit_codes_col()
     ensure_grind_log_unit_index()
     ensure_order_item_in_today_queue()
+    drop_order_item_legacy_production_columns()
     db = SessionLocal()
     try:
         seed_admin(db)

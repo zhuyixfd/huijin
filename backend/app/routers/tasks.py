@@ -54,7 +54,6 @@ def _task_filter_conditions(
         conds.append(
             or_(
                 OrderItem.order_no.contains(kw),
-                OrderItem.production_no.contains(kw),
                 OrderItem.incoming_no.contains(kw),
             )
         )
@@ -140,7 +139,7 @@ def list_task_items(
     _: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
     status_filter: str | None = Query(None, alias="status"),
-    q: str | None = Query(None, description="生产编号/来料编号/订单号"),
+    q: str | None = Query(None, description="来料编号/订单号"),
     customer_id: int | None = Query(None),
     customer_q: str | None = Query(None, description="客户名称模糊"),
     status_category: str | None = Query(
@@ -240,6 +239,8 @@ def create_work_order(
     cust_id = payload.pop("customer_id")
     order_remark = payload.pop("order_remark", None)
     item_fields = OrderItemCreate(**payload).model_dump()
+    if item_fields.get("incoming_date") is None:
+        item_fields["incoming_date"] = date.today()
 
     row = None
     for _ in range(40):

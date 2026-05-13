@@ -65,14 +65,12 @@ class CustomerOut(BaseModel):
 class OrderItemCreate(BaseModel):
     incoming_no: str | None = None
     material_grade: str | None = None
-    production_no: str | None = None
     spec_incoming: str | None = None
     weight_incoming: Decimal | None = None
     quantity: int = Field(default=1, ge=1)
     weight_return: Decimal | None = None
     formed_size: str | None = None
     forging_requirements: str | None = None
-    production_process: str | None = None
     remark: str | None = None
     production_status: str = "未入库"
     return_date: date | None = None
@@ -101,14 +99,12 @@ class OrderItemBatchProductionStatus(BaseModel):
 class OrderItemUpdate(BaseModel):
     incoming_no: str | None = None
     material_grade: str | None = None
-    production_no: str | None = None
     spec_incoming: str | None = None
     weight_incoming: Decimal | None = None
     quantity: int | None = Field(None, ge=1)
     weight_return: Decimal | None = None
     formed_size: str | None = None
     forging_requirements: str | None = None
-    production_process: str | None = None
     remark: str | None = None
     production_status: str | None = None
     in_today_queue: bool | None = None
@@ -135,14 +131,12 @@ class OrderItemOut(BaseModel):
     sort_order: int = 0
     incoming_no: str | None = None
     material_grade: str | None = None
-    production_no: str | None = None
     spec_incoming: str | None = None
     weight_incoming: Decimal | None = None
     quantity: int
     weight_return: Decimal | None = None
     formed_size: str | None = None
     forging_requirements: str | None = None
-    production_process: str | None = None
     remark: str | None = None
     production_status: str
     in_today_queue: bool = False
@@ -178,7 +172,7 @@ class OrderGrindLogRow(BaseModel):
 
     id: int
     order_item_id: int
-    production_no: str | None = None
+    order_no: str | None = None
     incoming_no: str | None = None
     note: str | None = None
     unit_index: int | None = None

@@ -12,22 +12,32 @@ import {
 import { openDeliverySlipPreview } from './deliverySheetPrint.js'
 import { openWorkshopProductionPreview } from './workshopSheetPrint.js'
 
+function todayDateISO() {
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+function todayDatetimeLocal() {
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
 const emptyItemForm = () => ({
   incoming_no: '',
   material_grade: '',
-  production_no: '',
   spec_incoming: '',
   weight_incoming: '',
   quantity: 1,
   weight_return: '',
   formed_size: '',
   forging_requirements: '',
-  production_process: '',
   remark: '',
   production_status: '未入库',
   return_date: '',
-  incoming_date: '',
-  cutting_time: '',
+  incoming_date: todayDateISO(),
+  cutting_time: todayDatetimeLocal(),
 })
 
 const emptyWorkOrderForm = () => ({
@@ -121,14 +131,12 @@ function normalizeItemPayload(form) {
   return {
     incoming_no: form.incoming_no || null,
     material_grade: form.material_grade || null,
-    production_no: form.production_no || null,
     spec_incoming: form.spec_incoming || null,
     weight_incoming: form.weight_incoming === '' ? null : String(form.weight_incoming),
     quantity: Number.isFinite(q) && q >= 1 ? q : 1,
     weight_return: form.weight_return === '' ? null : String(form.weight_return),
     formed_size: form.formed_size || null,
     forging_requirements: form.forging_requirements || null,
-    production_process: form.production_process || null,
     remark: form.remark || null,
     production_status: form.production_status || '未入库',
     return_date: form.return_date || null,
@@ -153,7 +161,7 @@ function dtLocal(val) {
 }
 
 const GS = 'task-col-group-start'
-const COL_COUNT = 22
+const COL_COUNT = 20
 const PAGE_SIZE_OPTIONS = [20, 50, 100]
 
 function listPageTitle(preset) {
@@ -338,12 +346,19 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     if (statusFilter) p.set('status', statusFilter)
     if (q.trim()) p.set('q', q.trim())
     if (cid) p.set('customer_id', cid)
-    if (listStatusCategory && listStatusCategory !== 'all')
+    if (tasksPreset === 'all' && statusFilter) {
+      p.set('status_category', 'all')
+    } else if (listStatusCategory && listStatusCategory !== 'all') {
       p.set('status_category', listStatusCategory)
+    }
     if (customerNameQ.trim()) p.set('customer_q', customerNameQ.trim())
     if (createdFrom) p.set('created_from', createdFrom)
     if (createdTo) p.set('created_to', createdTo)
-    if (tasksPreset === 'all') p.set('exclude_completed', 'true')
+    if (tasksPreset === 'all') {
+      if (!statusFilter || statusFilter !== '已发回') {
+        p.set('exclude_completed', 'true')
+      }
+    }
     p.set('skip', String((page - 1) * pageSize))
     p.set('limit', String(pageSize))
     const qs = p.toString()
@@ -527,21 +542,19 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     setItemForm({
       incoming_no: it.incoming_no ?? '',
       material_grade: it.material_grade ?? '',
-      production_no: it.production_no ?? '',
       spec_incoming: it.spec_incoming ?? '',
       weight_incoming: it.weight_incoming ?? '',
       quantity: it.quantity ?? 1,
       weight_return: it.weight_return ?? '',
       formed_size: it.formed_size ?? '',
       forging_requirements: it.forging_requirements ?? '',
-      production_process: it.production_process ?? '',
       remark: it.remark ?? '',
       production_status: it.production_status ?? '未入库',
       return_date: it.return_date ? String(it.return_date).slice(0, 10) : '',
-      incoming_date: it.incoming_date ? String(it.incoming_date).slice(0, 10) : '',
+      incoming_date: it.incoming_date ? String(it.incoming_date).slice(0, 10) : todayDateISO(),
       cutting_time: it.cutting_time
         ? String(it.cutting_time).slice(0, 16).replace('T', 'T')
-        : '',
+        : todayDatetimeLocal(),
     })
     setItemModal({ itemId: it.id })
   }
@@ -561,8 +574,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     }
   }
 
-  const showProductionStatusFilter =
-    tasksPreset === 'all' || tasksPreset === 'processing'
+  const showProductionStatusFilter = true
   const showNewWorkOrder = tasksPreset === 'all' || tasksPreset === 'pending'
   const showBulkSelectCol = showBulkCheckboxCol && bulkSelectColumnVisible
   const showReadyOutboundActionsCol = tasksPreset === 'ready_outbound'
@@ -991,6 +1003,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
           ) : null}
         </span>
       </td>
+      <td className={GS}>{fmtDate(it.incoming_date)}</td>
       {showProcessingUnitCol ? (
         <td className="cell-nowrap task-unit-code">{unitLabel ?? '—'}</td>
       ) : null}
@@ -1005,23 +1018,20 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
         {showOrderNoCell ? it.order_no : '\u00a0'}
       </td>
       <td>{fmtNum(it.customer_name)}</td>
+      <td>{fmtNum(it.material_grade)}</td>
+      <td className="text-cell">{fmtNum(it.spec_incoming)}</td>
+      <td>{fmtNum(it.weight_incoming)}</td>
+      <td>{qtyDisplay}</td>
       <td className="cell-nowrap">{fmtDateTime(it.order_created_at)}</td>
       <td>
         <span className="tag tag-status">{statusLabel}</span>
       </td>
       <td className="text-cell">{fmtNum(it.order_remark)}</td>
       <td className={GS}>{fmtNum(it.incoming_no)}</td>
-      <td>{fmtNum(it.production_no)}</td>
-      <td>{fmtNum(it.material_grade)}</td>
-      <td className="text-cell">{fmtNum(it.spec_incoming)}</td>
-      <td>{fmtNum(it.weight_incoming)}</td>
-      <td>{qtyDisplay}</td>
       <td className={GS}>{fmtNum(it.weight_return)}</td>
       <td className="text-cell">{fmtNum(it.formed_size)}</td>
       <td className={`text-cell ${GS}`}>{fmtNum(it.forging_requirements)}</td>
-      <td className="text-cell">{fmtNum(it.production_process)}</td>
       <td className="text-cell">{fmtNum(it.remark)}</td>
-      <td className={GS}>{fmtDate(it.incoming_date)}</td>
       {showCuttingReturnDateCols ? (
         <td>{fmtCuttingDate(it.cutting_time)}</td>
       ) : null}
@@ -1120,25 +1130,23 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
           </th>
         ) : null}
         <th className="cell-nowrap">明细ID</th>
+        <th className={GS}>来料日期</th>
         {showProcessingUnitCol ? <th className="cell-nowrap">件号</th> : null}
         <th className="cell-nowrap">订单编号</th>
         <th>{customerColLabel}</th>
-        <th className="cell-nowrap">下单时间</th>
-        <th>订单状态</th>
-        <th>订单备注</th>
-        <th className={GS}>来料编号</th>
-        <th>生产编号</th>
         <th>材质</th>
         <th>来料规格</th>
         <th>来料重量</th>
         <th>个数</th>
+        <th className="cell-nowrap">下单时间</th>
+        <th>订单状态</th>
+        <th>订单备注</th>
+        <th className={GS}>来料编号</th>
         <th className={GS}>发回重量</th>
         <th>成型尺寸</th>
-        <th className={GS}>锻造过程要求</th>
-        <th>生产过程</th>
+        <th className={GS}>锻造要求</th>
         <th>备注</th>
-        <th className={GS}>来料日期</th>
-        {showCuttingReturnDateCols ? <th>下料日期</th> : null}
+        {showCuttingReturnDateCols ? <th>下料/锻造时间</th> : null}
         {showCuttingReturnDateCols ? <th>发回日期</th> : null}
         {showProductionStatusCol ? <th className={GS}>生产状态</th> : null}
         {showTaskActionsCol ? <th className={GS}>操作</th> : null}
@@ -1239,12 +1247,19 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
             ) : null}
             <input
               type="search"
-              placeholder="订单号 / 生产编号 / 来料编号"
+              placeholder="订单号 / 来料编号"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
             {showNewWorkOrder ? (
-              <button type="button" className="btn btn-primary" onClick={() => setWorkOrderModal(true)}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  setNewWork(emptyWorkOrderForm())
+                  setWorkOrderModal(true)
+                }}
+              >
                 新建来料订单
               </button>
             ) : null}
@@ -1834,7 +1849,6 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                       <table className="data-table">
                         <thead>
                           <tr>
-                            <th>生产编号</th>
                             <th>来料编号</th>
                             <th>材质</th>
                             <th>来料规格</th>
@@ -1848,7 +1862,6 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                         <tbody>
                           {(detail.items ?? []).map((it) => (
                             <tr key={it.id}>
-                              <td>{it.production_no}</td>
                               <td>{it.incoming_no}</td>
                               <td>{it.material_grade}</td>
                               <td className="text-cell">{it.spec_incoming ?? '—'}</td>
@@ -1888,7 +1901,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                         <thead>
                           <tr>
                             <th>时间</th>
-                            <th>生产编号</th>
+                            <th>订单号</th>
                             <th>来料编号</th>
                             <th>备注</th>
                           </tr>
@@ -1904,7 +1917,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                             grindLogs.map((log) => (
                               <tr key={log.id}>
                                 <td className="cell-nowrap">{fmtDateTime(log.created_at)}</td>
-                                <td>{log.production_no ?? '—'}</td>
+                                <td>{log.order_no ?? '—'}</td>
                                 <td>{log.incoming_no ?? '—'}</td>
                                 <td className="text-cell">{log.note ?? '—'}</td>
                               </tr>
@@ -1949,16 +1962,20 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                             <table className="data-table order-unit-meta-table">
                               <tbody>
                                 <tr>
-                                  <th scope="row">生产编号</th>
-                                  <td>{it.production_no ?? '—'}</td>
                                   <th scope="row">来料编号</th>
                                   <td>{it.incoming_no ?? '—'}</td>
-                                </tr>
-                                <tr>
                                   <th scope="row">材质</th>
                                   <td>{it.material_grade ?? '—'}</td>
+                                </tr>
+                                <tr>
+                                  <th scope="row">来料规格</th>
+                                  <td colSpan={3} className="text-cell">
+                                    {it.spec_incoming ?? '—'}
+                                  </td>
+                                </tr>
+                                <tr>
                                   <th scope="row">状态</th>
-                                  <td>
+                                  <td colSpan={3}>
                                     <span className="tag">{it.production_status}</span>
                                   </td>
                                 </tr>
@@ -2067,13 +2084,6 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 />
               </label>
               <label>
-                生产编号
-                <input
-                  value={newWork.production_no}
-                  onChange={(e) => setNewWork((o) => ({ ...o, production_no: e.target.value }))}
-                />
-              </label>
-              <label>
                 来料规格
                 <input
                   value={newWork.spec_incoming}
@@ -2111,20 +2121,11 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 />
               </label>
               <label className="full">
-                锻造过程要求
+                锻造要求
                 <textarea
                   value={newWork.forging_requirements}
                   onChange={(e) =>
                     setNewWork((o) => ({ ...o, forging_requirements: e.target.value }))
-                  }
-                />
-              </label>
-              <label className="full">
-                生产过程
-                <textarea
-                  value={newWork.production_process}
-                  onChange={(e) =>
-                    setNewWork((o) => ({ ...o, production_process: e.target.value }))
                   }
                 />
               </label>
@@ -2167,7 +2168,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 />
               </label>
               <label>
-                下料时间
+                下料/锻造时间
                 <input
                   type="datetime-local"
                   value={dtLocal(newWork.cutting_time)}
@@ -2210,13 +2211,6 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 />
               </label>
               <label>
-                生产编号
-                <input
-                  value={itemForm.production_no}
-                  onChange={(e) => setItemForm((f) => ({ ...f, production_no: e.target.value }))}
-                />
-              </label>
-              <label>
                 来料规格
                 <input
                   value={itemForm.spec_incoming}
@@ -2254,20 +2248,11 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 />
               </label>
               <label className="full">
-                锻造过程要求
+                锻造要求
                 <textarea
                   value={itemForm.forging_requirements}
                   onChange={(e) =>
                     setItemForm((f) => ({ ...f, forging_requirements: e.target.value }))
-                  }
-                />
-              </label>
-              <label className="full">
-                生产过程
-                <textarea
-                  value={itemForm.production_process}
-                  onChange={(e) =>
-                    setItemForm((f) => ({ ...f, production_process: e.target.value }))
                   }
                 />
               </label>
@@ -2310,7 +2295,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 />
               </label>
               <label>
-                下料时间
+                下料/锻造时间
                 <input
                   type="datetime-local"
                   value={dtLocal(itemForm.cutting_time)}
@@ -2527,7 +2512,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
           <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog">
             <h2>修磨记录</h2>
             <p className="muted">
-              订单 {grindItem.order_no} · 生产编号 {grindItem.production_no ?? '—'}
+              订单 {grindItem.order_no} · 来料编号 {grindItem.incoming_no ?? '—'}
               {grindUnitIndex !== null && grindUnitIndex !== undefined
                 ? ` · 第 ${grindUnitIndex + 1} 件`
                 : ''}
