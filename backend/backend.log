@@ -1,0 +1,993 @@
+nohup: ignoring input
+INFO:     Started server process [627193]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:48024 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:48026 - "GET /docs HTTP/1.1" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=waiting_inbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=completed&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/101 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/101/grind-logs HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=completed&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/99/grind-logs HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/99 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=waiting_inbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=completed&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/split-merge-logs?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=completed&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=waiting_inbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/135 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/135/grind-logs HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "POST /api/order-items/batch-production-status HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/135/grind-logs HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/135 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "PATCH /api/order-items/135 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/135 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/135/grind-logs HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/cut-head-logs?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=waiting_inbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=waiting_inbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/135 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/135/grind-logs HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "PATCH /api/order-items/135 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/split-merge-logs?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=completed&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/135 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/135/grind-logs HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/split-merge-logs?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=completed&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=completed&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/split-merge-logs?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=completed&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/cut-head-logs?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/cut-head-logs?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=waiting_inbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     3.129.187.38:46096 - "GET / HTTP/1.1" 404 Not Found
+INFO:     3.129.187.38:46054 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     198.235.24.183:61114 - "GET / HTTP/1.1" 404 Not Found
+INFO:     45.205.1.73:33826 - "GET / HTTP/1.1" 404 Not Found
+INFO:     94.156.152.50:48926 - "GET / HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:60602 - "POST / HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:44476 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:36754 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:46206 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:52704 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:49638 - "POST /api/route HTTP/1.1" 404 Not Found
+INFO:     151.243.11.248:41222 - "GET / HTTP/1.1" 404 Not Found
+INFO:     147.185.132.201:60492 - "GET / HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:59256 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:32792 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=waiting_inbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/98 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/98/grind-logs HTTP/1.0" 200 OK
+INFO:     127.0.0.1:48490 - "GET /uploads/order_remarks/98/e90012b040ea437fba581b0073165e06.jpg HTTP/1.1" 404 Not Found
+INFO:     112.193.22.11:0 - "GET /api/tasks/cut-head-logs?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=ready_outbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=completed&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=completed&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/86/grind-logs HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/orders/86 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=completed&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     54.237.234.7:39438 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     143.20.185.242:54982 - "GET / HTTP/1.1" 404 Not Found
+INFO:     199.45.155.83:5632 - "GET / HTTP/1.1" 404 Not Found
+INFO:     199.45.155.83:25968 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     199.45.155.83:48908 - "POST /mcp HTTP/1.1" 404 Not Found
+INFO:     199.45.155.83:48964 - "POST /jsonrpc HTTP/1.1" 404 Not Found
+INFO:     199.45.155.83:53774 - "POST / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     199.45.155.83:31214 - "GET /robots.txt HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     116.169.0.77:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     116.169.0.77:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     116.169.0.77:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     116.169.0.77:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     116.169.0.77:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     116.169.0.77:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     116.169.0.77:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     116.169.0.77:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     205.210.31.11:64486 - "GET /metrics HTTP/1.1" 404 Not Found
+INFO:     147.185.132.37:58660 - "GET /metrics HTTP/1.1" 404 Not Found
+INFO:     205.210.31.18:58454 - "GET /metrics HTTP/1.1" 404 Not Found
+INFO:     198.235.24.74:60402 - "GET /metrics HTTP/1.1" 404 Not Found
+INFO:     45.198.224.9:19572 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     114.66.56.106:38008 - "GET / HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:38024 - "GET /login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:38028 - "GET /app/login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:38030 - "GET /auth/login HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:43946 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     39.98.40.16:44102 - "GET / HTTP/1.1" 404 Not Found
+INFO:     39.98.40.16:44190 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     193.32.162.104:39056 - "POST / HTTP/1.1" 404 Not Found
+INFO:     193.32.162.104:39072 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     193.32.162.104:39074 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     193.32.162.104:39078 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     193.32.162.104:39082 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     193.32.162.104:39098 - "POST /api/route HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:49822 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:49826 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:35352 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:35372 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:35388 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:35402 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:35410 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:35424 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:35428 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:35442 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:36474 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:36480 - "GET /skin/default_1/images/logo.png HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:36494 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:36502 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:36512 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:36524 - "GET /image/lgbg.jpg HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:36532 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:36544 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:36552 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:36554 - "GET /login.rsp HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:56196 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:56210 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:56226 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:56228 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:56240 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:56256 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:56262 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:56268 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:56272 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:56288 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:56298 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:56300 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:56310 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:52390 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:52392 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:52406 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:52420 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:52428 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.159.99.123:52442 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     114.66.56.106:52102 - "GET / HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:52108 - "GET /login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:52114 - "GET /app/login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:52116 - "GET /auth/login HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.224.89:8158 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.224.89:38364 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.224.89:46904 - "POST /mcp HTTP/1.1" 404 Not Found
+INFO:     66.132.224.89:46908 - "POST /jsonrpc HTTP/1.1" 404 Not Found
+INFO:     66.132.224.89:46922 - "POST / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.224.89:15870 - "GET /security.txt HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:47624 - "POST / HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:54150 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:54154 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:54170 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:54216 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:54232 - "POST /api/route HTTP/1.1" 404 Not Found
+INFO:     98.88.252.75:42876 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     143.20.185.242:49606 - "GET / HTTP/1.1" 404 Not Found
+INFO:     151.243.11.35:55948 - "GET / HTTP/1.1" 404 Not Found
+INFO:     199.45.154.131:40762 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     199.45.154.131:44594 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     199.45.154.131:46524 - "POST /mcp HTTP/1.1" 404 Not Found
+INFO:     199.45.154.131:46530 - "POST /jsonrpc HTTP/1.1" 404 Not Found
+INFO:     199.45.154.131:46532 - "POST / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     199.45.154.131:47610 - "GET /wiki HTTP/1.1" 404 Not Found
+INFO:     147.185.132.189:63802 - "GET /v1/metadata HTTP/1.1" 404 Not Found
+INFO:     198.235.24.9:61758 - "GET /v1/metadata HTTP/1.1" 404 Not Found
+INFO:     45.198.224.9:51020 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     114.66.56.106:57346 - "GET / HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:57352 - "GET /login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:57354 - "GET /app/login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:57368 - "GET /auth/login HTTP/1.1" 404 Not Found
+INFO:     151.243.11.248:36288 - "GET / HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:58318 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     45.198.224.9:3556 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     16.58.56.214:44964 - "GET / HTTP/1.1" 404 Not Found
+INFO:     16.58.56.214:34574 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     114.66.56.106:33590 - "GET / HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:33600 - "GET /login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:33602 - "GET /app/login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:33616 - "GET /auth/login HTTP/1.1" 404 Not Found
+INFO:     193.32.162.104:0 - "POST /api/route HTTP/1.0" 404 Not Found
+INFO:     151.243.11.35:59612 - "GET / HTTP/1.1" 404 Not Found
+INFO:     18.116.101.220:41004 - "GET / HTTP/1.1" 404 Not Found
+INFO:     18.116.101.220:43760 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     142.93.204.226:42766 - "HEAD / HTTP/1.0" 404 Not Found
+INFO:     142.93.204.226:52096 - "HEAD / HTTP/1.0" 404 Not Found
+INFO:     160.119.71.12:33904 - "POST / HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:33906 - "POST / HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:41220 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:41236 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:57156 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:57166 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:48886 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:48890 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:51868 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:51870 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:37174 - "POST /api/route HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:37190 - "POST /api/route HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     64.62.197.32:34018 - "GET / HTTP/1.1" 404 Not Found
+INFO:     64.62.197.39:7147 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     64.62.197.38:41969 - "GET /?format=json HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     143.20.185.242:50678 - "GET / HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:46272 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:47594 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     205.210.31.90:64578 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     114.66.56.106:43762 - "GET / HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:43770 - "GET /login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:43774 - "GET /app/login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:43778 - "GET /auth/login HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:59618 - "POST / HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:53388 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:41344 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:48302 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:54084 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:34766 - "POST /api/route HTTP/1.1" 404 Not Found
+INFO:     47.95.209.124:33978 - "GET / HTTP/1.1" 404 Not Found
+INFO:     47.95.209.124:33980 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     151.243.11.35:40022 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     114.66.56.106:43556 - "GET / HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:43572 - "GET /login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:43582 - "GET /app/login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:43596 - "GET /auth/login HTTP/1.1" 404 Not Found
+INFO:     45.198.224.9:32042 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     193.124.20.251:9204 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     160.119.71.12:56588 - "POST / HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:48438 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:59594 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:37570 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:44058 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:39740 - "POST /api/route HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.186.180:21080 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.186.180:25556 - "POST /mcp HTTP/1.1" 404 Not Found
+INFO:     66.132.186.180:25570 - "POST /jsonrpc HTTP/1.1" 404 Not Found
+INFO:     66.132.186.180:25584 - "POST / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.186.180:51956 - "GET /security.txt HTTP/1.1" 404 Not Found
+INFO:     205.210.31.49:58314 - "GET / HTTP/1.1" 404 Not Found
+INFO:     143.20.185.242:47622 - "GET / HTTP/1.1" 404 Not Found
+INFO:     165.22.37.118:39960 - "GET /.env HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     114.66.56.106:49800 - "GET / HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:49808 - "GET /login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:49812 - "GET /app/login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:49822 - "GET /auth/login HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     151.243.11.35:33564 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     94.231.206.38:53173 - "GET / HTTP/1.1" 404 Not Found
+INFO:     94.231.206.39:51405 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     193.124.20.243:15492 - "GET / HTTP/1.1" 404 Not Found
+INFO:     124.164.251.88:58020 - "GET /?_HELP_ME_ESCAPE_FROM_BELARUS_PLEASE_ HTTP/1.1" 404 Not Found
+INFO:     124.164.251.88:35624 - "GET /?_HELP_ME_ESCAPE_FROM_BELARUS_PLEASE_ HTTP/1.1" 404 Not Found
+INFO:     124.164.251.88:37010 - "GET /?_HELP_ME_ESCAPE_FROM_BELARUS_PLEASE_ HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     91.231.89.52:51815 - "GET / HTTP/1.1" 404 Not Found
+INFO:     91.231.89.215:44043 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:45506 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     64.62.197.2:9504 - "GET / HTTP/1.1" 404 Not Found
+INFO:     64.62.197.14:51097 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     64.62.197.4:26215 - "GET /?format=json HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     23.94.204.22:43560 - "GET /healthz HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     114.66.56.106:60808 - "GET / HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:60822 - "GET /login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:60836 - "GET /app/login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:60852 - "GET /auth/login HTTP/1.1" 404 Not Found
+INFO:     45.198.224.9:56500 - "GET / HTTP/1.1" 404 Not Found
+INFO:     9.234.10.182:43910 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     16.58.56.214:53170 - "GET / HTTP/1.1" 404 Not Found
+INFO:     16.58.56.214:51912 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     160.119.71.12:54008 - "POST / HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:54012 - "POST / HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:33690 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:33688 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:34866 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:34852 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:40290 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:40306 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:40182 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:40166 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:48686 - "POST /api/route HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:48688 - "POST /api/route HTTP/1.1" 404 Not Found
+INFO:     18.97.26.115:44166 - "GET / HTTP/1.1" 404 Not Found
+INFO:     143.20.185.242:60492 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.195.95:32276 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.195.95:25774 - "POST /mcp HTTP/1.1" 404 Not Found
+INFO:     66.132.195.95:25784 - "POST /jsonrpc HTTP/1.1" 404 Not Found
+INFO:     66.132.195.95:25800 - "POST / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.195.95:64620 - "GET /sitemap.xml HTTP/1.1" 404 Not Found
+INFO:     157.245.110.69:60068 - "GET / HTTP/1.1" 404 Not Found
+INFO:     157.245.110.69:60072 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     87.236.176.227:42651 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     114.66.56.106:51308 - "GET / HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:51324 - "GET /login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:51328 - "GET /app/login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:51338 - "GET /auth/login HTTP/1.1" 404 Not Found
+INFO:     66.132.172.46:46928 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.172.46:23126 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.172.46:23172 - "POST /mcp HTTP/1.1" 404 Not Found
+INFO:     66.132.172.46:23208 - "POST /jsonrpc HTTP/1.1" 404 Not Found
+INFO:     66.132.172.46:15908 - "POST / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.172.46:15924 - "GET /sitemap.xml HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:53328 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:54658 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     94.156.152.50:46222 - "GET / HTTP/1.1" 404 Not Found
+INFO:     45.79.207.54:37678 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     45.79.207.54:37690 - "GET /.git/config HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:37560 - "POST / HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:50638 - "POST / HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:50646 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:44022 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:44034 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:50242 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:50250 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:49452 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:49468 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:49470 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:49952 - "POST /api/route HTTP/1.1" 404 Not Found
+INFO:     160.119.71.12:49964 - "POST /api/route HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     69.5.169.133:10754 - "GET / HTTP/1.1" 404 Not Found
+INFO:     69.5.169.222:14990 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     138.68.159.242:46896 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     165.22.85.39:37678 - "GET /.env HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     69.5.169.150:13024 - "GET / HTTP/1.1" 404 Not Found
+INFO:     69.5.169.162:6588 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     192.46.230.178:41082 - "GET / HTTP/1.1" 404 Not Found
+INFO:     192.46.230.178:41084 - "GET /login HTTP/1.1" 404 Not Found
+INFO:     192.46.230.178:41100 - "GET /AGENTS.md HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     151.243.11.245:34926 - "GET / HTTP/1.1" 404 Not Found
+INFO:     45.198.224.9:49048 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     114.66.56.106:36148 - "GET / HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:36160 - "GET /login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:36174 - "GET /app/login HTTP/1.1" 404 Not Found
+INFO:     114.66.56.106:36184 - "GET /auth/login HTTP/1.1" 404 Not Found
+INFO:     134.199.216.52:33832 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     45.205.1.71:45022 - "GET / HTTP/1.1" 404 Not Found
+INFO:     151.243.11.35:47182 - "GET / HTTP/1.1" 404 Not Found
+INFO:     167.71.81.178:50842 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     205.210.31.74:60488 - "GET / HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:46688 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:48070 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     45.198.224.9:58628 - "GET / HTTP/1.1" 404 Not Found
+INFO:     198.235.24.67:58284 - "GET /v1/metadata HTTP/1.1" 404 Not Found
+INFO:     147.185.132.54:61588 - "GET /metrics HTTP/1.1" 404 Not Found
+INFO:     147.185.132.54:61594 - "GET /metrics HTTP/1.1" 404 Not Found
+INFO:     184.105.139.68:38430 - "GET / HTTP/1.1" 404 Not Found
+INFO:     184.105.139.108:16455 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     184.105.139.88:54273 - "GET /?format=json HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.186.193:37120 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.186.193:6464 - "POST /mcp HTTP/1.1" 404 Not Found
+INFO:     66.132.186.193:6470 - "POST /jsonrpc HTTP/1.1" 404 Not Found
+INFO:     66.132.186.193:6482 - "POST / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.186.193:14866 - "GET /wiki HTTP/1.1" 404 Not Found
+INFO:     167.94.146.53:21626 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     167.94.146.53:48148 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     167.94.146.53:48234 - "POST /mcp HTTP/1.1" 404 Not Found
+INFO:     167.94.146.53:48248 - "POST /jsonrpc HTTP/1.1" 404 Not Found
+INFO:     167.94.146.53:48308 - "POST / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     167.94.146.53:50186 - "GET /robots.txt HTTP/1.1" 404 Not Found
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 401 Unauthorized
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 401 Unauthorized
+INFO:     112.193.22.11:0 - "POST /api/auth/login HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 401 Unauthorized
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 401 Unauthorized
+INFO:     112.193.22.11:0 - "POST /api/auth/login HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/cut-head-logs?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=200 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=200 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=200 HTTP/1.0" 200 OK
+INFO:     143.20.185.242:39754 - "GET / HTTP/1.1" 404 Not Found
+INFO:     151.243.11.248:41492 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     69.5.169.228:15688 - "GET / HTTP/1.1" 404 Not Found
+INFO:     69.5.169.242:1662 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     138.68.111.224:54296 - "GET /.env HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     69.5.169.228:3228 - "GET / HTTP/1.1" 404 Not Found
+INFO:     69.5.169.215:6514 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     151.243.11.35:51680 - "GET / HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:59428 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:58070 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     45.205.1.73:57456 - "GET / HTTP/1.1" 404 Not Found
+INFO:     16.58.227.8:42740 - "GET / HTTP/1.1" 404 Not Found
+INFO:     16.58.227.8:49080 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     94.156.152.50:41214 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     112.193.22.11:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+WARNING:  Invalid HTTP request received.
+INFO:     139.224.0.39:61018 - "HEAD /start/index.html HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     139.224.0.39:61019 - "HEAD /pscc/ HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     45.198.224.9:7258 - "GET / HTTP/1.1" 404 Not Found
+INFO:     164.92.198.88:36306 - "GET /.env HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.195.99:43354 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.195.99:43804 - "POST /mcp HTTP/1.1" 404 Not Found
+INFO:     66.132.195.99:43808 - "POST /jsonrpc HTTP/1.1" 404 Not Found
+INFO:     66.132.195.99:43814 - "POST / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.195.99:9088 - "GET /.well-known/security.txt HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:58138 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:59468 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     198.235.24.234:64258 - "GET / HTTP/1.1" 404 Not Found
+INFO:     151.243.11.35:59088 - "GET / HTTP/1.1" 404 Not Found
+INFO:     198.235.24.170:57940 - "GET /metrics HTTP/1.1" 404 Not Found
+INFO:     205.210.31.200:62906 - "GET /metrics HTTP/1.1" 404 Not Found
+INFO:     134.209.93.160:50158 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     151.243.11.35:40300 - "GET / HTTP/1.1" 404 Not Found
+INFO:     198.235.24.93:57996 - "GET /v1/metadata HTTP/1.1" 404 Not Found
+INFO:     205.210.31.25:62496 - "GET / HTTP/1.1" 404 Not Found
+INFO:     94.156.152.50:58962 - "GET / HTTP/1.1" 404 Not Found
+INFO:     143.20.185.242:41490 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     89.248.164.165:60454 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:33650 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     45.205.1.71:38068 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.195.34:7588 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.195.34:7100 - "POST /mcp HTTP/1.1" 404 Not Found
+INFO:     66.132.195.34:7110 - "POST /jsonrpc HTTP/1.1" 404 Not Found
+INFO:     66.132.195.34:7122 - "POST / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.195.34:27798 - "GET /security.txt HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     121.235.76.155:0 - "GET /api/auth/me HTTP/1.0" 401 Unauthorized
+INFO:     121.235.76.155:0 - "GET /api/auth/me HTTP/1.0" 401 Unauthorized
+INFO:     121.235.76.155:0 - "POST /api/auth/login HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?status_category=waiting_inbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?status_category=waiting_inbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/135 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/135/grind-logs HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "DELETE /api/tasks/items/135 HTTP/1.0" 204 No Content
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/132/grind-logs HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/132 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "DELETE /api/tasks/items/132 HTTP/1.0" 204 No Content
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/66/grind-logs HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/66 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "DELETE /api/tasks/items/66 HTTP/1.0" 204 No Content
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/users HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/users HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/split-merge-logs?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/split-merge-logs?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/users HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/users HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?status_category=completed&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?status_category=completed&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/131/grind-logs HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/131 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "DELETE /api/tasks/items/131 HTTP/1.0" 204 No Content
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?status_category=completed&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/129/grind-logs HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/129 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "DELETE /api/tasks/items/129 HTTP/1.0" 204 No Content
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/100/grind-logs HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/100 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "DELETE /api/tasks/items/100 HTTP/1.0" 204 No Content
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/99/grind-logs HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/99 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "DELETE /api/tasks/items/99 HTTP/1.0" 204 No Content
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/98/grind-logs HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/98 HTTP/1.0" 200 OK
+INFO:     127.0.0.1:48832 - "GET /uploads/order_remarks/98/e90012b040ea437fba581b0073165e06.jpg HTTP/1.1" 404 Not Found
+INFO:     121.235.76.155:0 - "DELETE /api/tasks/items/98 HTTP/1.0" 204 No Content
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/95/grind-logs HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/95 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "DELETE /api/tasks/items/95 HTTP/1.0" 204 No Content
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/93 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/orders/93/grind-logs HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "DELETE /api/tasks/items/93 HTTP/1.0" 204 No Content
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?exclude_completed=true&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?status_category=in_progress&created_from=2026-04-26&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?status_category=in_progress&created_from=2026-04-01&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?status_category=in_progress&created_from=2026-04-01&created_to=2026-06-26&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/items?status_category=in_progress&created_from=2026-04-01&created_to=2026-06-03&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     121.235.76.155:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     45.198.224.9:16836 - "GET / HTTP/1.1" 404 Not Found
+INFO:     3.145.11.65:60606 - "GET / HTTP/1.1" 404 Not Found
+INFO:     3.145.11.65:65202 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     167.172.232.108:54188 - "GET /.env HTTP/1.1" 404 Not Found
+INFO:     143.20.185.242:46642 - "GET / HTTP/1.1" 404 Not Found
+INFO:     151.243.11.35:32774 - "GET / HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:44338 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     89.248.164.165:45714 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     198.235.24.81:60470 - "GET / HTTP/1.1" 404 Not Found
+INFO:     31.56.209.149:58720 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.172.187:40192 - "GET / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.172.187:57642 - "POST /mcp HTTP/1.1" 404 Not Found
+INFO:     66.132.172.187:57680 - "POST /jsonrpc HTTP/1.1" 404 Not Found
+INFO:     66.132.172.187:57692 - "POST / HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     66.132.172.187:39624 - "GET /security.txt HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     205.210.31.192:60902 - "GET /metrics HTTP/1.1" 404 Not Found
+INFO:     205.210.31.192:60888 - "GET /metrics HTTP/1.1" 404 Not Found
+INFO:     151.243.11.35:57340 - "GET / HTTP/1.1" 404 Not Found
+INFO:     45.198.224.9:12612 - "GET / HTTP/1.1" 404 Not Found
+INFO:     185.241.208.27:49738 - "POST / HTTP/1.1" 404 Not Found
+INFO:     185.241.208.27:49754 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     185.241.208.27:49764 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     185.241.208.27:49768 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     185.241.208.27:49772 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     185.241.208.27:49784 - "POST /api/route HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     89.248.164.165:33596 - "GET /images/js/eas/eas.js HTTP/1.1" 404 Not Found
+INFO:     151.243.11.245:58964 - "GET / HTTP/1.1" 404 Not Found
+INFO:     138.68.150.158:51822 - "GET / HTTP/1.1" 404 Not Found
+INFO:     138.68.150.158:51826 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     167.172.169.112:7369 - "GET / HTTP/1.0" 404 Not Found
+INFO:     134.122.82.176:55134 - "GET /solr/admin/info/system HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     134.122.82.176:55118 - "GET /query?q=SHOW+DIAGNOSTICS HTTP/1.1" 404 Not Found
+INFO:     68.183.76.144:32244 - "GET /v2/_catalog HTTP/1.1" 404 Not Found
+INFO:     159.89.17.56:31604 - "GET /cgi-bin/authLogin.cgi HTTP/1.1" 404 Not Found
+INFO:     134.122.93.157:5192 - "GET / HTTP/1.1" 404 Not Found
+INFO:     134.122.82.176:55136 - "GET /solr/admin/cores?action=STATUS&wt=json HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     68.183.76.144:32252 - "GET / HTTP/1.1" 404 Not Found
+INFO:     128.199.155.113:37950 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     205.210.31.193:60806 - "GET / HTTP/1.1" 404 Not Found
+INFO:     198.235.24.11:58310 - "GET /metrics HTTP/1.1" 404 Not Found
+INFO:     205.210.31.193:61688 - "GET /metrics HTTP/1.1" 404 Not Found
+INFO:     198.235.24.235:63132 - "GET /v1/metadata HTTP/1.1" 404 Not Found
+INFO:     205.210.31.74:63658 - "GET /v1/metadata HTTP/1.1" 404 Not Found
+INFO:     167.172.143.61:44600 - "GET / HTTP/1.1" 404 Not Found
+INFO:     101.207.201.16:0 - "GET /api/auth/me HTTP/1.0" 401 Unauthorized
+INFO:     101.207.201.16:0 - "GET /api/auth/me HTTP/1.0" 401 Unauthorized
+INFO:     101.207.201.16:0 - "POST /api/auth/login HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/auth/me HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/dashboard/summary HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/case-studies?skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/meta/production-statuses HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/customers HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/tasks/items?status_category=in_progress&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/tasks/items?status_category=waiting_inbound&skip=0&limit=20 HTTP/1.0" 200 OK
+INFO:     101.207.201.16:0 - "GET /api/tasks/nav-counts HTTP/1.0" 200 OK
+INFO:     212.73.148.38:45406 - "GET / HTTP/1.1" 404 Not Found

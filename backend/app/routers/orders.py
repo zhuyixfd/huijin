@@ -1,12 +1,13 @@
 from datetime import date, datetime, time
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_permission
+from app.permissions import PERM_ORDER_CREATE, PERM_ORDER_PROCESS
 from app.models import Customer, GrindLog, OrderItem
 from app.models import User as UserModel
 from app.order_number import generate_next_order_no
@@ -77,12 +78,16 @@ def list_orders(
         if cat == "placed":
             stmt = stmt.where(OrderItem.id == -1)
         elif cat == "waiting_inbound":
-            stmt = stmt.where(OrderItem.production_status == "未入库")
+            stmt = stmt.where(
+                or_(
+                    OrderItem.production_status == "在库中",
+                )
+            )
         elif cat == "completed":
             stmt = stmt.where(OrderItem.production_status == "已发回")
         elif cat == "in_progress":
             stmt = stmt.where(
-                OrderItem.production_status != "未入库",
+                OrderItem.production_status != "在库中",
                 OrderItem.production_status != "已发回",
                 OrderItem.production_status != "待发回",
                 OrderItem.production_status != "出库中",
@@ -116,7 +121,7 @@ def list_orders(
 @router.post("", response_model=OrderDetailOut, status_code=status.HTTP_201_CREATED)
 def create_order(
     body: OrderCreate,
-    _: UserModel = Depends(get_current_user),
+    _: UserModel = Depends(require_permission(PERM_ORDER_CREATE)),
     db: Session = Depends(get_db),
 ):
     if len(body.items) != 1:
@@ -196,7 +201,7 @@ def get_order(
     item = db.get(OrderItem, item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="订单不存在")
-    if not item.in_today_queue:
+    if not item.in_today_queue and not item.in_tomorrow_queue:
         ensure_order_item_processing_codes(db, item)
         db.commit()
         db.refresh(item)
@@ -207,7 +212,7 @@ def get_order(
 def update_order(
     item_id: int,
     body: OrderUpdate,
-    _: UserModel = Depends(get_current_user),
+    _: UserModel = Depends(require_permission(PERM_ORDER_PROCESS)),
     db: Session = Depends(get_db),
 ):
     item = db.get(OrderItem, item_id)
@@ -229,7 +234,7 @@ def update_order(
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_order(
     item_id: int,
-    _: UserModel = Depends(get_current_user),
+    _: UserModel = Depends(require_permission(PERM_ORDER_PROCESS)),
     db: Session = Depends(get_db),
 ):
     item = db.get(OrderItem, item_id)

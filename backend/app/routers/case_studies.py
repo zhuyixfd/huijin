@@ -11,7 +11,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_permission
+from app.permissions import PERM_ORDER_PROCESS
 from app.models import CaseStudy, Customer, OrderItem
 from app.models import User as UserModel
 from app.schemas_business import CaseStudyListOut, CaseStudyRow
@@ -72,7 +73,7 @@ def list_case_studies(
 
 @router.post("", response_model=CaseStudyRow, status_code=status.HTTP_201_CREATED)
 async def create_case_study(
-    _: UserModel = Depends(get_current_user),
+    _: UserModel = Depends(require_permission(PERM_ORDER_PROCESS)),
     db: Session = Depends(get_db),
     order_item_id: int = Form(),
     note: str = Form(""),

@@ -2,7 +2,7 @@
 
 const KEY = 'hj_today_slot_order_v1'
 
-/** 同一排多个件号用竖线存，展示用顿号 */
+/** 同一排多个件号用竖线存，展示用空格 */
 export const SLOT_PIECE_SEP = '|'
 
 export function parseSlotPieces(slotStr) {
@@ -22,7 +22,7 @@ export function joinSlotPieces(parts) {
 export function formatSlotPiecesDisplay(slotStr) {
   const parts = parseSlotPieces(slotStr)
   if (parts.length === 0) return ''
-  return parts.join('、')
+  return parts.join('\u00A0\u00A0')
 }
 
 export function todayCalendarKey() {

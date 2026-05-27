@@ -19,6 +19,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(
         String(32), server_default="employee", default="employee"
     )
+    permission_codes: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -58,16 +59,24 @@ class OrderItem(Base):
     weight_incoming: Mapped[Decimal | None] = mapped_column(Numeric(18, 3), nullable=True)
     quantity: Mapped[int] = mapped_column(Integer, server_default="1")
     weight_return: Mapped[Decimal | None] = mapped_column(Numeric(18, 3), nullable=True)
+    cut_head_weight: Mapped[Decimal | None] = mapped_column(Numeric(18, 3), nullable=True)
     formed_size: Mapped[str | None] = mapped_column(String(256), nullable=True)
     forging_requirements: Mapped[str | None] = mapped_column(Text(), nullable=True)
     remark: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    remark_images: Mapped[list | None] = mapped_column(JSON, nullable=True)
     production_status: Mapped[str] = mapped_column(
-        String(32), server_default="未入库", index=True
+        String(32), server_default="在库中", index=True
     )
     in_today_queue: Mapped[bool] = mapped_column(
         Boolean(), server_default="0", default=False
     )
+    in_tomorrow_queue: Mapped[bool] = mapped_column(
+        Boolean(), server_default="0", default=False
+    )
     processing_unit_codes: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    split_group_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    split_base_order_no: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    split_seq: Mapped[int | None] = mapped_column(Integer, nullable=True)
     return_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     incoming_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     cutting_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -77,6 +86,11 @@ class OrderItem(Base):
         back_populates="item",
         cascade="all, delete-orphan",
         order_by="GrindLog.created_at",
+    )
+    cut_head_logs: Mapped[list["CutHeadLog"]] = relationship(
+        back_populates="item",
+        cascade="all, delete-orphan",
+        order_by="CutHeadLog.created_at",
     )
     case_studies: Mapped[list["CaseStudy"]] = relationship(
         back_populates="item",
@@ -115,3 +129,32 @@ class GrindLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     item: Mapped["OrderItem"] = relationship(back_populates="grind_logs")
+
+
+class CutHeadLog(Base):
+    __tablename__ = "cut_head_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    order_item_id: Mapped[int] = mapped_column(
+        ForeignKey("order_items.id", ondelete="CASCADE"), index=True
+    )
+    weight: Mapped[Decimal] = mapped_column(Numeric(18, 3))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    item: Mapped["OrderItem"] = relationship(back_populates="cut_head_logs")
+
+
+class SplitMergeLog(Base):
+    __tablename__ = "split_merge_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    action: Mapped[str] = mapped_column(String(16), index=True)
+    group_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    base_order_no: Mapped[str] = mapped_column(String(64), index=True)
+    order_no_a: Mapped[str] = mapped_column(String(64), index=True)
+    order_no_b: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    production_status: Mapped[str] = mapped_column(String(32), index=True)
+    operator_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

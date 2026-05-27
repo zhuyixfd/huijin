@@ -43,6 +43,17 @@ function weightCell(it) {
   return String(w)
 }
 
+function cutHeadWeightCell(it) {
+  const w = it.cut_head_weight
+  if (w === null || w === undefined || w === '') return '—'
+  return String(w)
+}
+
+function hasCutHeadWeight(it) {
+  const w = it?.cut_head_weight
+  return !(w === null || w === undefined || w === '')
+}
+
 /** @param {Array<{ customer_name?: string }>} rows */
 function groupByConsignee(rows) {
   const m = new Map()
@@ -54,7 +65,7 @@ function groupByConsignee(rows) {
   return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], 'zh-CN'))
 }
 
-function buildOneSheet(consignee, items, sheetDateStr) {
+function buildOneSheet(consignee, items, sheetDateStr, showCutHeadCol) {
   let qtySum = 0
   const body = items
     .map((it) => {
@@ -62,17 +73,21 @@ function buildOneSheet(consignee, items, sheetDateStr) {
       const n = Number.isFinite(q) && q >= 1 ? Math.floor(q) : 1
       qtySum += n
       const forgeReq = it.forging_requirements ?? ''
+      const note = it.remark ?? ''
       return `<tr>
       <td>${esc(it.material_grade)}</td>
       <td>${esc(it.spec_incoming)}</td>
       <td>${esc(it.formed_size)}</td>
       <td class="num">${n}</td>
       <td class="num">${esc(weightCell(it))}</td>
+      ${showCutHeadCol ? `<td class="num">${esc(cutHeadWeightCell(it))}</td>` : ''}
       <td>${esc(forgeReq)}</td>
+      <td>${esc(note)}</td>
     </tr>`
     })
     .join('')
 
+  const totalTailColSpan = showCutHeadCol ? 4 : 3
   return `
 <section class="delivery-sheet">
   <div class="company-title">江阴市汇金机械有限公司</div>
@@ -89,7 +104,9 @@ function buildOneSheet(consignee, items, sheetDateStr) {
         <th>锻造规格</th>
         <th>数量</th>
         <th>发回重量</th>
+        ${showCutHeadCol ? '<th>切头重量</th>' : ''}
         <th>锻造要求</th>
+        <th>备注</th>
       </tr>
     </thead>
     <tbody>
@@ -97,7 +114,7 @@ function buildOneSheet(consignee, items, sheetDateStr) {
       <tr class="total-row">
         <td colspan="3">合计</td>
         <td class="num">${qtySum}</td>
-        <td colspan="2"></td>
+        <td colspan="${totalTailColSpan}"></td>
       </tr>
     </tbody>
   </table>
@@ -110,8 +127,12 @@ function buildOneSheet(consignee, items, sheetDateStr) {
 
 export function buildDeliverySlipHtml(rows, options = {}) {
   const sheetDateStr = options.dateLabel ?? fmtCnDate(options.date ?? new Date())
+  const showCutHeadCol =
+    options.showCutHeadCol ?? (Array.isArray(rows) ? rows.some((r) => hasCutHeadWeight(r)) : false)
   const groups = groupByConsignee(rows)
-  return groups.map(([name, items]) => buildOneSheet(name, items, sheetDateStr)).join('\n')
+  return groups
+    .map(([name, items]) => buildOneSheet(name, items, sheetDateStr, showCutHeadCol))
+    .join('\n')
 }
 
 export function buildDeliverySlipDocument(rows, options = {}) {
@@ -121,6 +142,11 @@ export function buildDeliverySlipDocument(rows, options = {}) {
 
 /** 从任务列表行得到可编辑送货单行（仅打印/导出用） */
 export function normalizeDeliveryDraftRow(r) {
+  const remark =
+    (r.delivery_remark ?? '').trim() ||
+    (r.remark ?? '').trim() ||
+    (r.order_remark ?? '').trim() ||
+    ''
   return {
     customer_name: r.customer_name ?? '',
     material_grade: r.material_grade ?? '',
@@ -129,7 +155,9 @@ export function normalizeDeliveryDraftRow(r) {
     quantity: r.quantity ?? 1,
     weight_return: r.weight_return ?? r.weight_incoming ?? '',
     weight_incoming: r.weight_incoming,
+    cut_head_weight: r.cut_head_weight ?? '',
     forging_requirements: r.forging_requirements ?? '',
+    remark,
   }
 }
 
@@ -140,7 +168,9 @@ function csvEscape(v) {
 }
 
 /** @param {ReturnType<normalizeDeliveryDraftRow>[]} rows */
-export function exportDeliveryRowsToExcelCsv(rows) {
+export function exportDeliveryRowsToExcelCsv(rows, options = {}) {
+  const showCutHeadCol =
+    options.showCutHeadCol ?? (Array.isArray(rows) ? rows.some((r) => hasCutHeadWeight(r)) : false)
   const headers = [
     '收货单位',
     '材质',
@@ -148,20 +178,27 @@ export function exportDeliveryRowsToExcelCsv(rows) {
     '锻造规格',
     '数量',
     '发回重量',
+    ...(showCutHeadCol ? ['切头重量'] : []),
     '锻造要求',
+    '备注',
   ]
   const lines = [headers.join(',')]
   for (const r of rows) {
     const w = r.weight_return ?? r.weight_incoming ?? ''
+    const base = [
+      csvEscape(r.customer_name),
+      csvEscape(r.material_grade),
+      csvEscape(r.spec_incoming),
+      csvEscape(r.formed_size),
+      csvEscape(r.quantity),
+      csvEscape(w),
+    ]
     lines.push(
       [
-        csvEscape(r.customer_name),
-        csvEscape(r.material_grade),
-        csvEscape(r.spec_incoming),
-        csvEscape(r.formed_size),
-        csvEscape(r.quantity),
-        csvEscape(w),
+        ...base,
+        ...(showCutHeadCol ? [csvEscape(r.cut_head_weight ?? '')] : []),
         csvEscape(r.forging_requirements),
+        csvEscape(r.remark),
       ].join(','),
     )
   }
@@ -213,7 +250,9 @@ function readDraftFromTable(tbody) {
       quantity: Number.isFinite(qty) && qty >= 1 ? qty : 1,
       weight_return: g('weight_return') || null,
       weight_incoming: null,
+      cut_head_weight: tr.querySelector('[name="cut_head_weight"]') ? g('cut_head_weight') || null : null,
       forging_requirements: g('forging_requirements'),
+      remark: g('remark'),
     })
   }
   return out
@@ -226,12 +265,14 @@ export function openDeliverySlipPreview(outboundRows) {
     return false
   }
   ensureModalStyles()
+  const showCutHeadCol = outboundRows.some((r) => hasCutHeadWeight(r))
   const draft = outboundRows.map(normalizeDeliveryDraftRow)
 
   const backdrop = document.createElement('div')
   backdrop.className = 'delivery-print-modal-backdrop'
   backdrop.setAttribute('role', 'dialog')
   backdrop.setAttribute('aria-label', '送货单预览与编辑')
+  const headCut = showCutHeadCol ? '<th style="width:6rem">切头重量</th>' : ''
   backdrop.innerHTML =
     '<div class="delivery-print-modal">' +
     '<div class="delivery-print-toolbar">' +
@@ -242,7 +283,9 @@ export function openDeliverySlipPreview(outboundRows) {
     '</div>' +
     '<div class="delivery-edit-scroll">' +
     '<table class="delivery-edit-table"><thead><tr>' +
-    '<th>收货单位</th><th>材质</th><th>来料规格</th><th>锻造规格</th><th style="width:4rem">数量</th><th style="width:6rem">发回重量</th><th>锻造要求</th>' +
+    '<th>收货单位</th><th>材质</th><th>来料规格</th><th>锻造规格</th><th style="width:4rem">数量</th><th style="width:6rem">发回重量</th>' +
+    headCut +
+    '<th>锻造要求</th><th>备注</th>' +
     '</tr></thead><tbody class="delivery-edit-tbody"></tbody></table>' +
     '</div>' +
     '<iframe class="delivery-print-frame" title="送货单打印"></iframe>' +
@@ -262,7 +305,9 @@ export function openDeliverySlipPreview(outboundRows) {
       <td><input type="text" name="formed_size" autocomplete="off" /></td>
       <td><input type="number" name="quantity" min="1" step="1" /></td>
       <td><input type="text" name="weight_return" autocomplete="off" /></td>
+      ${showCutHeadCol ? '<td><input type="text" name="cut_head_weight" autocomplete="off" /></td>' : ''}
       <td><textarea name="forging_requirements" rows="2"></textarea></td>
+      <td><textarea name="remark" rows="2"></textarea></td>
     `
     tr.querySelector('[name="customer_name"]').value = r.customer_name
     tr.querySelector('[name="material_grade"]').value = r.material_grade
@@ -271,7 +316,12 @@ export function openDeliverySlipPreview(outboundRows) {
     tr.querySelector('[name="quantity"]').value = String(r.quantity)
     tr.querySelector('[name="weight_return"]').value =
       r.weight_return === null || r.weight_return === undefined ? '' : String(r.weight_return)
+    if (showCutHeadCol) {
+      tr.querySelector('[name="cut_head_weight"]').value =
+        r.cut_head_weight === null || r.cut_head_weight === undefined ? '' : String(r.cut_head_weight)
+    }
     tr.querySelector('[name="forging_requirements"]').value = r.forging_requirements
+    tr.querySelector('[name="remark"]').value = r.remark ?? ''
     tbody.appendChild(tr)
   }
 
@@ -281,7 +331,7 @@ export function openDeliverySlipPreview(outboundRows) {
 
   function printFromDraft() {
     const rows = readDraftFromTable(tbody)
-    const docHtml = buildDeliverySlipDocument(rows)
+    const docHtml = buildDeliverySlipDocument(rows, { showCutHeadCol })
     const doc = iframe.contentDocument || iframe.contentWindow?.document
     if (!doc) {
       window.alert('打印窗口无法打开')
@@ -299,7 +349,7 @@ export function openDeliverySlipPreview(outboundRows) {
   })
   backdrop.querySelector('.delivery-print-btn-export').addEventListener('click', () => {
     const rows = readDraftFromTable(tbody)
-    exportDeliveryRowsToExcelCsv(rows)
+    exportDeliveryRowsToExcelCsv(rows, { showCutHeadCol })
   })
   backdrop.querySelector('.delivery-print-btn-close').addEventListener('click', close)
   backdrop.addEventListener('click', (e) => {

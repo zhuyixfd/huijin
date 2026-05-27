@@ -175,7 +175,7 @@ function buildDataRows(rows) {
 }
 
 export function buildWorkshopProductionSheetHtml(todayQueueRows, options = {}) {
-  const { toolbar = true, slotLabels } = options
+  const { toolbar = true, slotLabels, workshop = '快锻机' } = options
   const expanded = expandTodayQueueForSheet(todayQueueRows)
 
   const todayStr = fmtSheetDate()
@@ -213,7 +213,7 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows, options = {}) {
   return `
     <h1 class="sheet-title">汇金加工生产单</h1>
     <div class="sheet-meta">
-      <span>车间：快锻机</span>
+      <span>车间：${esc(workshop)}</span>
       <span class="right">日期：${esc(todayStr)}</span>
     </div>
     <table class="sheet">
@@ -249,6 +249,8 @@ function ensureModalStyles() {
 .workshop-print-toolbar { flex: 0 0 auto; padding: 10px 12px; border-bottom: 1px solid var(--border, #ddd); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .workshop-print-toolbar .btn { font: inherit; padding: 0.45rem 0.9rem; border-radius: 8px; border: 1px solid #ccc; background: #f4f4f5; cursor: pointer; }
 .workshop-print-toolbar .workshop-print-btn-print { background: #2563eb; color: #fff; border-color: #1d4ed8; }
+.workshop-print-toolbar .workshop-print-workshop { margin-right: auto; display: flex; align-items: center; gap: 6px; }
+.workshop-print-toolbar .workshop-print-workshop select { font: inherit; border-radius: 8px; border: 1px solid #ccc; padding: 0.35rem 0.6rem; background: #fff; }
 .workshop-print-frame { flex: 1 1 auto; width: 100%; min-height: 280px; height: min(78vh, 880px); border: none; background: #fff; }
 `
   document.head.appendChild(el)
@@ -261,10 +263,7 @@ export function openWorkshopProductionPreview(todayQueueRows, previewOptions = {
     return false
   }
   ensureModalStyles()
-  const docHtml = buildWorkshopProductionSheetDocument(todayQueueRows, {
-    toolbar: false,
-    ...previewOptions,
-  })
+  let workshop = String(previewOptions.workshop ?? '快锻机')
 
   const backdrop = document.createElement('div')
   backdrop.className = 'workshop-print-modal-backdrop'
@@ -278,6 +277,13 @@ export function openWorkshopProductionPreview(todayQueueRows, previewOptions = {
   backdrop.innerHTML =
     '<div class="workshop-print-modal">' +
     '<div class="workshop-print-toolbar">' +
+    '<div class="workshop-print-workshop">' +
+    '<span>车间</span>' +
+    '<select class="workshop-print-workshop-select" aria-label="选择车间">' +
+    '<option value="快锻机">快锻机</option>' +
+    '<option value="电液锤">电液锤</option>' +
+    '</select>' +
+    '</div>' +
     '<button type="button" class="btn workshop-print-btn-print">打印</button>' +
     '<button type="button" class="btn workshop-print-btn-close">关闭</button>' +
     '</div>' +
@@ -285,9 +291,28 @@ export function openWorkshopProductionPreview(todayQueueRows, previewOptions = {
     '</div>'
 
   const iframe = backdrop.querySelector('iframe')
+  const selectEl = backdrop.querySelector('.workshop-print-workshop-select')
 
   const close = () => {
     backdrop.remove()
+  }
+
+  function writePreview() {
+    const doc = iframe.contentDocument || iframe.contentWindow?.document
+    if (!doc) {
+      backdrop.remove()
+      window.alert('预览无法打开，请刷新页面后重试')
+      return false
+    }
+    const docHtml = buildWorkshopProductionSheetDocument(todayQueueRows, {
+      toolbar: false,
+      ...previewOptions,
+      workshop,
+    })
+    doc.open()
+    doc.write(docHtml)
+    doc.close()
+    return true
   }
 
   backdrop.querySelector('.workshop-print-btn-print').addEventListener('click', () => {
@@ -301,16 +326,14 @@ export function openWorkshopProductionPreview(todayQueueRows, previewOptions = {
 
   /* 必须先挂到文档树，否则 iframe.contentDocument / contentWindow 常为 null */
   document.body.appendChild(backdrop)
-
-  const doc = iframe.contentDocument || iframe.contentWindow?.document
-  if (!doc) {
-    backdrop.remove()
-    window.alert('预览无法打开，请刷新页面后重试')
-    return false
+  if (selectEl) {
+    selectEl.value = workshop
+    selectEl.addEventListener('change', (e) => {
+      workshop = String(e.target?.value ?? '快锻机')
+      writePreview()
+    })
   }
-  doc.open()
-  doc.write(docHtml)
-  doc.close()
+  if (!writePreview()) return false
 
   return true
 }

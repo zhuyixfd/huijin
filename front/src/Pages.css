@@ -830,7 +830,25 @@
   font-size: 0.65rem;
   line-height: 1.12;
   font-variant-numeric: tabular-nums;
-  cursor: default;
+  cursor: pointer;
+  user-select: none;
+  padding: 0.18rem 0.28rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+.tasks-processing-piece-cell:hover {
+  background: var(--accent-bg);
+}
+
+.tasks-processing-piece-cell:focus {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 2px;
+}
+
+.tasks-processing-piece-cell.is-active {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
 }
 
 .tasks-processing-piece-letter {

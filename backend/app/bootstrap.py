@@ -46,6 +46,86 @@ def ensure_grind_log_unit_index() -> None:
         conn.execute(text("ALTER TABLE grind_logs ADD COLUMN unit_index INT NULL"))
 
 
+def ensure_user_permission_codes_column() -> None:
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("users")}
+    if "permission_codes" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN permission_codes JSON NULL"))
+
+
+def ensure_order_item_remark_images() -> None:
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_items")}
+    if "remark_images" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE order_items ADD COLUMN remark_images JSON NULL"))
+
+
+def ensure_order_item_cut_head_weight() -> None:
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_items")}
+    if "cut_head_weight" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text("ALTER TABLE order_items ADD COLUMN cut_head_weight DECIMAL(18,3) NULL")
+        )
+
+
+def ensure_order_item_split_columns() -> None:
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_items")}
+    adds: list[str] = []
+    if "split_group_id" not in cols:
+        adds.append("ADD COLUMN split_group_id VARCHAR(40) NULL")
+    if "split_base_order_no" not in cols:
+        adds.append("ADD COLUMN split_base_order_no VARCHAR(64) NULL")
+    if "split_seq" not in cols:
+        adds.append("ADD COLUMN split_seq INT NULL")
+    if not adds:
+        return
+    with engine.begin() as conn:
+        conn.execute(text(f"ALTER TABLE order_items {', '.join(adds)}"))
+
+
+def ensure_order_item_production_status_v2() -> None:
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_items")}
+    if "production_status" not in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE order_items SET production_status = '在库中' "
+                "WHERE production_status IS NULL OR TRIM(production_status) = '' "
+                "OR production_status IN ('未入库', '已入库')"
+            )
+        )
+        if engine.dialect.name in ("mysql", "mariadb"):
+            try:
+                conn.execute(
+                    text(
+                        "ALTER TABLE order_items "
+                        "MODIFY COLUMN production_status VARCHAR(32) NOT NULL DEFAULT '在库中'"
+                    )
+                )
+            except Exception:
+                pass
+
+
 def drop_order_item_legacy_production_columns() -> None:
     """移除已废弃字段 production_no、production_process（ORM 已删除）。"""
     inspector = inspect(engine)
@@ -75,6 +155,21 @@ def ensure_order_item_in_today_queue() -> None:
         conn.execute(
             text(
                 "ALTER TABLE order_items ADD COLUMN in_today_queue TINYINT(1) NOT NULL DEFAULT 0"
+            )
+        )
+
+
+def ensure_order_item_in_tomorrow_queue() -> None:
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_items")}
+    if "in_tomorrow_queue" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE order_items ADD COLUMN in_tomorrow_queue TINYINT(1) NOT NULL DEFAULT 0"
             )
         )
 
@@ -145,10 +240,16 @@ def init_db() -> None:
     ensure_users_role_column()
     ensure_user_profile_columns()
     ensure_customer_abbr_column()
+    ensure_order_item_production_status_v2()
     ensure_order_item_processing_unit_codes_col()
     ensure_grind_log_unit_index()
     ensure_order_item_in_today_queue()
+    ensure_order_item_in_tomorrow_queue()
     drop_order_item_legacy_production_columns()
+    ensure_user_permission_codes_column()
+    ensure_order_item_remark_images()
+    ensure_order_item_cut_head_weight()
+    ensure_order_item_split_columns()
     db = SessionLocal()
     try:
         seed_admin(db)

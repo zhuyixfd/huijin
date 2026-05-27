@@ -69,10 +69,12 @@ class OrderItemCreate(BaseModel):
     weight_incoming: Decimal | None = None
     quantity: int = Field(default=1, ge=1)
     weight_return: Decimal | None = None
+    cut_head_weight: Decimal | None = None
     formed_size: str | None = None
     forging_requirements: str | None = None
     remark: str | None = None
-    production_status: str = "未入库"
+    remark_images: list[str] | None = None
+    production_status: str = "在库中"
     return_date: date | None = None
     incoming_date: date | None = None
     cutting_time: datetime | None = None
@@ -89,6 +91,7 @@ class OrderItemBatchProductionStatus(BaseModel):
     item_ids: list[int] = Field(min_length=1, max_length=500)
     production_status: str
     in_today_queue: bool | None = None
+    in_tomorrow_queue: bool | None = None
 
     @field_validator("production_status")
     @classmethod
@@ -103,11 +106,14 @@ class OrderItemUpdate(BaseModel):
     weight_incoming: Decimal | None = None
     quantity: int | None = Field(None, ge=1)
     weight_return: Decimal | None = None
+    cut_head_weight: Decimal | None = None
     formed_size: str | None = None
     forging_requirements: str | None = None
     remark: str | None = None
+    remark_images: list[str] | None = None
     production_status: str | None = None
     in_today_queue: bool | None = None
+    in_tomorrow_queue: bool | None = None
     return_date: date | None = None
     incoming_date: date | None = None
     cutting_time: datetime | None = None
@@ -135,11 +141,14 @@ class OrderItemOut(BaseModel):
     weight_incoming: Decimal | None = None
     quantity: int
     weight_return: Decimal | None = None
+    cut_head_weight: Decimal | None = None
     formed_size: str | None = None
     forging_requirements: str | None = None
     remark: str | None = None
+    remark_images: list[str] | None = None
     production_status: str
     in_today_queue: bool = False
+    in_tomorrow_queue: bool = False
     return_date: date | None = None
     incoming_date: date | None = None
     cutting_time: datetime | None = None
@@ -147,6 +156,9 @@ class OrderItemOut(BaseModel):
         default=None,
         description="处理中单件编号（与个数等长），生成后永久保留",
     )
+    split_group_id: str | None = None
+    split_base_order_no: str | None = None
+    split_seq: int | None = None
 
 
 class GrindLogCreate(BaseModel):
@@ -254,6 +266,56 @@ class TaskItemListOut(BaseModel):
     total: int
 
 
+class CutHeadLogCreate(BaseModel):
+    order_item_id: int
+    weight: Decimal = Field(gt=0)
+
+
+class CutHeadLogRow(BaseModel):
+    id: int
+    order_item_id: int
+    order_no: str
+    customer_name: str
+    incoming_no: str | None = None
+    material_grade: str | None = None
+    weight: Decimal
+    created_at: datetime
+
+
+class CutHeadLogListOut(BaseModel):
+    items: list[CutHeadLogRow]
+    total: int
+
+
+class SplitOrderBody(BaseModel):
+    order_item_id: int
+    move_unit_indexes: list[int] = Field(min_length=1, max_length=500)
+
+
+class SplitOrderOut(BaseModel):
+    base_order_no: str
+    order_no_1: str
+    order_no_2: str
+    item_id_1: int
+    item_id_2: int
+
+
+class SplitMergeLogRow(BaseModel):
+    id: int
+    action: str
+    base_order_no: str
+    order_no_a: str
+    order_no_b: str | None = None
+    production_status: str
+    operator_username: str | None = None
+    created_at: datetime
+
+
+class SplitMergeLogListOut(BaseModel):
+    items: list[SplitMergeLogRow]
+    total: int
+
+
 class ProcessingLetterPieceCount(BaseModel):
     """侧栏件号轮回字母对应的在制件数"""
 
@@ -267,6 +329,7 @@ class TaskNavCountsOut(BaseModel):
     all: int
     pending: int
     processing: int
+    cut_head: int = Field(default=0, description="切头记录条数")
     ready_outbound: int
     done: int
     processing_piece_strip: list[ProcessingLetterPieceCount] = Field(

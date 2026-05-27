@@ -92,7 +92,6 @@ def _try_merge_split_group(
         )
 
     keep.split_group_id = None
-    keep.split_base_order_no = None
     keep.split_seq = None
     db.delete(drop)
     db.add(

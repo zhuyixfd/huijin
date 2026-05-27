@@ -58,9 +58,10 @@ SELECT
   NULL AS forging_requirements,
   CONCAT('备注', nums.n) AS remark,
   ELT(
-    1 + MOD(nums.n - 1, 9),
-    '未入库',
-    '已入库',
+    1 + MOD(nums.n - 1, 10),
+    '在库中',
+    '开坯',
+    '待修磨',
     '修磨中',
     '锻造中',
     '待发回',

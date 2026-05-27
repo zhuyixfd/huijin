@@ -8,6 +8,13 @@ import Login from './Login.jsx'
 import TasksPage from './TasksPage.jsx'
 import { authFetch, clearToken, getToken } from './auth.js'
 import { getJson } from './api.js'
+import {
+  canAnyOrderNav,
+  canNavDone,
+  canNavPending,
+  canNavProcessing,
+  canNavReadyOutbound,
+} from './permissions.js'
 
 export default function App() {
   const [sessionChecked, setSessionChecked] = useState(false)
@@ -67,6 +74,29 @@ export default function App() {
     setActiveNav(key)
   }
 
+  const resolvedNav =
+    activeNav === 'orders'
+      ? 'tasks-all'
+      : user?.role !== 'admin' && activeNav === 'accounts'
+        ? 'home'
+        : activeNav
+  const showAccounts = user?.role === 'admin' && resolvedNav === 'accounts'
+
+  useEffect(() => {
+    if (!sessionChecked || !user) return
+    if (user.role === 'admin') return
+    let deny = false
+    if ((resolvedNav === 'tasks' || resolvedNav === 'tasks-all') && !canAnyOrderNav(user)) {
+      deny = true
+    }
+    if (resolvedNav === 'tasks-pending' && !canNavPending(user)) deny = true
+    if (resolvedNav === 'tasks-processing' && !canNavProcessing(user)) deny = true
+    if (resolvedNav === 'tasks-cut-head' && !canNavProcessing(user)) deny = true
+    if (resolvedNav === 'tasks-ready-outbound' && !canNavReadyOutbound(user)) deny = true
+    if (resolvedNav === 'tasks-done' && !canNavDone(user)) deny = true
+    if (deny) setActiveNav('home')
+  }, [sessionChecked, user, resolvedNav])
+
   if (!sessionChecked) {
     return (
       <div className="app app--centered">
@@ -84,6 +114,8 @@ export default function App() {
     'tasks-all',
     'tasks-pending',
     'tasks-processing',
+    'tasks-cut-head',
+    'tasks-split-merge-logs',
     'tasks-ready-outbound',
     'tasks-done',
   ])
@@ -94,19 +126,13 @@ export default function App() {
       'tasks-all': 'all',
       'tasks-pending': 'pending',
       'tasks-processing': 'processing',
+      'tasks-cut-head': 'cut_head',
+      'tasks-split-merge-logs': 'split_merge_logs',
       'tasks-ready-outbound': 'ready_outbound',
       'tasks-done': 'done',
     }
     return map[key] ?? 'all'
   }
-
-  const resolvedNav =
-    activeNav === 'orders'
-      ? 'tasks-all'
-      : user.role !== 'admin' && activeNav === 'accounts'
-        ? 'home'
-        : activeNav
-  const showAccounts = user.role === 'admin' && resolvedNav === 'accounts'
 
   function renderMain() {
     if (showAccounts) return <EmployeeAdmin />
@@ -116,6 +142,7 @@ export default function App() {
           tasksPreset={tasksPresetFromNav(resolvedNav)}
           onTasksMutated={refreshTaskNavCounts}
           taskNavCounts={taskNavCounts}
+          user={user}
         />
       )
     }

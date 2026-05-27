@@ -3,6 +3,7 @@ import './EmployeeAdmin.css'
 import './Pages.css'
 import { patchJson } from './api.js'
 import { authFetch, formatApiError } from './auth.js'
+import { PERM_OPTIONS } from './permissions.js'
 
 function fmtDateTime(iso) {
   if (!iso) return '—'
@@ -24,6 +25,15 @@ export default function EmployeeAdmin() {
   const [newPwd, setNewPwd] = useState('')
   const [pwdErr, setPwdErr] = useState(null)
   const [pwdLoading, setPwdLoading] = useState(false)
+
+  const [permTarget, setPermTarget] = useState(null)
+  const [permDraft, setPermDraft] = useState(() => new Set())
+  const [permErr, setPermErr] = useState(null)
+  const [permLoading, setPermLoading] = useState(false)
+
+  const [createPermSet, setCreatePermSet] = useState(
+    () => new Set(PERM_OPTIONS.map(([code]) => code)),
+  )
 
   const loadUsers = useCallback(() => {
     setListLoading(true)
@@ -50,6 +60,7 @@ export default function EmployeeAdmin() {
         username,
         password,
         display_name: displayName.trim() || null,
+        permission_codes: [...createPermSet],
       }
       const r = await authFetch('/api/users/employees', {
         method: 'POST',
@@ -63,6 +74,7 @@ export default function EmployeeAdmin() {
       setUsername('')
       setDisplayName('')
       setPassword('')
+      setCreatePermSet(new Set(PERM_OPTIONS.map(([c]) => c)))
       loadUsers()
     } catch (err) {
       setError(err instanceof Error ? err.message : '请求失败')
@@ -86,6 +98,42 @@ export default function EmployeeAdmin() {
     } finally {
       setPwdLoading(false)
     }
+  }
+
+  async function submitPerm(e) {
+    e.preventDefault()
+    if (!permTarget) return
+    setPermErr(null)
+    setPermLoading(true)
+    try {
+      await patchJson(`/api/users/${permTarget.id}/permissions`, {
+        permission_codes: [...permDraft],
+      })
+      setPermTarget(null)
+      loadUsers()
+    } catch (err) {
+      setPermErr(err instanceof Error ? err.message : '保存失败')
+    } finally {
+      setPermLoading(false)
+    }
+  }
+
+  function togglePermDraft(code) {
+    setPermDraft((prev) => {
+      const next = new Set(prev)
+      if (next.has(code)) next.delete(code)
+      else next.add(code)
+      return next
+    })
+  }
+
+  function toggleCreatePerm(code) {
+    setCreatePermSet((prev) => {
+      const next = new Set(prev)
+      if (next.has(code)) next.delete(code)
+      else next.add(code)
+      return next
+    })
   }
 
   return (
@@ -132,6 +180,19 @@ export default function EmployeeAdmin() {
             {loading ? '提交中…' : '添加用户'}
           </button>
         </div>
+        <div className="employee-form-row" style={{ marginTop: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <span style={{ width: '100%', fontSize: '0.9rem', color: '#555' }}>业务权限（新账号）</span>
+          {PERM_OPTIONS.map(([code, label]) => (
+            <label key={code} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+              <input
+                type="checkbox"
+                checked={createPermSet.has(code)}
+                onChange={() => toggleCreatePerm(code)}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
         {error ? <p className="employee-error">{error}</p> : null}
       </form>
       <div className="employee-list-wrap">
@@ -145,19 +206,20 @@ export default function EmployeeAdmin() {
                 <th>创建时间</th>
                 <th>最后一次登录时间</th>
                 <th>密码</th>
-                <th style={{ minWidth: '7rem' }}>操作</th>
+                <th>权限</th>
+                <th style={{ minWidth: '10rem' }}>操作</th>
               </tr>
             </thead>
             <tbody>
               {listLoading ? (
                 <tr>
-                  <td colSpan={6} className="muted">
+                  <td colSpan={7} className="muted">
                     加载中…
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="muted">
+                  <td colSpan={7} className="muted">
                     暂无用户
                   </td>
                 </tr>
@@ -169,19 +231,52 @@ export default function EmployeeAdmin() {
                     <td className="cell-nowrap">{fmtDateTime(u.created_at)}</td>
                     <td className="cell-nowrap">{fmtDateTime(u.last_login_at)}</td>
                     <td className="cell-mono">{u.password ?? '******'}</td>
+                    <td className="text-cell muted">
+                      {u.permission_codes == null
+                        ? '全部（未单独配置）'
+                        : !Array.isArray(u.permission_codes)
+                          ? '—'
+                          : u.permission_codes.length === 0
+                            ? '无业务权限'
+                            : u.permission_codes
+                                .map(
+                                  (c) => PERM_OPTIONS.find(([x]) => x === c)?.[1] ?? c,
+                                )
+                                .join('、')}
+                    </td>
                     <td>
                       {u.role === 'employee' ? (
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          onClick={() => {
-                            setPwdTarget(u)
-                            setNewPwd('')
-                            setPwdErr(null)
-                          }}
-                        >
-                          修改密码
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => {
+                              setPermTarget(u)
+                              const raw = u.permission_codes
+                              setPermDraft(
+                                new Set(
+                                  Array.isArray(raw)
+                                    ? raw
+                                    : PERM_OPTIONS.map(([c]) => c),
+                                ),
+                              )
+                              setPermErr(null)
+                            }}
+                          >
+                            权限
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => {
+                              setPwdTarget(u)
+                              setNewPwd('')
+                              setPwdErr(null)
+                            }}
+                          >
+                            改密码
+                          </button>
+                        </div>
                       ) : (
                         <span className="muted">—</span>
                       )}
@@ -228,6 +323,55 @@ export default function EmployeeAdmin() {
                   className="btn"
                   onClick={() => setPwdTarget(null)}
                   disabled={pwdLoading}
+                >
+                  取消
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {permTarget ? (
+        <div
+          className="modal-backdrop"
+          onClick={() => !permLoading && setPermTarget(null)}
+          role="presentation"
+        >
+          <div
+            className="modal-card wide"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+          >
+            <h3 style={{ marginTop: 0 }}>业务权限 · {permTarget.username}</h3>
+            <p className="muted" style={{ marginBottom: '1rem' }}>
+              未在数据库中单独配置过权限的帐号，仍视为拥有全部四项权限。保存后将以当前勾选为准；若全部不勾选并保存，该帐号将不能进行任何订单相关操作。
+            </p>
+            <form className="form-grid" onSubmit={submitPerm}>
+              {PERM_OPTIONS.map(([code, label]) => (
+                <label
+                  key={code}
+                  className="full"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={permDraft.has(code)}
+                    onChange={() => togglePermDraft(code)}
+                  />
+                  {label}
+                </label>
+              ))}
+              {permErr ? <p className="err full">{permErr}</p> : null}
+              <div className="form-actions full" style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="submit" className="btn btn-primary" disabled={permLoading}>
+                  {permLoading ? '保存中…' : '保存'}
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setPermTarget(null)}
+                  disabled={permLoading}
                 >
                   取消
                 </button>

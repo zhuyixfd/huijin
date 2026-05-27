@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 
 class EmployeeCreate(BaseModel):
@@ -9,6 +9,31 @@ class EmployeeCreate(BaseModel):
     username: str = Field(min_length=2, max_length=64)
     password: str = Field(min_length=6, max_length=128)
     display_name: str | None = Field(None, max_length=64)
+    permission_codes: list[str] | None = Field(
+        default=None,
+        description="业务权限码列表；不传或 null 表示与旧版一致（全部权限）",
+    )
+
+    @field_validator("permission_codes")
+    @classmethod
+    def validate_perm_codes(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        from app.permissions import ALL_PERMISSION_CODES
+
+        out = [str(x) for x in v if x in ALL_PERMISSION_CODES]
+        return out
+
+
+class EmployeePermissionsUpdate(BaseModel):
+    permission_codes: list[str] = Field(default_factory=list)
+
+    @field_validator("permission_codes")
+    @classmethod
+    def validate_perm_codes(cls, v: list[str]) -> list[str]:
+        from app.permissions import ALL_PERMISSION_CODES
+
+        return [str(x) for x in v if x in ALL_PERMISSION_CODES]
 
 
 class EmployeePasswordSet(BaseModel):
@@ -36,6 +61,7 @@ class UserOut(BaseModel):
     username: str
     display_name: str | None = None
     role: str
+    permission_codes: list[str] | None = None
     created_at: datetime | None = None
     last_login_at: datetime | None = None
 

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
+from app.permissions import PERMISSION_LABELS, has_permission
 from app.security import decode_token
 
 security = HTTPBearer(auto_error=False)
@@ -47,3 +48,18 @@ def require_admin(current: User = Depends(get_current_user)) -> User:
             detail="需要管理员权限",
         )
     return current
+
+
+def require_permission(code: str):
+    """依赖注入：要求当前用户具备指定业务权限（管理员始终通过）。"""
+
+    def _checker(current: User = Depends(get_current_user)) -> User:
+        if not has_permission(current, code):
+            label = PERMISSION_LABELS.get(code, code)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"无权限：{label}",
+            )
+        return current
+
+    return _checker

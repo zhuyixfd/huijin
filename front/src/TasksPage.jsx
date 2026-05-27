@@ -11,6 +11,8 @@ import {
 } from './todaySlotOrderStorage.js'
 import { openDeliverySlipPreview } from './deliverySheetPrint.js'
 import { openWorkshopProductionPreview } from './workshopSheetPrint.js'
+import { apiUrl } from './config.js'
+import { can, PERM } from './permissions.js'
 
 function todayDateISO() {
   const d = new Date()
@@ -34,7 +36,8 @@ const emptyItemForm = () => ({
   formed_size: '',
   forging_requirements: '',
   remark: '',
-  production_status: '未入库',
+  remark_images: [],
+  production_status: '在库中',
   return_date: '',
   incoming_date: todayDateISO(),
   cutting_time: todayDatetimeLocal(),
@@ -138,7 +141,11 @@ function normalizeItemPayload(form) {
     formed_size: form.formed_size || null,
     forging_requirements: form.forging_requirements || null,
     remark: form.remark || null,
-    production_status: form.production_status || '未入库',
+    remark_images:
+      Array.isArray(form.remark_images) && form.remark_images.length > 0
+        ? form.remark_images
+        : null,
+    production_status: form.production_status || '在库中',
     return_date: form.return_date || null,
     incoming_date: form.incoming_date || null,
     cutting_time: cutting,
@@ -161,7 +168,7 @@ function dtLocal(val) {
 }
 
 const GS = 'task-col-group-start'
-const COL_COUNT = 20
+const COL_COUNT = 21
 const PAGE_SIZE_OPTIONS = [20, 50, 100]
 
 function listPageTitle(preset) {
@@ -176,6 +183,10 @@ function listPageTitle(preset) {
       return '待出库'
     case 'done':
       return '已完成'
+    case 'cut_head':
+      return '切头'
+    case 'split_merge_logs':
+      return '拆分/合并日志'
     default:
       return '全部订单'
   }
@@ -192,13 +203,24 @@ function statusCategoryFromPreset(preset) {
       return 'ready_outbound'
     case 'done':
       return 'completed'
+    case 'cut_head':
+      return 'all'
+    case 'split_merge_logs':
+      return 'all'
     case 'all':
     default:
       return 'all'
   }
 }
 
-export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNavCounts }) {
+export default function TasksPage({
+  tasksPreset = 'all',
+  onTasksMutated,
+  taskNavCounts,
+  user = null,
+}) {
+  const isCutHead = tasksPreset === 'cut_head'
+  const isSplitMergeLogs = tasksPreset === 'split_merge_logs'
   const [customers, setCustomers] = useState([])
   const [statuses, setStatuses] = useState([])
 
@@ -226,9 +248,30 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
 
   const [workOrderModal, setWorkOrderModal] = useState(false)
   const [newWork, setNewWork] = useState(emptyWorkOrderForm)
+  const [newWorkRemarkFiles, setNewWorkRemarkFiles] = useState([])
+  const [newWorkRemarkPreviews, setNewWorkRemarkPreviews] = useState([])
+  const [newWorkRemarkPreviewOpen, setNewWorkRemarkPreviewOpen] = useState(null)
 
   const [itemModal, setItemModal] = useState(null)
   const [itemForm, setItemForm] = useState(emptyItemForm)
+
+  const [cutHeadModalOpen, setCutHeadModalOpen] = useState(false)
+  const [cutHeadPickQ, setCutHeadPickQ] = useState('')
+  const [cutHeadPickRows, setCutHeadPickRows] = useState([])
+  const [cutHeadPickLoading, setCutHeadPickLoading] = useState(false)
+  const [cutHeadPickId, setCutHeadPickId] = useState('')
+  const [cutHeadWeight, setCutHeadWeight] = useState('')
+  const [cutHeadRows, setCutHeadRows] = useState([])
+  const [cutHeadTotal, setCutHeadTotal] = useState(0)
+  const [cutHeadListLoading, setCutHeadListLoading] = useState(false)
+  const [splitMergeRows, setSplitMergeRows] = useState([])
+  const [splitMergeTotal, setSplitMergeTotal] = useState(0)
+  const [splitMergeLoading, setSplitMergeLoading] = useState(false)
+
+  const [splitModalOpen, setSplitModalOpen] = useState(false)
+  const [splitTargetId, setSplitTargetId] = useState('')
+  const [splitMoveIdx, setSplitMoveIdx] = useState(() => new Set())
+  const [splitSubmitting, setSplitSubmitting] = useState(false)
 
   const [selectedIds, setSelectedIds] = useState([])
   const [bulkSelectColumnVisible, setBulkSelectColumnVisible] = useState(false)
@@ -250,6 +293,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   const [slotOrderDraft, setSlotOrderDraft] = useState(() => Array(10).fill(''))
   /** 编辑排序：当前选中的排（0～9），点击件号填入该排 */
   const [slotOrderActiveSlot, setSlotOrderActiveSlot] = useState(0)
+  const [processingPieceLetter, setProcessingPieceLetter] = useState('')
   const headerSelectRef = useRef(null)
 
   const listStatusCategory = useMemo(
@@ -261,6 +305,42 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   useEffect(() => {
     queueMicrotask(() => setStatusFilter(''))
   }, [tasksPreset])
+
+  useEffect(() => {
+    let alive = true
+    const files = Array.isArray(newWorkRemarkFiles) ? newWorkRemarkFiles : []
+    if (files.length === 0) {
+      queueMicrotask(() => setNewWorkRemarkPreviews([]))
+      return () => {
+        alive = false
+      }
+    }
+    const readOne = (file) =>
+      new Promise((resolve) => {
+        const r = new FileReader()
+        r.onload = () => resolve(String(r.result || ''))
+        r.onerror = () => resolve('')
+        r.readAsDataURL(file)
+      })
+    ;(async () => {
+      const next = []
+      for (const f of files) {
+        const src = await readOne(f)
+        if (!src) continue
+        next.push({ src, name: f?.name ?? '' })
+      }
+      if (!alive) return
+      setNewWorkRemarkPreviews(next)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [newWorkRemarkFiles])
+
+  useEffect(() => {
+    if (workOrderModal) return
+    queueMicrotask(() => setNewWorkRemarkPreviewOpen(null))
+  }, [workOrderModal])
 
   function toggleTodayOrderCollapse(orderNo) {
     const key = String(orderNo ?? '')
@@ -288,6 +368,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       setBatchProductionExpanded(false)
       setCollapsedTodayOrderNos(new Set())
       setCollapsedRestOrderNos(new Set())
+      setProcessingPieceLetter('')
     })
   }, [tasksPreset])
 
@@ -317,9 +398,10 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   }, [bulkSelectColumnVisible])
 
   const showBulkCheckboxCol =
-    tasksPreset === 'processing' ||
-    tasksPreset === 'pending' ||
-    tasksPreset === 'ready_outbound'
+    (tasksPreset === 'processing' && can(user, PERM.ORDER_PROCESS)) ||
+    (tasksPreset === 'pending' && can(user, PERM.ORDER_PROCESS)) ||
+    (tasksPreset === 'ready_outbound' &&
+      (can(user, PERM.ORDER_OUTBOUND) || can(user, PERM.ORDER_CONFIRM_SHIP)))
 
   useEffect(() => {
     if (!showBulkCheckboxCol) {
@@ -334,6 +416,14 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     const nSel = onPage.filter((id) => selectedIds.includes(id)).length
     el.indeterminate = onPage.length > 0 && nSel > 0 && nSel < onPage.length
   }, [showBulkCheckboxCol, bulkSelectColumnVisible, rows, selectedIds])
+
+  async function uploadRemarkImagesForItem(itemId, fileList) {
+    if (!itemId || !fileList?.length) return []
+    const fd = new FormData()
+    for (const f of fileList) fd.append('files', f)
+    const urls = await postFormData(`/api/order-items/${itemId}/remark-images`, fd)
+    return Array.isArray(urls) ? urls : []
+  }
 
   const loadMeta = useCallback(() => {
     getJson('/api/meta/production-statuses').then((d) => setStatuses(d.statuses ?? []))
@@ -385,13 +475,91 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     onTasksMutated,
   ])
 
+  const loadCutHeadLogs = useCallback(() => {
+    setLoading(false)
+    setCutHeadListLoading(true)
+    const p = new URLSearchParams()
+    if (q.trim()) p.set('q', q.trim())
+    p.set('skip', String((page - 1) * pageSize))
+    p.set('limit', String(pageSize))
+    getJson(`/api/tasks/cut-head-logs?${p.toString()}`)
+      .then((d) => {
+        setErr(null)
+        setCutHeadRows(Array.isArray(d.items) ? d.items : [])
+        const tt = typeof d.total === 'number' ? d.total : 0
+        setCutHeadTotal(tt)
+        setListTotal(tt)
+      })
+      .catch((e) => setErr(e.message))
+      .finally(() => setCutHeadListLoading(false))
+  }, [q, page, pageSize])
+
+  const loadSplitMergeLogs = useCallback(() => {
+    setLoading(false)
+    setSplitMergeLoading(true)
+    const p = new URLSearchParams()
+    if (q.trim()) p.set('q', q.trim())
+    p.set('skip', String((page - 1) * pageSize))
+    p.set('limit', String(pageSize))
+    getJson(`/api/tasks/split-merge-logs?${p.toString()}`)
+      .then((d) => {
+        setErr(null)
+        setSplitMergeRows(Array.isArray(d.items) ? d.items : [])
+        const tt = typeof d.total === 'number' ? d.total : 0
+        setSplitMergeTotal(tt)
+        setListTotal(tt)
+      })
+      .catch((e) => setErr(e.message))
+      .finally(() => setSplitMergeLoading(false))
+  }, [q, page, pageSize])
+
   useEffect(() => {
     queueMicrotask(() => loadMeta())
   }, [loadMeta])
 
   useEffect(() => {
-    queueMicrotask(() => loadTasks())
-  }, [loadTasks])
+    if (isSplitMergeLogs) {
+      queueMicrotask(() => loadSplitMergeLogs())
+    } else if (isCutHead) {
+      queueMicrotask(() => loadCutHeadLogs())
+    } else {
+      queueMicrotask(() => loadTasks())
+    }
+  }, [isSplitMergeLogs, isCutHead, loadTasks, loadCutHeadLogs, loadSplitMergeLogs])
+
+  useEffect(() => {
+    if (!cutHeadModalOpen) return
+    let alive = true
+    const tid = window.setTimeout(() => {
+      setCutHeadPickLoading(true)
+      const p = new URLSearchParams()
+      p.set('status_category', 'in_progress')
+      p.set('skip', '0')
+      p.set('limit', '200')
+      if (cutHeadPickQ.trim()) p.set('q', cutHeadPickQ.trim())
+      getJson(`/api/tasks/items?${p.toString()}`)
+        .then((d) => {
+          if (!alive) return
+          const items = Array.isArray(d.items) ? d.items : []
+          setCutHeadPickRows(items)
+          if (!cutHeadPickId && items[0]?.id) {
+            setCutHeadPickId(String(items[0].id))
+          }
+        })
+        .catch(() => {
+          if (!alive) return
+          setCutHeadPickRows([])
+        })
+        .finally(() => {
+          if (!alive) return
+          setCutHeadPickLoading(false)
+        })
+    }, 200)
+    return () => {
+      alive = false
+      window.clearTimeout(tid)
+    }
+  }, [cutHeadModalOpen, cutHeadPickQ, cutHeadPickId])
 
   async function refreshDetail(orderId) {
     const [d, logs] = await Promise.all([
@@ -436,6 +604,31 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     }
   }
 
+  async function submitCutHead(e) {
+    e.preventDefault()
+    if (!cutHeadPickId) return
+    if (!String(cutHeadWeight ?? '').trim()) return
+    setErr(null)
+    try {
+      await postJson(`/api/tasks/cut-head-logs`, {
+        order_item_id: Number(cutHeadPickId),
+        weight: String(cutHeadWeight).trim(),
+      })
+      setCutHeadModalOpen(false)
+      setCutHeadPickQ('')
+      setCutHeadPickRows([])
+      setCutHeadPickId('')
+      setCutHeadWeight('')
+      if (isCutHead) loadCutHeadLogs()
+      else loadTasks()
+      if (detail && String(detail.id) === String(cutHeadPickId)) {
+        await refreshDetail(detail.id)
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '切头重量保存失败')
+    }
+  }
+
   function captureUndoSnapshot(ids) {
     const out = []
     for (const id of ids) {
@@ -445,6 +638,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
           id,
           production_status: r.production_status,
           in_today_queue: Boolean(r.in_today_queue),
+          in_tomorrow_queue: Boolean(r.in_tomorrow_queue),
         })
       }
     }
@@ -460,6 +654,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
         await patchJson(`/api/order-items/${u.id}`, {
           production_status: u.production_status,
           in_today_queue: u.in_today_queue,
+          in_tomorrow_queue: u.in_tomorrow_queue,
         })
       }
       setLastBatchUndo(null)
@@ -476,9 +671,10 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   }
 
   async function submitStartProcessingToday() {
-    const ids = selectedIds.filter(
-      (id) => rows.find((r) => r.id === id)?.production_status === '未入库',
-    )
+    const ids = selectedIds.filter((id) => {
+      const st = rows.find((r) => r.id === id)?.production_status
+      return st === '在库中'
+    })
     if (ids.length === 0) return
     setErr(null)
     setBatchSubmitting(true)
@@ -528,8 +724,17 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
         ...normalizeItemPayload(newWork),
       }
       const created = await postJson('/api/tasks/work-orders', payload)
+      let mergedImages = Array.isArray(newWork.remark_images) ? [...newWork.remark_images] : []
+      if (newWorkRemarkFiles.length > 0) {
+        const up = await uploadRemarkImagesForItem(created.id, newWorkRemarkFiles)
+        mergedImages = [...mergedImages, ...up]
+        if (mergedImages.length > 0) {
+          await patchJson(`/api/order-items/${created.id}`, { remark_images: mergedImages })
+        }
+      }
       setWorkOrderModal(false)
       setNewWork(emptyWorkOrderForm())
+      setNewWorkRemarkFiles([])
       loadTasks()
       await refreshDetail(created.id)
       setView('detail')
@@ -549,7 +754,8 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       formed_size: it.formed_size ?? '',
       forging_requirements: it.forging_requirements ?? '',
       remark: it.remark ?? '',
-      production_status: it.production_status ?? '未入库',
+      remark_images: Array.isArray(it.remark_images) ? [...it.remark_images] : [],
+      production_status: it.production_status ?? '在库中',
       return_date: it.return_date ? String(it.return_date).slice(0, 10) : '',
       incoming_date: it.incoming_date ? String(it.incoming_date).slice(0, 10) : todayDateISO(),
       cutting_time: it.cutting_time
@@ -574,25 +780,45 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     }
   }
 
-  const showProductionStatusFilter = true
-  const showNewWorkOrder = tasksPreset === 'all' || tasksPreset === 'pending'
+  async function onItemRemarkFilesSelected(e) {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (!files.length || !itemModal?.itemId) return
+    setErr(null)
+    try {
+      const urls = await uploadRemarkImagesForItem(itemModal.itemId, files)
+      setItemForm((f) => ({
+        ...f,
+        remark_images: [...(Array.isArray(f.remark_images) ? f.remark_images : []), ...urls],
+      }))
+    } catch (err) {
+      setErr(err instanceof Error ? err.message : '图片上传失败')
+    }
+  }
+
+  const showProductionStatusFilter = !isCutHead && !isSplitMergeLogs
+  const showNewWorkOrder =
+    (tasksPreset === 'all' || tasksPreset === 'pending') && can(user, PERM.ORDER_CREATE)
   const showBulkSelectCol = showBulkCheckboxCol && bulkSelectColumnVisible
   const showReadyOutboundActionsCol = tasksPreset === 'ready_outbound'
   const customerColLabel = tasksPreset === 'ready_outbound' ? '收货单位' : '客户'
+  const showCutHeadWeightColInList = tasksPreset === 'done' || isCutHead
   /** 列表 mega 表列显隐（进入详情改状态；部分预设去掉列减轻干扰） */
   const showTaskActionsCol = !(
     tasksPreset === 'all' ||
     tasksPreset === 'pending' ||
     tasksPreset === 'processing' ||
     tasksPreset === 'ready_outbound' ||
-    tasksPreset === 'done'
+    tasksPreset === 'done' ||
+    isCutHead
   )
-  const showCuttingReturnDateCols = tasksPreset !== 'pending'
+  const showCuttingReturnDateCols = tasksPreset !== 'pending' && !isCutHead
   const showProductionStatusCol =
-    tasksPreset !== 'ready_outbound' && tasksPreset !== 'done'
+    tasksPreset !== 'ready_outbound' && tasksPreset !== 'done' && !isCutHead
   const showProcessingUnitCol = tasksPreset === 'processing'
   const dataColCount =
     COL_COUNT -
+    (showCutHeadWeightColInList ? 0 : 1) -
     (showTaskActionsCol ? 0 : 1) -
     (showCuttingReturnDateCols ? 0 : 2) -
     (showProductionStatusCol ? 0 : 1) +
@@ -601,18 +827,30 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   const listColSpan = dataColCount + (showBulkSelectCol ? 1 : 0)
   const totalPages = Math.max(1, Math.ceil(listTotal / pageSize))
 
-  const { todayQueueRows, restProcessingRows } = useMemo(() => {
+  const { todayQueueRows, tomorrowQueueRows, restProcessingRows } = useMemo(() => {
     if (tasksPreset !== 'processing') {
-      return { todayQueueRows: [], restProcessingRows: [] }
+      return { todayQueueRows: [], tomorrowQueueRows: [], restProcessingRows: [] }
     }
     const t = []
+    const m = []
     const r = []
     for (const row of rows) {
       if (row.in_today_queue) t.push(row)
+      else if (row.in_tomorrow_queue) m.push(row)
       else r.push(row)
     }
-    return { todayQueueRows: t, restProcessingRows: r }
+    return { todayQueueRows: t, tomorrowQueueRows: m, restProcessingRows: r }
   }, [rows, tasksPreset])
+
+  const splitCandidates = useMemo(() => {
+    if (tasksPreset !== 'processing') return []
+    return todayQueueRows.filter((it) => {
+      if (Number(it.quantity ?? 1) <= 1) return false
+      const ono = String(it.order_no ?? '')
+      if (ono.endsWith('-1') || ono.endsWith('-2')) return false
+      return true
+    })
+  }, [tasksPreset, todayQueueRows])
 
   const { waitingOutboundRows, shippingOutboundRows } = useMemo(() => {
     if (tasksPreset !== 'ready_outbound') {
@@ -628,8 +866,8 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   }, [rows, tasksPreset])
 
   async function submitAddToTodayFromProcessing() {
-    const restIds = new Set(restProcessingRows.map((r) => r.id))
-    const ids = selectedIds.filter((id) => restIds.has(id))
+    const todayIds = new Set(todayQueueRows.map((r) => r.id))
+    const ids = selectedIds.filter((id) => !todayIds.has(id))
     if (ids.length === 0) return
     setErr(null)
     setBatchSubmitting(true)
@@ -638,7 +876,59 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       for (const id of ids) {
         await patchJson(`/api/order-items/${id}`, {
           in_today_queue: true,
+          in_tomorrow_queue: false,
           production_status: '锻造中',
+        })
+      }
+      setLastBatchUndo(snap)
+      setSelectedIds([])
+      loadTasks()
+    } catch (err) {
+      setErr(err instanceof Error ? err.message : '操作失败')
+    } finally {
+      setBatchSubmitting(false)
+    }
+  }
+
+  async function submitAddToTomorrowFromProcessing() {
+    const tomoIds = new Set(tomorrowQueueRows.map((r) => r.id))
+    const ids = selectedIds.filter((id) => !tomoIds.has(id))
+    if (ids.length === 0) return
+    setErr(null)
+    setBatchSubmitting(true)
+    const snap = captureUndoSnapshot(ids)
+    try {
+      for (const id of ids) {
+        await patchJson(`/api/order-items/${id}`, {
+          in_today_queue: false,
+          in_tomorrow_queue: true,
+        })
+      }
+      setLastBatchUndo(snap)
+      setSelectedIds([])
+      loadTasks()
+    } catch (err) {
+      setErr(err instanceof Error ? err.message : '操作失败')
+    } finally {
+      setBatchSubmitting(false)
+    }
+  }
+
+  async function submitRemoveFromQueues() {
+    const queued = new Set([
+      ...todayQueueRows.map((r) => r.id),
+      ...tomorrowQueueRows.map((r) => r.id),
+    ])
+    const ids = selectedIds.filter((id) => queued.has(id))
+    if (ids.length === 0) return
+    setErr(null)
+    setBatchSubmitting(true)
+    const snap = captureUndoSnapshot(ids)
+    try {
+      for (const id of ids) {
+        await patchJson(`/api/order-items/${id}`, {
+          in_today_queue: false,
+          in_tomorrow_queue: false,
         })
       }
       setLastBatchUndo(snap)
@@ -654,6 +944,11 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
   const todayQueueQtySum = useMemo(
     () => todayQueueRows.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
     [todayQueueRows],
+  )
+
+  const tomorrowQueueQtySum = useMemo(
+    () => tomorrowQueueRows.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
+    [tomorrowQueueRows],
   )
 
   const restQueueQtySum = useMemo(
@@ -700,6 +995,42 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     () => buildTodaySlotPiecePool(todayQueueExpandedBands),
     [todayQueueExpandedBands],
   )
+
+  const processingPieceLetterFilter =
+    tasksPreset === 'processing' ? String(processingPieceLetter ?? '').trim() : ''
+  const processingPieceLetterNorm = useMemo(() => {
+    const s = String(processingPieceLetterFilter ?? '').trim()
+    return s ? s[0].toUpperCase() : ''
+  }, [processingPieceLetterFilter])
+
+  const filteredTodayQueueExpandedBands = useMemo(() => {
+    if (!processingPieceLetterNorm) return todayQueueExpandedBands
+    return todayQueueExpandedBands.filter((row) =>
+      String(row.unitLabel ?? '')
+        .trim()
+        .toUpperCase()
+        .startsWith(processingPieceLetterNorm),
+    )
+  }, [todayQueueExpandedBands, processingPieceLetterNorm])
+
+  const filteredTodayQueueClusters = useMemo(() => {
+    const flat = filteredTodayQueueExpandedBands
+    const clusters = []
+    let cur = []
+    let curOno = null
+    for (const row of flat) {
+      const ono = String(row.it.order_no ?? '')
+      if (ono !== curOno) {
+        if (cur.length) clusters.push(cur)
+        cur = [row]
+        curOno = ono
+      } else {
+        cur.push(row)
+      }
+    }
+    if (cur.length) clusters.push(cur)
+    return clusters
+  }, [filteredTodayQueueExpandedBands])
 
   /** 今日处理：按订单编号分簇（同一订单号多件可聚合为一行展示） */
   const todayQueueClusters = useMemo(() => {
@@ -788,6 +1119,98 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     return clusters
   }, [restProcessingExpandedBands])
 
+  const filteredRestProcessingExpandedBands = useMemo(() => {
+    if (!processingPieceLetterNorm) return restProcessingExpandedBands
+    return restProcessingExpandedBands.filter((row) =>
+      String(row.unitLabel ?? '')
+        .trim()
+        .toUpperCase()
+        .startsWith(processingPieceLetterNorm),
+    )
+  }, [restProcessingExpandedBands, processingPieceLetterNorm])
+
+  const filteredRestProcessingClusters = useMemo(() => {
+    const flat = filteredRestProcessingExpandedBands
+    const clusters = []
+    let cur = []
+    let curOno = null
+    for (const row of flat) {
+      const ono = String(row.it.order_no ?? '')
+      if (ono !== curOno) {
+        if (cur.length) clusters.push(cur)
+        cur = [row]
+        curOno = ono
+      } else {
+        cur.push(row)
+      }
+    }
+    if (cur.length) clusters.push(cur)
+    return clusters
+  }, [filteredRestProcessingExpandedBands])
+
+  const tomorrowQueueExpandedBands = useMemo(() => {
+    if (tasksPreset !== 'processing') return []
+    const sorted = [...tomorrowQueueRows].sort((a, b) => {
+      const ao = String(a.order_no ?? '')
+      const bo = String(b.order_no ?? '')
+      const cmp = ao.localeCompare(bo, 'zh-CN')
+      if (cmp !== 0) return cmp
+      return a.id - b.id
+    })
+    const flat = []
+    for (const it of sorted) {
+      const rawQ = Number(it.quantity)
+      const units = Number.isFinite(rawQ) && rawQ >= 1 ? Math.floor(rawQ) : 1
+      for (let u = 0; u < units; u += 1) {
+        flat.push({ it, unitIndex: u, unitsTotal: units })
+      }
+    }
+    let g = 0
+    return flat.map((row, i) => {
+      const ono = String(row.it.order_no ?? '')
+      const prevOno = i > 0 ? String(flat[i - 1].it.order_no ?? '') : '\x00'
+      if (i > 0 && ono !== prevOno) g += 1
+      const codes = Array.isArray(row.it.processing_unit_codes)
+        ? row.it.processing_unit_codes
+        : []
+      const unitLabel = codes[row.unitIndex] ?? '—'
+      return {
+        ...row,
+        orderBand: g % 2 === 0 ? 'a' : 'b',
+        showOrderNo: i === 0 || ono !== prevOno,
+        unitLabel,
+      }
+    })
+  }, [tasksPreset, tomorrowQueueRows])
+
+  const filteredTomorrowQueueExpandedBands = useMemo(() => {
+    if (!processingPieceLetterNorm) return tomorrowQueueExpandedBands
+    return tomorrowQueueExpandedBands.filter((row) =>
+      String(row.unitLabel ?? '')
+        .trim()
+        .toUpperCase()
+        .startsWith(processingPieceLetterNorm),
+    )
+  }, [tomorrowQueueExpandedBands, processingPieceLetterNorm])
+
+  const showProcessingPieceFilter =
+    tasksPreset === 'processing' && Boolean(processingPieceLetterNorm)
+  const filteredTodayOrderCount = useMemo(() => {
+    const s = new Set()
+    for (const row of filteredTodayQueueExpandedBands) s.add(String(row.it.order_no ?? ''))
+    return s.size
+  }, [filteredTodayQueueExpandedBands])
+  const filteredTomorrowOrderCount = useMemo(() => {
+    const s = new Set()
+    for (const row of filteredTomorrowQueueExpandedBands) s.add(String(row.it.order_no ?? ''))
+    return s.size
+  }, [filteredTomorrowQueueExpandedBands])
+  const filteredRestOrderCount = useMemo(() => {
+    const s = new Set()
+    for (const row of filteredRestProcessingExpandedBands) s.add(String(row.it.order_no ?? ''))
+    return s.size
+  }, [filteredRestProcessingExpandedBands])
+
   const restMultiFoldStats = useMemo(() => {
     let multi = 0
     let aggregated = 0
@@ -816,7 +1239,53 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
     setCollapsedRestOrderNos(allAgg ? new Set() : new Set(onos))
   }
 
-  const showCaseStudyUi = tasksPreset === 'processing'
+  const showCaseStudyUi = tasksPreset === 'processing' && can(user, PERM.ORDER_PROCESS)
+
+  const splitTarget = useMemo(() => {
+    if (!splitTargetId) return null
+    const idNum = Number(splitTargetId)
+    if (!Number.isFinite(idNum)) return null
+    return splitCandidates.find((x) => x.id === idNum) ?? null
+  }, [splitTargetId, splitCandidates])
+
+  const splitUnits = useMemo(() => {
+    if (!splitTarget) return []
+    const rawQ = Number(splitTarget.quantity)
+    const n = Number.isFinite(rawQ) && rawQ >= 1 ? Math.floor(rawQ) : 1
+    const codes = Array.isArray(splitTarget.processing_unit_codes)
+      ? splitTarget.processing_unit_codes
+      : []
+    const out = []
+    for (let i = 0; i < n; i += 1) {
+      out.push({ idx: i, label: codes[i] ?? `第${i + 1}件` })
+    }
+    return out
+  }, [splitTarget])
+
+  async function submitSplit(e) {
+    e.preventDefault()
+    if (!splitTarget) return
+    const idxs = [...splitMoveIdx].map((x) => Number(x)).filter((x) => Number.isFinite(x))
+    if (idxs.length === 0) return
+    if (idxs.length >= splitUnits.length) return
+    setErr(null)
+    setSplitSubmitting(true)
+    try {
+      await postJson('/api/tasks/split-order', {
+        order_item_id: splitTarget.id,
+        move_unit_indexes: idxs,
+      })
+      setSplitModalOpen(false)
+      setSplitTargetId('')
+      setSplitMoveIdx(new Set())
+      loadTasks()
+      onTasksMutated?.()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '拆分失败')
+    } finally {
+      setSplitSubmitting(false)
+    }
+  }
 
   function openCaseStudy(it, unitIndex, unitLabel) {
     setCaseModal({ it, unitIndex, unitLabel })
@@ -909,6 +1378,11 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
           ? 'task-order-group-b'
           : ''
     const showChrome = groupSummary || !todayExpand || todayExpand.unitIndex === 0
+    const canMutateStatus =
+      can(user, PERM.ORDER_PROCESS) ||
+      can(user, PERM.ORDER_OUTBOUND) ||
+      can(user, PERM.ORDER_CONFIRM_SHIP)
+    const showStatusSelect = showChrome && canMutateStatus
     const showOrderNoCell =
       groupSummary || !todayExpand || todayExpand.showOrderNo
     const rowKey = groupSummary
@@ -1029,6 +1503,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       <td className="text-cell">{fmtNum(it.order_remark)}</td>
       <td className={GS}>{fmtNum(it.incoming_no)}</td>
       <td className={GS}>{fmtNum(it.weight_return)}</td>
+      {showCutHeadWeightColInList ? <td className={GS}>{fmtNum(it.cut_head_weight)}</td> : null}
       <td className="text-cell">{fmtNum(it.formed_size)}</td>
       <td className={`text-cell ${GS}`}>{fmtNum(it.forging_requirements)}</td>
       <td className="text-cell">{fmtNum(it.remark)}</td>
@@ -1038,7 +1513,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       {showCuttingReturnDateCols ? <td>{fmtDate(it.return_date)}</td> : null}
       {showProductionStatusCol ? (
         <td className={GS} onClick={(e) => e.stopPropagation()}>
-          {showChrome ? (
+          {showStatusSelect ? (
             <select
               value={it.production_status}
               onChange={(e) => patchStatus(it, e.target.value)}
@@ -1055,11 +1530,21 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       {showReadyOutboundActionsCol ? (
         <td className={`row-actions cell-actions ${GS}`} onClick={(e) => e.stopPropagation()}>
           {it.production_status === '待发回' ? (
-            <button type="button" className="btn btn-primary" onClick={() => patchStatus(it, '出库中')}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!can(user, PERM.ORDER_OUTBOUND)}
+              onClick={() => patchStatus(it, '出库中')}
+            >
               →出库中
             </button>
           ) : it.production_status === '出库中' ? (
-            <button type="button" className="btn btn-ghost" onClick={() => patchStatus(it, '待发回')}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={!can(user, PERM.ORDER_OUTBOUND)}
+              onClick={() => patchStatus(it, '待发回')}
+            >
               ←等待出库
             </button>
           ) : null}
@@ -1067,7 +1552,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       ) : null}
       {showTaskActionsCol ? (
         <td className={`row-actions cell-actions ${GS}`} onClick={(e) => e.stopPropagation()}>
-          {showChrome ? (
+          {showChrome && can(user, PERM.ORDER_PROCESS) ? (
             <>
               <button type="button" className="btn btn-ghost" onClick={() => patchStatus(it, '锻造中')}>
                 →锻造
@@ -1143,6 +1628,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
         <th>订单备注</th>
         <th className={GS}>来料编号</th>
         <th className={GS}>发回重量</th>
+        {showCutHeadWeightColInList ? <th className={GS}>切头重量</th> : null}
         <th>成型尺寸</th>
         <th className={GS}>锻造要求</th>
         <th>备注</th>
@@ -1204,33 +1690,41 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       {view === 'list' ? (
         <>
           <div className="toolbar orders-toolbar">
-            <select value={cid} onChange={(e) => setCid(e.target.value)}>
-              <option value="">全部客户</option>
-              {customers.map((c) => (
-                <option key={c.id} value={String(c.id)}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <input
-              type="search"
-              placeholder="客户名称（模糊）"
-              value={customerNameQ}
-              onChange={(e) => setCustomerNameQ(e.target.value)}
-            />
-            <input
-              type="date"
-              aria-label="下单时间起"
-              value={createdFrom}
-              onChange={(e) => setCreatedFrom(e.target.value)}
-            />
-            <input
-              type="date"
-              aria-label="下单时间止"
-              value={createdTo}
-              onChange={(e) => setCreatedTo(e.target.value)}
-            />
-            {showProductionStatusFilter ? (
+            {!isCutHead && !isSplitMergeLogs ? (
+              <select value={cid} onChange={(e) => setCid(e.target.value)}>
+                <option value="">全部客户</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            {!isCutHead && !isSplitMergeLogs ? (
+              <input
+                type="search"
+                placeholder="客户名称（模糊）"
+                value={customerNameQ}
+                onChange={(e) => setCustomerNameQ(e.target.value)}
+              />
+            ) : null}
+            {!isCutHead && !isSplitMergeLogs ? (
+              <input
+                type="date"
+                aria-label="下单时间起"
+                value={createdFrom}
+                onChange={(e) => setCreatedFrom(e.target.value)}
+              />
+            ) : null}
+            {!isCutHead && !isSplitMergeLogs ? (
+              <input
+                type="date"
+                aria-label="下单时间止"
+                value={createdTo}
+                onChange={(e) => setCreatedTo(e.target.value)}
+              />
+            ) : null}
+            {!isCutHead && showProductionStatusFilter ? (
               <select
                 className="select-production-status"
                 aria-label="按生产状态筛选"
@@ -1247,16 +1741,43 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
             ) : null}
             <input
               type="search"
-              placeholder="订单号 / 来料编号"
+              placeholder={
+                isCutHead
+                  ? '订单号 / 来料编号 / 客户'
+                  : isSplitMergeLogs
+                    ? '订单号'
+                    : '订单号 / 来料编号'
+              }
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
+            {isCutHead && can(user, PERM.ORDER_PROCESS) ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  setCutHeadModalOpen(true)
+                  setCutHeadPickQ('')
+                  setCutHeadPickRows([])
+                  setCutHeadPickId('')
+                  setCutHeadWeight('')
+                }}
+              >
+                新建切头
+              </button>
+            ) : null}
+            {isSplitMergeLogs ? (
+              <button type="button" className="btn" onClick={() => loadSplitMergeLogs()}>
+                刷新
+              </button>
+            ) : null}
             {showNewWorkOrder ? (
               <button
                 type="button"
                 className="btn btn-primary"
                 onClick={() => {
                   setNewWork(emptyWorkOrderForm())
+                  setNewWorkRemarkFiles([])
                   setWorkOrderModal(true)
                 }}
               >
@@ -1298,9 +1819,10 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                     className="btn btn-primary"
                     disabled={
                       batchSubmitting ||
-                      selectedIds.filter(
-                        (id) => rows.find((r) => r.id === id)?.production_status === '未入库',
-                      ).length === 0
+                      selectedIds.filter((id) => {
+                        const st = rows.find((r) => r.id === id)?.production_status
+                        return st === '在库中'
+                      }).length === 0
                     }
                     onClick={() => {
                       setErr(null)
@@ -1312,23 +1834,61 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   </button>
                 ) : null}
                 {tasksPreset === 'processing' ? (
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={
-                      batchSubmitting ||
-                      selectedIds.filter((id) =>
-                        restProcessingRows.some((r) => r.id === id),
-                      ).length === 0
-                    }
-                    onClick={() => {
-                      setErr(null)
-                      setBulkSelectColumnVisible(true)
-                      void submitAddToTodayFromProcessing()
-                    }}
-                  >
-                    开始处理（今日）
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={
+                        batchSubmitting ||
+                        selectedIds.filter(
+                          (id) => !todayQueueRows.some((r) => r.id === id),
+                        ).length === 0
+                      }
+                      onClick={() => {
+                        setErr(null)
+                        setBulkSelectColumnVisible(true)
+                        void submitAddToTodayFromProcessing()
+                      }}
+                    >
+                      开始处理（今日）
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={
+                        batchSubmitting ||
+                        selectedIds.filter(
+                          (id) => !tomorrowQueueRows.some((r) => r.id === id),
+                        ).length === 0
+                      }
+                      onClick={() => {
+                        setErr(null)
+                        setBulkSelectColumnVisible(true)
+                        void submitAddToTomorrowFromProcessing()
+                      }}
+                    >
+                      安排明日处理
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={
+                        batchSubmitting ||
+                        selectedIds.filter(
+                          (id) =>
+                            todayQueueRows.some((r) => r.id === id) ||
+                            tomorrowQueueRows.some((r) => r.id === id),
+                        ).length === 0
+                      }
+                      onClick={() => {
+                        setErr(null)
+                        setBulkSelectColumnVisible(true)
+                        void submitRemoveFromQueues()
+                      }}
+                    >
+                      移回待完成
+                    </button>
+                  </>
                 ) : null}
                 {lastBatchUndo?.length ? (
                   <button
@@ -1428,7 +1988,13 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
           <button
             type="button"
             className="btn"
-            disabled={loading || page <= 1}
+            disabled={
+              (isSplitMergeLogs
+                ? splitMergeLoading
+                : isCutHead
+                  ? cutHeadListLoading
+                  : loading) || page <= 1
+            }
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
             上一页
@@ -1436,7 +2002,13 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
           <button
             type="button"
             className="btn"
-            disabled={loading || page >= totalPages}
+            disabled={
+              (isSplitMergeLogs
+                ? splitMergeLoading
+                : isCutHead
+                  ? cutHeadListLoading
+                  : loading) || page >= totalPages
+            }
             onClick={() => setPage((p) => p + 1)}
           >
             下一页
@@ -1445,7 +2017,93 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
       ) : null}
 
       {view === 'list' ? (
-        loading ? (
+        isSplitMergeLogs ? (
+          <div className="data-table-wrap task-table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th className="cell-nowrap">记录ID</th>
+                  <th className="cell-nowrap">时间</th>
+                  <th className="cell-nowrap">动作</th>
+                  <th className="cell-nowrap">阶段</th>
+                  <th className="cell-nowrap">订单</th>
+                  <th className="cell-nowrap">关联订单</th>
+                  <th className="cell-nowrap">操作人</th>
+                </tr>
+              </thead>
+              <tbody>
+                {splitMergeLoading ? (
+                  <tr>
+                    <td colSpan={7} className="muted">
+                      加载中…
+                    </td>
+                  </tr>
+                ) : splitMergeRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="muted">
+                      暂无日志
+                    </td>
+                  </tr>
+                ) : (
+                  splitMergeRows.map((r) => (
+                    <tr key={r.id}>
+                      <td className="cell-nowrap">{r.id}</td>
+                      <td className="cell-nowrap">{fmtDateTime(r.created_at)}</td>
+                      <td className="cell-nowrap">{r.action === 'merge' ? '合并' : '拆分'}</td>
+                      <td className="cell-nowrap">{fmtNum(r.production_status)}</td>
+                      <td className="cell-nowrap">{fmtNum(r.order_no_a)}</td>
+                      <td className="cell-nowrap">{fmtNum(r.order_no_b ?? '—')}</td>
+                      <td className="cell-nowrap">{fmtNum(r.operator_username ?? '—')}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : isCutHead ? (
+          <div className="data-table-wrap task-table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th className="cell-nowrap">记录ID</th>
+                  <th className="cell-nowrap">创建时间</th>
+                  <th className="cell-nowrap">订单编号</th>
+                  <th>客户</th>
+                  <th>来料编号</th>
+                  <th>材质</th>
+                  <th className="cell-nowrap">切头重量</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cutHeadListLoading ? (
+                  <tr>
+                    <td colSpan={7} className="muted">
+                      加载中…
+                    </td>
+                  </tr>
+                ) : cutHeadRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="muted">
+                      暂无切头记录
+                    </td>
+                  </tr>
+                ) : (
+                  cutHeadRows.map((r) => (
+                    <tr key={r.id}>
+                      <td className="cell-nowrap">{r.id}</td>
+                      <td className="cell-nowrap">{fmtDateTime(r.created_at)}</td>
+                      <td className="cell-nowrap">{fmtNum(r.order_no)}</td>
+                      <td>{fmtNum(r.customer_name)}</td>
+                      <td>{fmtNum(r.incoming_no)}</td>
+                      <td>{fmtNum(r.material_grade)}</td>
+                      <td className="cell-nowrap">{fmtNum(r.weight)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : loading ? (
           <div className="data-table-wrap task-table-wrap">
             <table className="data-table task-mega-table">
               {renderMegaThead(true)}
@@ -1486,7 +2144,48 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   {taskNavCounts.processing_piece_strip.map(({ letter, count }) => (
                     <span
                       key={letter}
-                      className={`tasks-processing-piece-cell ${count === 0 ? 'is-muted' : ''}`}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={
+                        showProcessingPieceFilter &&
+                        String(letter ?? '')
+                          .trim()
+                          .toUpperCase()
+                          .startsWith(processingPieceLetterNorm)
+                      }
+                      onClick={() => {
+                        const next = String(letter ?? '').trim()
+                        setProcessingPieceLetter((prev) => {
+                          const cur = String(prev ?? '').trim()
+                          if (!next) return ''
+                          if (cur && cur[0]?.toUpperCase() === next[0]?.toUpperCase()) return ''
+                          return next
+                        })
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter' && e.key !== ' ') return
+                        e.preventDefault()
+                        const next = String(letter ?? '').trim()
+                        setProcessingPieceLetter((prev) => {
+                          const cur = String(prev ?? '').trim()
+                          if (!next) return ''
+                          if (cur && cur[0]?.toUpperCase() === next[0]?.toUpperCase()) return ''
+                          return next
+                        })
+                      }}
+                      className={[
+                        'tasks-processing-piece-cell',
+                        count === 0 ? 'is-muted' : '',
+                        showProcessingPieceFilter &&
+                        String(letter ?? '')
+                          .trim()
+                          .toUpperCase()
+                          .startsWith(processingPieceLetterNorm)
+                          ? 'is-active'
+                          : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
                       title={`${letter}：${count}件`}
                     >
                       <span className="tasks-processing-piece-letter">{letter}</span>
@@ -1507,7 +2206,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                     <button
                       type="button"
                       className="btn btn-ghost"
-                      disabled={todayQueueRows.length === 0}
+                      disabled={todayQueueRows.length === 0 || !can(user, PERM.ORDER_PROCESS)}
                       onClick={() =>
                         openWorkshopProductionPreview(todayQueueRows, {
                           slotLabels: todaySlotOrder,
@@ -1573,7 +2272,10 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
             >
               <div className="task-queue-panel-head">
                 <h3 id="task-queue-today-heading" className="task-queue-panel-title">
-                  今日处理 · {todayQueueRows.length}个订单，{todayQueueQtySum}件
+                  今日处理 ·{' '}
+                  {showProcessingPieceFilter
+                    ? `${processingPieceLetterNorm} · ${filteredTodayOrderCount}个订单，${filteredTodayQueueExpandedBands.length}件`
+                    : `${todayQueueRows.length}个订单，${todayQueueQtySum}件`}
                 </h3>
                 <div className="task-queue-panel-actions">
                   {todayMultiFoldStats.multi > 0 ? (
@@ -1593,10 +2295,23 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    disabled={todayQueueRows.length === 0}
+                    disabled={todayQueueRows.length === 0 || !can(user, PERM.ORDER_PROCESS)}
                     onClick={() => openWorkshopProductionPreview(todayQueueRows)}
                   >
                     加工生产单预览
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={splitCandidates.length === 0 || !can(user, PERM.ORDER_PROCESS)}
+                    onClick={() => {
+                      setSplitModalOpen(true)
+                      const first = splitCandidates[0]?.id
+                      setSplitTargetId(first ? String(first) : '')
+                      setSplitMoveIdx(new Set())
+                    }}
+                  >
+                    拆分订单
                   </button>
                 </div>
               </div>
@@ -1604,14 +2319,21 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 <table className="data-table task-mega-table">
                   {renderMegaThead(true)}
                   <tbody>
-                    {todayQueueRows.length === 0 ? (
+                    {(showProcessingPieceFilter
+                      ? filteredTodayQueueExpandedBands.length === 0
+                      : todayQueueRows.length === 0) ? (
                       <tr>
                         <td colSpan={listColSpan} className="muted task-queue-empty-hint">
-                          暂无；勾选「今日」列可将订单移入本节
+                          {showProcessingPieceFilter
+                            ? '暂无符合筛选的件号'
+                            : '暂无；使用「开始处理（今日）」将订单移入本节'}
                         </td>
                       </tr>
                     ) : (
-                      todayQueueClusters.flatMap((cluster) => {
+                      (showProcessingPieceFilter
+                        ? filteredTodayQueueClusters
+                        : todayQueueClusters
+                      ).flatMap((cluster) => {
                         const it0 = cluster[0].it
                         const ono = String(it0.order_no ?? '')
                         const multi = cluster.length > 1
@@ -1654,13 +2376,68 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
             </div>
             <div
               role="region"
+              aria-labelledby="task-queue-tomorrow-heading"
+              className="task-queue-panel card"
+              style={{ width: '100%', minWidth: 0, flexShrink: 0 }}
+            >
+              <div className="task-queue-panel-head">
+                <h3 id="task-queue-tomorrow-heading" className="task-queue-panel-title">
+                  明日处理 ·{' '}
+                  {showProcessingPieceFilter
+                    ? `${processingPieceLetterNorm} · ${filteredTomorrowOrderCount}个订单，${filteredTomorrowQueueExpandedBands.length}件`
+                    : `${tomorrowQueueRows.length}个订单，${tomorrowQueueQtySum}件`}
+                </h3>
+              </div>
+              <div className="data-table-wrap task-queue-panel-inner">
+                <table className="data-table task-mega-table">
+                  {renderMegaThead(false)}
+                  <tbody>
+                    {showProcessingPieceFilter ? (
+                      filteredTomorrowQueueExpandedBands.length === 0 ? (
+                        <tr>
+                          <td colSpan={listColSpan} className="muted">
+                            暂无符合筛选的件号
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredTomorrowQueueExpandedBands.map((row) =>
+                          renderTaskRow(row.it, {
+                            orderBand: row.orderBand,
+                            queueExpandMode: 'today',
+                            todayExpand: {
+                              unitIndex: row.unitIndex,
+                              unitsTotal: row.unitsTotal,
+                              showOrderNo: row.showOrderNo,
+                              unitLabel: row.unitLabel,
+                            },
+                          }),
+                        )
+                      )
+                    ) : tomorrowQueueRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={listColSpan} className="muted">
+                          暂无；使用「安排明日处理」将订单移入本节
+                        </td>
+                      </tr>
+                    ) : (
+                      tomorrowQueueRows.map((it) => renderTaskRow(it))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div
+              role="region"
               aria-labelledby="task-queue-rest-heading"
               className="task-queue-panel card"
               style={{ width: '100%', minWidth: 0, flexShrink: 0 }}
             >
               <div className="task-queue-panel-head">
                 <h3 id="task-queue-rest-heading" className="task-queue-panel-title">
-                  待完成 · {restProcessingRows.length}个订单，{restQueueQtySum}件
+                  待完成 ·{' '}
+                  {showProcessingPieceFilter
+                    ? `${processingPieceLetterNorm} · ${filteredRestOrderCount}个订单，${filteredRestProcessingExpandedBands.length}件`
+                    : `${restProcessingRows.length}个订单，${restQueueQtySum}件`}
                 </h3>
                 <div className="task-queue-panel-actions">
                   {restMultiFoldStats.multi > 0 ? (
@@ -1683,14 +2460,21 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 <table className="data-table task-mega-table">
                   {renderMegaThead(false)}
                   <tbody>
-                    {restProcessingRows.length === 0 ? (
+                    {(showProcessingPieceFilter
+                      ? filteredRestProcessingExpandedBands.length === 0
+                      : restProcessingRows.length === 0) ? (
                       <tr>
                         <td colSpan={listColSpan} className="muted">
-                          暂无待完成明细
+                          {showProcessingPieceFilter
+                            ? '暂无符合筛选的件号'
+                            : '暂无待完成明细'}
                         </td>
                       </tr>
                     ) : (
-                      restProcessingClusters.flatMap((cluster) => {
+                      (showProcessingPieceFilter
+                        ? filteredRestProcessingClusters
+                        : restProcessingClusters
+                      ).flatMap((cluster) => {
                         const it0 = cluster[0].it
                         const ono = String(it0.order_no ?? '')
                         const multi = cluster.length > 1
@@ -1758,7 +2542,9 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    disabled={shippingOutboundRows.length === 0}
+                    disabled={
+                      shippingOutboundRows.length === 0 || !can(user, PERM.ORDER_OUTBOUND)
+                    }
                     onClick={() => openDeliverySlipPreview(shippingOutboundRows)}
                   >
                     打印送货单（按收货单位分页）
@@ -1834,14 +2620,43 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                     </p>
                   </div>
                   <div className="row-actions">
-                    <button type="button" className="btn btn-danger" onClick={deleteWorkOrder}>
-                      删除订单
-                    </button>
+                    {can(user, PERM.ORDER_PROCESS) ? (
+                      <button type="button" className="btn btn-danger" onClick={deleteWorkOrder}>
+                        删除订单
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </section>
 
-              {detail.items?.[0]?.in_today_queue ? (
+              {detail.items?.[0] &&
+              (detail.items[0].remark ||
+                (Array.isArray(detail.items[0].remark_images) &&
+                  detail.items[0].remark_images.length > 0)) ? (
+                <section className="card order-section">
+                  <h2 className="order-section-title">来料备注</h2>
+                  <p className="text-cell">{detail.items[0].remark || '—'}</p>
+                  {Array.isArray(detail.items[0].remark_images) &&
+                  detail.items[0].remark_images.length > 0 ? (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '0.5rem',
+                        marginTop: '0.5rem',
+                      }}
+                    >
+                      {detail.items[0].remark_images.map((src) => (
+                        <a key={src} href={apiUrl(src)} target="_blank" rel="noreferrer">
+                          <img src={apiUrl(src)} alt="" style={{ maxHeight: 120, display: 'block' }} />
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
+
+              {detail.items?.[0]?.in_today_queue || detail.items?.[0]?.in_tomorrow_queue ? (
                 <>
                   <section className="card order-section">
                     <h2 className="order-section-title">来料信息</h2>
@@ -1949,7 +2764,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                       const it = detail.items[0]
                       const codes = it.processing_unit_codes
                       const isProc =
-                        it.production_status !== '未入库' && it.production_status !== '已发回'
+                        it.production_status !== '在库中' && it.production_status !== '已发回'
                       const pieceLabel =
                         isProc && Array.isArray(codes) && codes[u]
                           ? codes[u]
@@ -2039,9 +2854,193 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
         </>
       )}
 
+      {splitModalOpen ? (
+        <div className="modal-backdrop" onClick={() => setSplitModalOpen(false)} role="presentation">
+          <div className="modal-card wide" onClick={(e) => e.stopPropagation()} role="dialog">
+            <h2>拆分订单（今日不处理）</h2>
+            <form className="form-grid" onSubmit={submitSplit}>
+              <label className="full">
+                选择今日处理订单 *
+                <select
+                  value={splitTargetId}
+                  onChange={(e) => {
+                    setSplitTargetId(e.target.value)
+                    setSplitMoveIdx(new Set())
+                  }}
+                  required
+                >
+                  {splitCandidates.length === 0 ? (
+                    <option value="">暂无可拆分订单</option>
+                  ) : (
+                    splitCandidates.map((it) => (
+                      <option key={it.id} value={String(it.id)}>
+                        {it.order_no} · {it.customer_name} · 件数 {it.quantity}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+              <fieldset className="full" style={{ border: '1px solid #ddd', borderRadius: 10 }}>
+                <legend className="muted" style={{ padding: '0 0.5rem' }}>
+                  选择今日不处理的件（至少 1 件，且不能全选）
+                </legend>
+                {splitUnits.length === 0 ? (
+                  <p className="muted" style={{ padding: '0 0.75rem' }}>
+                    请选择订单
+                  </p>
+                ) : (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                      gap: '0.5rem',
+                      padding: '0.5rem 0.75rem 0.75rem',
+                    }}
+                  >
+                    {splitUnits.map((u) => {
+                      const checked = splitMoveIdx.has(u.idx)
+                      return (
+                        <label
+                          key={u.idx}
+                          style={{
+                            display: 'flex',
+                            gap: '0.5rem',
+                            alignItems: 'center',
+                            padding: '0.35rem 0.5rem',
+                            borderRadius: 8,
+                            border: '1px solid #e5e7eb',
+                            background: checked ? '#eef2ff' : '#fff',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              setSplitMoveIdx((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(u.idx)) next.delete(u.idx)
+                                else next.add(u.idx)
+                                return next
+                              })
+                            }}
+                          />
+                          <span>{u.label}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+              </fieldset>
+              <div className="row-actions full" style={{ justifyContent: 'flex-end' }}>
+                <button type="button" className="btn" onClick={() => setSplitModalOpen(false)}>
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={
+                    splitSubmitting ||
+                    !splitTargetId ||
+                    splitUnits.length <= 1 ||
+                    splitMoveIdx.size === 0 ||
+                    splitMoveIdx.size >= splitUnits.length
+                  }
+                >
+                  {splitSubmitting ? '拆分中…' : '确认拆分'}
+                </button>
+              </div>
+              <p className="muted full" style={{ marginTop: '-0.25rem' }}>
+                拆分后订单号将变为「原订单号-1」与「原订单号-2」，切头重量会按件数比例分摊；当两单再次处于同一阶段（不晚于等待出库）会自动合并。
+              </p>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {cutHeadModalOpen ? (
+        <div
+          className="modal-backdrop"
+          onClick={() => setCutHeadModalOpen(false)}
+          role="presentation"
+        >
+          <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog">
+            <h2>新建切头</h2>
+            <form className="form-grid" onSubmit={submitCutHead}>
+              <label className="full">
+                搜索（订单号/来料编号）
+                <input
+                  value={cutHeadPickQ}
+                  onChange={(e) => setCutHeadPickQ(e.target.value)}
+                  placeholder="输入关键字"
+                />
+              </label>
+              <label className="full">
+                选择处理中订单 *
+                <select
+                  value={cutHeadPickId}
+                  onChange={(e) => setCutHeadPickId(e.target.value)}
+                  required
+                >
+                  {cutHeadPickLoading ? (
+                    <option value="">加载中…</option>
+                  ) : cutHeadPickRows.length === 0 ? (
+                    <option value="">暂无数据</option>
+                  ) : (
+                    cutHeadPickRows.map((r) => (
+                      <option key={r.id} value={String(r.id)}>
+                        {r.order_no} · {r.customer_name} · {r.incoming_no ?? '—'} ·{' '}
+                        {r.material_grade ?? '—'}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+              <label>
+                切头重量
+                <input
+                  type="number"
+                  step="0.001"
+                  value={cutHeadWeight}
+                  onChange={(e) => setCutHeadWeight(e.target.value)}
+                  placeholder="kg"
+                  required
+                />
+              </label>
+              <div className="row-actions full" style={{ justifyContent: 'flex-end' }}>
+                <button type="button" className="btn" onClick={() => setCutHeadModalOpen(false)}>
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={!cutHeadPickId || !String(cutHeadWeight ?? '').trim()}
+                >
+                  保存
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
       {workOrderModal ? (
         <div className="modal-backdrop" onClick={() => setWorkOrderModal(false)} role="presentation">
-          <div className="modal-card wide" onClick={(e) => e.stopPropagation()} role="dialog">
+          <div
+            className="modal-card wide"
+            onMouseDownCapture={(e) => {
+              if (e.button !== 0) return
+              const t = e.target
+              if (!(t instanceof HTMLElement)) return
+              if (t.closest('input,textarea,select')) return
+              if (t.closest('button,a')) {
+                e.preventDefault()
+                return
+              }
+              e.preventDefault()
+            }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+          >
             <h2>新建来料订单</h2>
             <p className="muted" style={{ marginTop: '-0.5rem', marginBottom: '0.5rem' }}>
               一单一条来料；订单号由服务端按 hj + 该客户的「客户缩写」+ 日期 + 流水 自动生成。
@@ -2070,7 +3069,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 />
               </label>
               <label>
-                来料编号
+                来料炉号
                 <input
                   value={newWork.incoming_no}
                   onChange={(e) => setNewWork((o) => ({ ...o, incoming_no: e.target.value }))}
@@ -2136,6 +3135,61 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   onChange={(e) => setNewWork((o) => ({ ...o, remark: e.target.value }))}
                 />
               </label>
+              <label className="full">
+                备注配图（保存订单后上传）
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  onChange={(e) => {
+                    setNewWorkRemarkFiles((prev) => [...prev, ...Array.from(e.target.files || [])])
+                  }}
+                />
+                {newWorkRemarkFiles.length > 0 ? (
+                  <p className="muted" style={{ marginTop: '0.35rem' }}>
+                    已选 {newWorkRemarkFiles.length} 个文件 ·{' '}
+                    <button type="button" className="btn btn-ghost" onClick={() => setNewWorkRemarkFiles([])}>
+                      清除
+                    </button>
+                  </p>
+                ) : null}
+                {newWorkRemarkPreviews.length > 0 ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem',
+                      marginTop: '0.5rem',
+                    }}
+                  >
+                    {newWorkRemarkPreviews.map((p) => (
+                      <button
+                        key={p.src}
+                        type="button"
+                        title={p.name}
+                        onClick={() => setNewWorkRemarkPreviewOpen(p)}
+                        style={{
+                          padding: 0,
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'zoom-in',
+                        }}
+                      >
+                        <img
+                          src={p.src}
+                          alt=""
+                          style={{
+                            maxHeight: 120,
+                            display: 'block',
+                            borderRadius: 8,
+                            border: '1px solid var(--border)',
+                          }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </label>
               <label>
                 生产状态
                 <select
@@ -2187,6 +3241,85 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                 </button>
               </div>
             </form>
+            {newWorkRemarkPreviewOpen ? (
+              <div
+                role="presentation"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setNewWorkRemarkPreviewOpen(null)
+                }}
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 10001,
+                  background: 'rgba(0,0,0,.6)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 12,
+                  boxSizing: 'border-box',
+                }}
+              >
+                <div
+                  role="dialog"
+                  aria-label="图片预览"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    width: 'min(1100px, 100%)',
+                    maxHeight: '92vh',
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 12,
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: '0.65rem 0.85rem',
+                      borderBottom: '1px solid var(--border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.75rem',
+                    }}
+                  >
+                    <span className="muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {newWorkRemarkPreviewOpen.name || '预览'}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => setNewWorkRemarkPreviewOpen(null)}
+                    >
+                      关闭
+                    </button>
+                  </div>
+                  <div
+                    style={{
+                      padding: 12,
+                      overflow: 'auto',
+                      background: 'rgba(0,0,0,.04)',
+                      flex: '1 1 auto',
+                    }}
+                  >
+                    <img
+                      src={newWorkRemarkPreviewOpen.src}
+                      alt=""
+                      style={{
+                        width: '100%',
+                        height: 'auto',
+                        display: 'block',
+                        borderRadius: 10,
+                        border: '1px solid var(--border)',
+                        background: '#fff',
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -2263,6 +3396,58 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                   onChange={(e) => setItemForm((f) => ({ ...f, remark: e.target.value }))}
                 />
               </label>
+              <div className="full" style={{ gridColumn: '1 / -1' }}>
+                <label>备注配图</label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  onChange={onItemRemarkFilesSelected}
+                />
+                {Array.isArray(itemForm.remark_images) && itemForm.remark_images.length > 0 ? (
+                  <ul
+                    style={{
+                      listStyle: 'none',
+                      padding: 0,
+                      margin: '0.5rem 0 0',
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    {itemForm.remark_images.map((src) => (
+                      <li
+                        key={src}
+                        style={{
+                          border: '1px solid var(--border, #ddd)',
+                          borderRadius: 8,
+                          padding: 4,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <a href={apiUrl(src)} target="_blank" rel="noreferrer">
+                          <img src={apiUrl(src)} alt="" style={{ maxHeight: 72, display: 'block' }} />
+                        </a>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() =>
+                            setItemForm((f) => ({
+                              ...f,
+                              remark_images: (f.remark_images || []).filter((x) => x !== src),
+                            }))
+                          }
+                        >
+                          移除
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
               <label>
                 生产状态
                 <select
@@ -2371,7 +3556,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
           >
             <h2 id="slot-order-modal-title">今日件号排序</h2>
             <p className="muted" style={{ marginTop: '-0.35rem' }}>
-              先点选一排（高亮），再点上方的件号：可连续点多个件号排进同一排（顿号分隔）；同一排再点已选件号会从该排去掉。非「未编号」的件号仍不可同时出现在两排。
+              先点选一排（高亮），再点上方的件号：可连续点多个件号排进同一排（用两个空格分隔）；同一排再点已选件号会从该排去掉。非「未编号」的件号仍不可同时出现在两排。
             </p>
             <section className="today-slot-modal-pool" aria-label="今日处理件号">
               <div className="today-slot-modal-pool-head">
@@ -2392,7 +3577,7 @@ export default function TasksPage({ tasksPreset = 'all', onTasksMutated, taskNav
                     const isPlaced = placedRows.length > 0
                     const placedLabel =
                       placedRows.length > 0
-                        ? placedRows.map((i) => `第${i + 1}排`).join('、')
+                        ? placedRows.map((i) => `第${i + 1}排`).join(' / ')
                         : ''
                     return (
                       <button
