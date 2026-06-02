@@ -1,4 +1,3 @@
-import { formatFormedSizeStagesText } from './formedSizeStages.js'
 import { emptyFinishedOutput, formatPieceCodeLabel, sumFinishedOutputWeights } from './finishedOutputs.js'
 
 function pieceCodeCell(code) {
@@ -20,7 +19,6 @@ export function FinishedOutputsView({ outputs, variant = 'compact', empty = '—
           <tr>
             <th>件号</th>
             <th>成品规格</th>
-            <th>成品成型尺寸</th>
             <th>发回重量</th>
             <th>备注</th>
           </tr>
@@ -30,9 +28,6 @@ export function FinishedOutputsView({ outputs, variant = 'compact', empty = '—
             <tr key={o.id ?? i}>
               <td>{pieceCodeCell(o.piece_code)}</td>
               <td className="text-cell">{o.spec || '—'}</td>
-              <td className="text-cell">
-                {formatFormedSizeStagesText(o.formed_size) || o.formed_size || '—'}
-              </td>
               <td>{o.weight_return ?? '—'}</td>
               <td className="text-cell">{o.remark || '—'}</td>
             </tr>
@@ -55,10 +50,6 @@ export function FinishedOutputsView({ outputs, variant = 'compact', empty = '—
             <div>
               <dt>规格</dt>
               <dd>{o.spec || '—'}</dd>
-            </div>
-            <div>
-              <dt>成型</dt>
-              <dd>{formatFormedSizeStagesText(o.formed_size) || o.formed_size || '—'}</dd>
             </div>
             <div>
               <dt>重量</dt>
@@ -95,7 +86,7 @@ export function FinishedOutputsEditor({ rows, onChange, className = '' }) {
   return (
     <div className={`finished-outputs-editor ${className}`.trim()}>
       <p className="muted finished-outputs-editor__hint">
-        同一来料可登记多个成品：填写规格、成品成型尺寸与发回重量。
+        同一来料可登记多个成品：填写成品规格与发回重量。
         <strong>件号不在此填写</strong>，订单进入处理并排生产单后，系统按「成品 1、2、3…」顺序自动生成件号（与处理中件号列一致）。
       </p>
       <div className="finished-outputs-editor__list">
@@ -109,14 +100,6 @@ export function FinishedOutputsEditor({ rows, onChange, className = '' }) {
                   value={row.spec}
                   placeholder="成品规格"
                   onChange={(e) => updateAt(i, 'spec', e.target.value)}
-                />
-              </label>
-              <label>
-                成品成型尺寸
-                <input
-                  value={row.formed_size}
-                  placeholder="该件成品尺寸"
-                  onChange={(e) => updateAt(i, 'formed_size', e.target.value)}
                 />
               </label>
               <label>

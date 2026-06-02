@@ -28,7 +28,6 @@ def _normalize_inputs(raw: list[FinishedOutputIn] | None) -> list[FinishedOutput
         if not any(
             [
                 o.spec and str(o.spec).strip(),
-                o.formed_size and str(o.formed_size).strip(),
                 o.weight_return is not None,
                 o.remark and str(o.remark).strip(),
             ]
@@ -78,7 +77,6 @@ def legacy_output_from_item(item: OrderItem) -> list[FinishedOutputOut]:
             sort_order=0,
             piece_code=_piece_code_for_index(item, 0),
             spec=item.spec_incoming,
-            formed_size=item.formed_size,
             weight_return=item.weight_return,
             remark=None,
         )
@@ -149,7 +147,6 @@ def replace_finished_outputs(
         outputs = [
             FinishedOutputIn(
                 spec=item.spec_incoming,
-                formed_size=item.formed_size,
                 weight_return=item.weight_return,
                 remark=None,
             )
@@ -167,7 +164,7 @@ def replace_finished_outputs(
                 sort_order=i,
                 piece_code=None,
                 spec=(str(o.spec).strip() if o.spec else None) or None,
-                formed_size=(str(o.formed_size).strip() if o.formed_size else None) or None,
+                formed_size=None,
                 weight_return=o.weight_return,
                 remark=(str(o.remark).strip() if o.remark else None) or None,
             )
@@ -194,7 +191,6 @@ def backfill_finished_outputs_from_items(db: Session) -> int:
             [
                 FinishedOutputIn(
                     spec=item.spec_incoming,
-                    formed_size=item.formed_size,
                     weight_return=item.weight_return,
                     remark=None,
                 )

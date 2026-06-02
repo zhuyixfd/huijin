@@ -3,7 +3,6 @@
 export function emptyFinishedOutput() {
   return {
     spec: '',
-    formed_size: '',
     weight_return: '',
     remark: '',
   }
@@ -19,7 +18,6 @@ export function parseFinishedOutputsFromItem(it) {
   if (Array.isArray(it?.finished_outputs) && it.finished_outputs.length > 0) {
     return it.finished_outputs.map((o) => ({
       spec: o.spec ?? '',
-      formed_size: o.formed_size ?? '',
       weight_return:
         o.weight_return === null || o.weight_return === undefined ? '' : String(o.weight_return),
       remark: o.remark ?? '',
@@ -28,7 +26,6 @@ export function parseFinishedOutputsFromItem(it) {
   return [
     {
       spec: it?.spec_incoming ?? '',
-      formed_size: it?.formed_size ?? '',
       weight_return:
         it?.weight_return === null || it?.weight_return === undefined
           ? ''
@@ -42,17 +39,10 @@ export function normalizeFinishedOutputsForApi(rows) {
   return (Array.isArray(rows) ? rows : [])
     .map((o) => ({
       spec: String(o.spec ?? '').trim() || null,
-      formed_size: String(o.formed_size ?? '').trim() || null,
       weight_return: o.weight_return === '' || o.weight_return === null ? null : String(o.weight_return),
       remark: String(o.remark ?? '').trim() || null,
     }))
-    .filter(
-      (o) =>
-        o.spec ||
-        o.formed_size ||
-        o.weight_return != null ||
-        o.remark,
-    )
+    .filter((o) => o.spec || o.weight_return != null || o.remark)
 }
 
 export function sumFinishedOutputWeights(rows) {
@@ -87,7 +77,6 @@ export function expandOrdersToDeliveryLines(rows) {
         material_grade: r.material_grade ?? '',
         spec_incoming: r.spec_incoming ?? '',
         spec: r.spec_incoming ?? '',
-        formed_size: r.formed_size ?? '',
         quantity: 1,
         weight_return: r.weight_return ?? r.weight_incoming ?? '',
         weight_incoming: r.weight_incoming,
@@ -106,7 +95,6 @@ export function expandOrdersToDeliveryLines(rows) {
         spec_incoming: r.spec_incoming ?? '',
         piece_code: o.piece_code ?? null,
         spec: o.spec ?? '',
-        formed_size: o.formed_size ?? '',
         quantity: 1,
         weight_return:
           o.weight_return === null || o.weight_return === undefined ? '' : String(o.weight_return),

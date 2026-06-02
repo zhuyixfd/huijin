@@ -3,7 +3,6 @@
  */
 
 import { expandOrdersToDeliveryLines, formatPieceCodeLabel } from './finishedOutputs.js'
-import { formatFormedSizeStagesText } from './formedSizeStages.js'
 
 const slipCss = `
   * { box-sizing: border-box; }
@@ -83,13 +82,11 @@ function buildOneSheet(consignee, items, sheetDateStr, showCutHeadCol) {
       }
       const forgeReq = it.forging_requirements ?? ''
       const note = it.remark ?? ''
-      const formed = formatFormedSizeStagesText(it.formed_size) || it.formed_size || ''
       return `<tr>
       <td>${esc(it.material_grade)}</td>
       <td>${esc(it.spec_incoming)}</td>
       <td class="num">${esc(formatPieceCodeLabel(it.piece_code))}</td>
       <td>${esc(it.spec || '—')}</td>
-      <td>${esc(formed)}</td>
       <td class="num">1</td>
       <td class="num">${esc(weightCell(it))}</td>
       ${showCutHeadCol ? `<td class="num">${esc(cutHeadWeightCell(it))}</td>` : ''}
@@ -116,7 +113,6 @@ function buildOneSheet(consignee, items, sheetDateStr, showCutHeadCol) {
         <th>来料规格</th>
         <th>件号</th>
         <th>成品规格</th>
-        <th>成品成型尺寸</th>
         <th>数量</th>
         <th>发回重量</th>
         ${showCutHeadCol ? '<th>切头重量</th>' : ''}
@@ -127,7 +123,7 @@ function buildOneSheet(consignee, items, sheetDateStr, showCutHeadCol) {
     <tbody>
       ${body}
       <tr class="total-row">
-        <td colspan="5">合计</td>
+        <td colspan="4">合计</td>
         <td class="num">${qtySum}</td>
         <td class="num">${weightTotalCell}</td>
         <td colspan="${totalTailColSpan}"></td>
@@ -177,7 +173,6 @@ export function exportDeliveryRowsToExcelCsv(rows, options = {}) {
     '来料规格',
     '件号',
     '成品规格',
-    '成品成型尺寸',
     '数量',
     '发回重量',
     ...(showCutHeadCol ? ['切头重量'] : []),
@@ -187,14 +182,12 @@ export function exportDeliveryRowsToExcelCsv(rows, options = {}) {
   const lines = [headers.join(',')]
   for (const r of rows) {
     const w = r.weight_return ?? r.weight_incoming ?? ''
-    const formed = formatFormedSizeStagesText(r.formed_size) || r.formed_size || ''
     const base = [
       csvEscape(r.customer_name),
       csvEscape(r.material_grade),
       csvEscape(r.spec_incoming),
       csvEscape(r.piece_code),
       csvEscape(r.spec),
-      csvEscape(formed),
       csvEscape(r.quantity),
       csvEscape(w),
     ]
@@ -253,7 +246,6 @@ function readDraftFromTable(tbody) {
       spec_incoming: g('spec_incoming'),
       piece_code: g('piece_code'),
       spec: g('spec'),
-      formed_size: g('formed_size'),
       quantity: 1,
       weight_return: g('weight_return') || null,
       weight_incoming: null,
@@ -290,7 +282,7 @@ export function openDeliverySlipPreview(outboundRows) {
     '</div>' +
     '<div class="delivery-edit-scroll">' +
     '<table class="delivery-edit-table"><thead><tr>' +
-    '<th>收货单位</th><th>材质</th><th>来料规格</th><th>件号</th><th>成品规格</th><th>成品成型</th><th style="width:3rem">数</th><th style="width:5rem">发回重量</th>' +
+    '<th>收货单位</th><th>材质</th><th>来料规格</th><th>件号</th><th>成品规格</th><th style="width:3rem">数</th><th style="width:5rem">发回重量</th>' +
     headCut +
     '<th>锻造要求</th><th>备注</th>' +
     '</tr></thead><tbody class="delivery-edit-tbody"></tbody></table>' +
@@ -311,7 +303,6 @@ export function openDeliverySlipPreview(outboundRows) {
       <td><input type="text" name="spec_incoming" autocomplete="off" /></td>
       <td><input type="text" name="piece_code" autocomplete="off" readonly title="件号由系统排产后生成，打印前可在出库单中核对" /></td>
       <td><input type="text" name="spec" autocomplete="off" /></td>
-      <td><input type="text" name="formed_size" autocomplete="off" /></td>
       <td><input type="hidden" name="quantity" value="1" />
       <td><input type="text" name="weight_return" autocomplete="off" /></td>
       ${showCutHeadCol ? '<td><input type="text" name="cut_head_weight" autocomplete="off" /></td>' : ''}
@@ -323,7 +314,6 @@ export function openDeliverySlipPreview(outboundRows) {
     tr.querySelector('[name="spec_incoming"]').value = r.spec_incoming
     tr.querySelector('[name="piece_code"]').value = r.piece_code ?? ''
     tr.querySelector('[name="spec"]').value = r.spec ?? ''
-    tr.querySelector('[name="formed_size"]').value = r.formed_size ?? ''
     tr.querySelector('[name="weight_return"]').value =
       r.weight_return === null || r.weight_return === undefined ? '' : String(r.weight_return)
     if (showCutHeadCol) {
