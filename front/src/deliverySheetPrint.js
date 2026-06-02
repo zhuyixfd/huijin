@@ -2,6 +2,8 @@
  * 出库送货单：按收货单位（客户名称）拆分多页；模态框内可编辑后打印（不写入数据库）；支持导出 CSV（Excel 可打开）。
  */
 
+import { formatFormedSizeStagesText } from './formedSizeStages.js'
+
 const slipCss = `
   * { box-sizing: border-box; }
   body { font-family: system-ui, "Segoe UI", Roboto, "PingFang SC", sans-serif; padding: 16px; color: #111; background: #fff; }
@@ -77,7 +79,7 @@ function buildOneSheet(consignee, items, sheetDateStr, showCutHeadCol) {
       return `<tr>
       <td>${esc(it.material_grade)}</td>
       <td>${esc(it.spec_incoming)}</td>
-      <td>${esc(it.formed_size)}</td>
+      <td>${esc(formatFormedSizeStagesText(it.formed_size) || it.formed_size || '')}</td>
       <td class="num">${n}</td>
       <td class="num">${esc(weightCell(it))}</td>
       ${showCutHeadCol ? `<td class="num">${esc(cutHeadWeightCell(it))}</td>` : ''}
@@ -101,7 +103,7 @@ function buildOneSheet(consignee, items, sheetDateStr, showCutHeadCol) {
       <tr>
         <th>材质</th>
         <th>来料规格</th>
-        <th>锻造规格</th>
+        <th>成型尺寸（工序）</th>
         <th>数量</th>
         <th>发回重量</th>
         ${showCutHeadCol ? '<th>切头重量</th>' : ''}
@@ -175,7 +177,7 @@ export function exportDeliveryRowsToExcelCsv(rows, options = {}) {
     '收货单位',
     '材质',
     '来料规格',
-    '锻造规格',
+    '成型尺寸（工序）',
     '数量',
     '发回重量',
     ...(showCutHeadCol ? ['切头重量'] : []),
@@ -283,7 +285,7 @@ export function openDeliverySlipPreview(outboundRows) {
     '</div>' +
     '<div class="delivery-edit-scroll">' +
     '<table class="delivery-edit-table"><thead><tr>' +
-    '<th>收货单位</th><th>材质</th><th>来料规格</th><th>锻造规格</th><th style="width:4rem">数量</th><th style="width:6rem">发回重量</th>' +
+    '<th>收货单位</th><th>材质</th><th>来料规格</th><th>成型尺寸（工序）</th><th style="width:4rem">数量</th><th style="width:6rem">发回重量</th>' +
     headCut +
     '<th>锻造要求</th><th>备注</th>' +
     '</tr></thead><tbody class="delivery-edit-tbody"></tbody></table>' +

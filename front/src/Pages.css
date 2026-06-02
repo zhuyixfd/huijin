@@ -987,6 +987,14 @@
   font-size: 0.88rem;
 }
 
+.form-field-label {
+  display: block;
+  font-size: 0.88rem;
+  margin-bottom: 0.35rem;
+  font-weight: 500;
+  color: var(--text-h, #222);
+}
+
 .form-grid input,
 .form-grid select,
 .form-grid textarea {
@@ -1262,4 +1270,152 @@ td.task-col-group-start {
   .task-slip-aside {
     position: static;
   }
+}
+
+/* 成型尺寸（工序）：多道尺寸流程展示与编辑 */
+.formed-size-stages-view--compact {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.2rem;
+  line-height: 1.45;
+  max-width: 100%;
+}
+
+.formed-size-stages-view__arrow {
+  color: var(--muted, #888);
+  font-weight: 600;
+  margin: 0 0.1rem;
+  user-select: none;
+}
+
+.formed-size-stage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 6px;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  font-size: 0.92em;
+  white-space: nowrap;
+}
+
+.formed-size-stage-chip__idx {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.18);
+  font-size: 0.75em;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.formed-size-stage-chip--lg {
+  padding: 0.25rem 0.65rem;
+  font-size: 1rem;
+  white-space: normal;
+}
+
+.formed-size-stages-view--block {
+  margin: 0.25rem 0;
+}
+
+.formed-size-stages-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.formed-size-stages-timeline__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.formed-size-stages-timeline__badge {
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #555;
+  min-width: 3.2rem;
+}
+
+.formed-size-stages-timeline__connector {
+  color: var(--muted, #888);
+  font-weight: 700;
+  font-size: 1.1rem;
+  width: 100%;
+  padding-left: 3.2rem;
+  line-height: 1;
+}
+
+.formed-size-stages-flow-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.88rem;
+}
+
+.formed-size-stages-editor__hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.formed-size-stages-editor__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.formed-size-stages-editor__row {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.formed-size-stages-editor__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.formed-size-stages-editor__row input {
+  width: 100%;
+  min-width: 0;
+}
+
+.formed-size-stages-editor__remove {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.formed-size-stages-editor__actions {
+  margin-top: 0.35rem;
+}
+
+.formed-size-stages-editor__preview {
+  margin-top: 0.65rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px dashed var(--border, #ddd);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+td .formed-size-stages-view--compact {
+  white-space: normal;
 }

@@ -2,6 +2,7 @@
  * 汇金加工生产单：今日处理排产预览 / 打印（快锻机车间）
  */
 
+import { formatFormedSizeStagesText } from './formedSizeStages.js'
 import { formatSlotPiecesDisplay } from './todaySlotOrderStorage.js'
 
 const sheetCss = `
@@ -163,7 +164,7 @@ function buildDataRows(rows) {
         <td>${esc(item.production_status ?? '')}</td>
         <td>${esc(item.customer_name ?? '')}</td>
         <td>${esc(item.material_grade ?? '')}</td>
-        <td>${esc(item.formed_size ?? '')}</td>
+        <td>${esc(formatFormedSizeStagesText(item.formed_size) || item.formed_size || '')}</td>
         <td>${esc(spec)}</td>
         <td class="num sheet-col-qty">${qty}</td>
         <td class="num">${esc(fmtWeight(item.weight_incoming))}</td>
@@ -185,7 +186,7 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows, options = {}) {
     '生产状态',
     '客户名称',
     '材质',
-    '成型尺寸',
+    '成型尺寸（工序）',
     '规格',
     '数量',
     '重量',

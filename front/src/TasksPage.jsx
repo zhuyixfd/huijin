@@ -12,6 +12,8 @@ import {
 import { openDeliverySlipPreview } from './deliverySheetPrint.js'
 import { openWorkshopProductionPreview } from './workshopSheetPrint.js'
 import { apiUrl } from './config.js'
+import { FormedSizeStagesEditor, FormedSizeStagesView } from './FormedSizeStages.jsx'
+import { FORMED_SIZE_FIELD_LABEL } from './formedSizeStages.js'
 import { can, PERM } from './permissions.js'
 
 function todayDateISO() {
@@ -248,7 +250,6 @@ export default function TasksPage({
 
   const [workOrderModal, setWorkOrderModal] = useState(false)
   const [newWork, setNewWork] = useState(emptyWorkOrderForm)
-  const [newWorkFormedSizes, setNewWorkFormedSizes] = useState(() => [''])
   const [newWorkRemarkFiles, setNewWorkRemarkFiles] = useState([])
   const [newWorkRemarkPreviews, setNewWorkRemarkPreviews] = useState([])
   const [newWorkRemarkPreviewOpen, setNewWorkRemarkPreviewOpen] = useState(null)
@@ -719,14 +720,10 @@ export default function TasksPage({
     e.preventDefault()
     setErr(null)
     try {
-      const formedSizeJoined = (Array.isArray(newWorkFormedSizes) ? newWorkFormedSizes : [])
-        .map((x) => String(x ?? '').trim())
-        .filter(Boolean)
-        .join(',')
       const payload = {
         customer_id: Number(newWork.customer_id),
         order_remark: newWork.order_remark || null,
-        ...normalizeItemPayload({ ...newWork, formed_size: formedSizeJoined }),
+        ...normalizeItemPayload(newWork),
       }
       const created = await postJson('/api/tasks/work-orders', payload)
       let mergedImages = Array.isArray(newWork.remark_images) ? [...newWork.remark_images] : []
@@ -739,7 +736,6 @@ export default function TasksPage({
       }
       setWorkOrderModal(false)
       setNewWork(emptyWorkOrderForm())
-      setNewWorkFormedSizes([''])
       setNewWorkRemarkFiles([])
       loadTasks()
       await refreshDetail(created.id)
@@ -1525,7 +1521,9 @@ export default function TasksPage({
       <td className={GS}>{fmtNum(it.incoming_no)}</td>
       <td className={GS}>{fmtNum(it.weight_return)}</td>
       {showCutHeadWeightColInList ? <td className={GS}>{fmtNum(it.cut_head_weight)}</td> : null}
-      <td className="text-cell">{fmtNum(it.formed_size)}</td>
+      <td className="text-cell formed-size-stages-cell">
+        <FormedSizeStagesView value={it.formed_size} variant="compact" />
+      </td>
       <td className={`text-cell ${GS}`}>{fmtNum(it.forging_requirements)}</td>
       <td className="text-cell">{fmtNum(it.remark)}</td>
       {showCuttingReturnDateCols ? (
@@ -1650,7 +1648,7 @@ export default function TasksPage({
         <th className={GS}>来料编号</th>
         <th className={GS}>发回重量</th>
         {showCutHeadWeightColInList ? <th className={GS}>切头重量</th> : null}
-        <th>成型尺寸</th>
+        <th>{FORMED_SIZE_FIELD_LABEL}</th>
         <th className={GS}>锻造要求</th>
         <th>备注</th>
         {showCuttingReturnDateCols ? <th>下料/锻造时间</th> : null}
@@ -1798,7 +1796,6 @@ export default function TasksPage({
                 className="btn btn-primary"
                 onClick={() => {
                   setNewWork(emptyWorkOrderForm())
-                  setNewWorkFormedSizes([''])
                   setNewWorkRemarkFiles([])
                   setWorkOrderModal(true)
                 }}
@@ -2691,7 +2688,7 @@ export default function TasksPage({
                             <th>来料规格</th>
                             <th>来料重</th>
                             <th>个数</th>
-                            <th>成型尺寸</th>
+                            <th>{FORMED_SIZE_FIELD_LABEL}</th>
                             <th>状态</th>
                             <th style={{ minWidth: '6rem' }}>操作</th>
                           </tr>
@@ -2704,7 +2701,9 @@ export default function TasksPage({
                               <td className="text-cell">{it.spec_incoming ?? '—'}</td>
                               <td>{it.weight_incoming ?? '—'}</td>
                               <td>{it.quantity}</td>
-                              <td className="text-cell">{it.formed_size ?? '—'}</td>
+                              <td className="text-cell formed-size-stages-cell">
+                                <FormedSizeStagesView value={it.formed_size} variant="block" />
+                              </td>
                               <td>
                                 <span className="tag">{it.production_status}</span>
                               </td>
@@ -3134,33 +3133,13 @@ export default function TasksPage({
                   onChange={(e) => setNewWork((o) => ({ ...o, weight_return: e.target.value }))}
                 />
               </label>
-              <label>
-                成型尺寸
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: '1 1 auto' }}>
-                    {(Array.isArray(newWorkFormedSizes) ? newWorkFormedSizes : ['']).map((v, idx) => (
-                      <input
-                        key={idx}
-                        value={v}
-                        onChange={(e) => {
-                          const next = Array.isArray(newWorkFormedSizes) ? [...newWorkFormedSizes] : ['']
-                          next[idx] = e.target.value
-                          setNewWorkFormedSizes(next)
-                          setNewWork((o) => ({ ...o, formed_size: next.map((x) => String(x ?? '').trim()).filter(Boolean).join(',') }))
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    aria-label="添加成型尺寸"
-                    onClick={() => setNewWorkFormedSizes((prev) => [...(Array.isArray(prev) ? prev : ['']), ''])}
-                  >
-                    +
-                  </button>
-                </div>
-              </label>
+              <div className="full">
+                <span className="form-field-label">{FORMED_SIZE_FIELD_LABEL}</span>
+                <FormedSizeStagesEditor
+                  value={newWork.formed_size}
+                  onChange={(v) => setNewWork((o) => ({ ...o, formed_size: v }))}
+                />
+              </div>
               <label className="full">
                 锻造要求
                 <textarea
@@ -3415,13 +3394,13 @@ export default function TasksPage({
                   onChange={(e) => setItemForm((f) => ({ ...f, weight_return: e.target.value }))}
                 />
               </label>
-              <label>
-                成型尺寸
-                <input
+              <div className="full">
+                <span className="form-field-label">{FORMED_SIZE_FIELD_LABEL}</span>
+                <FormedSizeStagesEditor
                   value={itemForm.formed_size}
-                  onChange={(e) => setItemForm((f) => ({ ...f, formed_size: e.target.value }))}
+                  onChange={(v) => setItemForm((f) => ({ ...f, formed_size: v }))}
                 />
-              </label>
+              </div>
               <label className="full">
                 锻造要求
                 <textarea
