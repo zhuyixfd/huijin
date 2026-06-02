@@ -358,6 +358,12 @@ class TaskNavCountsOut(BaseModel):
     cut_head: int = Field(default=0, description="切头记录条数")
     ready_outbound: int
     done: int
+    today_processing_letter: str = Field(
+        ...,
+        min_length=1,
+        max_length=1,
+        description="当日新排产件号首字母（按当月第几天：1 日 A、2 日 B…，区分大小写）",
+    )
     processing_piece_strip: list[ProcessingLetterPieceCount] = Field(
         default_factory=list,
         description="处理中（不含待发回）按件号首字母统计，顺序与当月日序轮回表一致（A/a 区分）",

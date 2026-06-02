@@ -13,7 +13,11 @@ from app.permissions import PERM_ORDER_CREATE, PERM_ORDER_PROCESS
 from app.models import CaseStudy, Customer, CutHeadLog, OrderItem, SplitMergeLog, User
 from app.models import User as UserModel
 from app.order_number import generate_next_order_no
-from app.processing_codes import count_processing_piece_strip, ensure_processing_codes_batch
+from app.processing_codes import (
+    count_processing_piece_strip,
+    day_code_char,
+    ensure_processing_codes_batch,
+)
 from app.order_status import format_single_line_item_order_status
 from app.schemas_business import (
     CutHeadLogCreate,
@@ -169,6 +173,7 @@ def task_nav_counts(
         cut_head=int(cut_head_n),
         ready_outbound=int(ready_n),
         done=int(done_n),
+        today_processing_letter=day_code_char(),
         processing_piece_strip=piece_strip,
     )
 

@@ -2156,17 +2156,32 @@ export default function TasksPage({
           </div>
         ) : tasksPreset === 'processing' ? (
           <>
-            {Array.isArray(taskNavCounts?.processing_piece_strip) &&
-            taskNavCounts.processing_piece_strip.length > 0 ? (
+            {taskNavCounts?.today_processing_letter ||
+            (Array.isArray(taskNavCounts?.processing_piece_strip) &&
+              taskNavCounts.processing_piece_strip.length > 0) ? (
               <div
                 className="card tasks-processing-strip-card"
                 aria-label="处理中件号首字母件数统计"
               >
                 <div className="tasks-processing-strip-head">
+                  {taskNavCounts?.today_processing_letter ? (
+                    <div className="tasks-today-piece-letter-row">
+                      <span className="tasks-today-piece-letter-label">今日件号</span>
+                      <span
+                        className="tasks-today-piece-letter-value"
+                        title="当日新排产件号首字母（按本月第几天）"
+                      >
+                        {taskNavCounts.today_processing_letter}
+                      </span>
+                    </div>
+                  ) : null}
                   <span className="tasks-processing-strip-title">件号字母（在制件数）</span>
                 </div>
                 <div className="tasks-processing-piece-strip">
-                  {taskNavCounts.processing_piece_strip.map(({ letter, count }) => (
+                  {(taskNavCounts?.processing_piece_strip ?? []).map(({ letter, count }) => {
+                    const todayLetter = String(taskNavCounts?.today_processing_letter ?? '').trim()
+                    const isTodayLetter = todayLetter && String(letter ?? '').trim() === todayLetter
+                    return (
                     <span
                       key={letter}
                       role="button"
@@ -2198,6 +2213,7 @@ export default function TasksPage({
                       className={[
                         'tasks-processing-piece-cell',
                         count === 0 ? 'is-muted' : '',
+                        isTodayLetter ? 'is-today-letter' : '',
                         showProcessingPieceFilter &&
                         String(letter ?? '').trim() === processingPieceLetterKey
                           ? 'is-active'
@@ -2205,12 +2221,17 @@ export default function TasksPage({
                       ]
                         .filter(Boolean)
                         .join(' ')}
-                      title={`${letter}：${count}件`}
+                      title={
+                        isTodayLetter
+                          ? `今日件号 ${letter}：${count}件`
+                          : `${letter}：${count}件`
+                      }
                     >
                       <span className="tasks-processing-piece-letter">{letter}</span>
                       <span className="tasks-processing-piece-num">{count}</span>
                     </span>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             ) : null}

@@ -805,7 +805,39 @@
 }
 
 .tasks-processing-strip-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
   margin-bottom: 0.45rem;
+}
+
+.tasks-today-piece-letter-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tasks-today-piece-letter-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+.tasks-today-piece-letter-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  padding: 0.12rem 0.45rem;
+  font-family: var(--mono);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-h);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
 }
 
 .tasks-processing-strip-title {
@@ -849,6 +881,15 @@
 .tasks-processing-piece-cell.is-active {
   background: var(--accent-bg);
   border-color: var(--accent-border);
+}
+
+.tasks-processing-piece-cell.is-today-letter {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 1px var(--accent-border);
+}
+
+.tasks-processing-piece-cell.is-today-letter .tasks-processing-piece-letter {
+  color: var(--accent, var(--text-h));
 }
 
 .tasks-processing-piece-letter {
