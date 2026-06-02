@@ -2,7 +2,6 @@
 
 export function emptyFinishedOutput() {
   return {
-    piece_code: '',
     spec: '',
     formed_size: '',
     weight_return: '',
@@ -10,10 +9,15 @@ export function emptyFinishedOutput() {
   }
 }
 
+/** 件号由排产/处理中自动生成 */
+export function formatPieceCodeLabel(code) {
+  const s = code === null || code === undefined ? '' : String(code).trim()
+  return s || '待排产生成'
+}
+
 export function parseFinishedOutputsFromItem(it) {
   if (Array.isArray(it?.finished_outputs) && it.finished_outputs.length > 0) {
     return it.finished_outputs.map((o) => ({
-      piece_code: o.piece_code ?? '',
       spec: o.spec ?? '',
       formed_size: o.formed_size ?? '',
       weight_return:
@@ -23,7 +27,6 @@ export function parseFinishedOutputsFromItem(it) {
   }
   return [
     {
-      piece_code: '',
       spec: it?.spec_incoming ?? '',
       formed_size: it?.formed_size ?? '',
       weight_return:
@@ -38,7 +41,6 @@ export function parseFinishedOutputsFromItem(it) {
 export function normalizeFinishedOutputsForApi(rows) {
   return (Array.isArray(rows) ? rows : [])
     .map((o) => ({
-      piece_code: String(o.piece_code ?? '').trim() || null,
       spec: String(o.spec ?? '').trim() || null,
       formed_size: String(o.formed_size ?? '').trim() || null,
       weight_return: o.weight_return === '' || o.weight_return === null ? null : String(o.weight_return),
@@ -46,7 +48,6 @@ export function normalizeFinishedOutputsForApi(rows) {
     }))
     .filter(
       (o) =>
-        o.piece_code ||
         o.spec ||
         o.formed_size ||
         o.weight_return != null ||
@@ -85,7 +86,6 @@ export function expandOrdersToDeliveryLines(rows) {
         customer_name: r.customer_name ?? '',
         material_grade: r.material_grade ?? '',
         spec_incoming: r.spec_incoming ?? '',
-        piece_code: '',
         spec: r.spec_incoming ?? '',
         formed_size: r.formed_size ?? '',
         quantity: 1,
@@ -104,7 +104,7 @@ export function expandOrdersToDeliveryLines(rows) {
         customer_name: r.customer_name ?? '',
         material_grade: r.material_grade ?? '',
         spec_incoming: r.spec_incoming ?? '',
-        piece_code: o.piece_code ?? '',
+        piece_code: o.piece_code ?? null,
         spec: o.spec ?? '',
         formed_size: o.formed_size ?? '',
         quantity: 1,

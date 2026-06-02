@@ -1,5 +1,11 @@
 import { formatFormedSizeStagesText } from './formedSizeStages.js'
-import { emptyFinishedOutput, sumFinishedOutputWeights } from './finishedOutputs.js'
+import { emptyFinishedOutput, formatPieceCodeLabel, sumFinishedOutputWeights } from './finishedOutputs.js'
+
+function pieceCodeCell(code) {
+  const label = formatPieceCodeLabel(code)
+  const pending = !code || !String(code).trim()
+  return <span className={pending ? 'muted' : ''}>{label}</span>
+}
 
 export function FinishedOutputsView({ outputs, variant = 'compact', empty = '—' }) {
   const rows = Array.isArray(outputs) ? outputs : []
@@ -14,7 +20,7 @@ export function FinishedOutputsView({ outputs, variant = 'compact', empty = '—
           <tr>
             <th>件号</th>
             <th>成品规格</th>
-            <th>成型尺寸</th>
+            <th>成品成型尺寸</th>
             <th>发回重量</th>
             <th>备注</th>
           </tr>
@@ -22,7 +28,7 @@ export function FinishedOutputsView({ outputs, variant = 'compact', empty = '—
         <tbody>
           {rows.map((o, i) => (
             <tr key={o.id ?? i}>
-              <td>{o.piece_code || '—'}</td>
+              <td>{pieceCodeCell(o.piece_code)}</td>
               <td className="text-cell">{o.spec || '—'}</td>
               <td className="text-cell">
                 {formatFormedSizeStagesText(o.formed_size) || o.formed_size || '—'}
@@ -44,7 +50,7 @@ export function FinishedOutputsView({ outputs, variant = 'compact', empty = '—
           <dl className="finished-outputs-view__dl">
             <div>
               <dt>件号</dt>
-              <dd>{o.piece_code || '—'}</dd>
+              <dd>{pieceCodeCell(o.piece_code)}</dd>
             </div>
             <div>
               <dt>规格</dt>
@@ -89,21 +95,14 @@ export function FinishedOutputsEditor({ rows, onChange, className = '' }) {
   return (
     <div className={`finished-outputs-editor ${className}`.trim()}>
       <p className="muted finished-outputs-editor__hint">
-        同一来料可登记多个成品：每件可填不同件号、规格与发回重量。上方「成型尺寸（工序）」记录锻/修过程，此处为各成品结果。
+        同一来料可登记多个成品：填写规格、成品成型尺寸与发回重量。
+        <strong>件号不在此填写</strong>，订单进入处理并排生产单后，系统按「成品 1、2、3…」顺序自动生成件号（与处理中件号列一致）。
       </p>
       <div className="finished-outputs-editor__list">
         {list.map((row, i) => (
           <fieldset key={i} className="finished-outputs-editor__card">
             <legend>成品 {i + 1}</legend>
             <div className="finished-outputs-editor__grid">
-              <label>
-                件号
-                <input
-                  value={row.piece_code}
-                  placeholder="如 A1"
-                  onChange={(e) => updateAt(i, 'piece_code', e.target.value)}
-                />
-              </label>
               <label>
                 成品规格
                 <input

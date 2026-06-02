@@ -63,9 +63,8 @@ class CustomerOut(BaseModel):
 
 
 class FinishedOutputIn(BaseModel):
-    """成品明细（同一来料下的一个成品）。"""
+    """成品明细（同一来料下的一个成品）；件号由排产/处理中自动生成，不可手填。"""
 
-    piece_code: str | None = Field(None, description="件号")
     spec: str | None = Field(None, description="成品规格")
     formed_size: str | None = Field(None, description="成品成型尺寸（可与工序尺寸不同）")
     weight_return: Decimal | None = Field(None, description="该成品发回重量")
@@ -77,6 +76,10 @@ class FinishedOutputOut(FinishedOutputIn):
 
     id: int
     sort_order: int = 0
+    piece_code: str | None = Field(
+        None,
+        description="件号（只读，与 processing_unit_codes 按序号对应，排产后生成）",
+    )
 
 
 class OrderItemCreate(BaseModel):

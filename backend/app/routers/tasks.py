@@ -249,7 +249,8 @@ def list_task_items(
         for item in proc_items:
             db.refresh(item)
 
-    outputs_map = load_finished_outputs_map(db, item_ids)
+    items_by_id = {item.id: item for item, _ in rows}
+    outputs_map = load_finished_outputs_map(db, item_ids, items_by_id)
 
     out: list[TaskItemOut] = []
     for item, cust_name in rows:

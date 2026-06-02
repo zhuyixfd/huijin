@@ -105,6 +105,13 @@ def ensure_order_item_processing_codes(db: Session, row: OrderItem) -> None:
         changed = True
     if changed:
         row.processing_unit_codes = [c for c in codes]
+    _sync_finished_piece_codes(db, row)
+
+
+def _sync_finished_piece_codes(db: Session, row: OrderItem) -> None:
+    from app.order_item_finished import sync_output_piece_codes_store
+
+    sync_output_piece_codes_store(db, row)
 
 
 def ensure_processing_codes_batch(db: Session, items: list[OrderItem]) -> None:
@@ -126,6 +133,7 @@ def ensure_processing_codes_batch(db: Session, items: list[OrderItem]) -> None:
             changed = True
         if changed:
             row.processing_unit_codes = [c for c in codes]
+        _sync_finished_piece_codes(db, row)
 
 
 def sync_processing_codes_length(row: OrderItem) -> None:

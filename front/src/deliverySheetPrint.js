@@ -2,7 +2,7 @@
  * 出库送货单：按收货单位（客户名称）拆分多页；模态框内可编辑后打印（不写入数据库）；支持导出 CSV（Excel 可打开）。
  */
 
-import { expandOrdersToDeliveryLines } from './finishedOutputs.js'
+import { expandOrdersToDeliveryLines, formatPieceCodeLabel } from './finishedOutputs.js'
 import { formatFormedSizeStagesText } from './formedSizeStages.js'
 
 const slipCss = `
@@ -87,7 +87,7 @@ function buildOneSheet(consignee, items, sheetDateStr, showCutHeadCol) {
       return `<tr>
       <td>${esc(it.material_grade)}</td>
       <td>${esc(it.spec_incoming)}</td>
-      <td class="num">${esc(it.piece_code || '—')}</td>
+      <td class="num">${esc(formatPieceCodeLabel(it.piece_code))}</td>
       <td>${esc(it.spec || '—')}</td>
       <td>${esc(formed)}</td>
       <td class="num">1</td>
@@ -308,7 +308,7 @@ export function openDeliverySlipPreview(outboundRows) {
       <td><input type="text" name="customer_name" autocomplete="off" /></td>
       <td><input type="text" name="material_grade" autocomplete="off" /></td>
       <td><input type="text" name="spec_incoming" autocomplete="off" /></td>
-      <td><input type="text" name="piece_code" autocomplete="off" /></td>
+      <td><input type="text" name="piece_code" autocomplete="off" readonly title="件号由系统排产后生成，打印前可在出库单中核对" /></td>
       <td><input type="text" name="spec" autocomplete="off" /></td>
       <td><input type="text" name="formed_size" autocomplete="off" /></td>
       <td><input type="hidden" name="quantity" value="1" />
