@@ -12,6 +12,7 @@ from app.models import Customer, GrindLog, OrderItem
 from app.models import User as UserModel
 from app.order_number import generate_next_order_no
 from app.order_status import format_single_line_item_order_status
+from app.order_item_finished import replace_finished_outputs, resolve_finished_outputs
 from app.processing_codes import ensure_order_item_processing_codes
 from app.schemas_business import (
     CustomerOut,
@@ -31,7 +32,8 @@ def _detail_out(db: Session, item: OrderItem) -> OrderDetailOut:
     cust = db.get(Customer, item.customer_id)
     if cust is None:
         raise HTTPException(status_code=404, detail="客户不存在")
-    item_out = OrderItemOutSchema.model_validate(item)
+    item_out = OrderItemOutSchema.model_validate(item).model_dump()
+    item_out["finished_outputs"] = resolve_finished_outputs(db, item)
     return OrderDetailOut(
         id=item.id,
         order_no=item.order_no,
@@ -39,7 +41,7 @@ def _detail_out(db: Session, item: OrderItem) -> OrderDetailOut:
         remark=item.order_remark,
         created_at=item.created_at,
         customer=CustomerOut.model_validate(cust),
-        items=[item_out],
+        items=[OrderItemOutSchema(**item_out)],
     )
 
 
@@ -132,6 +134,7 @@ def create_order(
 
     it = body.items[0]
     payload = it.model_dump()
+    finished_outputs = payload.pop("finished_outputs", None)
 
     row = None
     for _ in range(40):
@@ -157,6 +160,9 @@ def create_order(
             continue
     if row is None:
         raise HTTPException(status_code=500, detail="无法生成唯一订单编号，请重试")
+    replace_finished_outputs(db, row, finished_outputs)
+    db.commit()
+    db.refresh(row)
     return _detail_out(db, row)
 
 

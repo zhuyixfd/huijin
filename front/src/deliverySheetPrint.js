@@ -2,6 +2,7 @@
  * 出库送货单：按收货单位（客户名称）拆分多页；模态框内可编辑后打印（不写入数据库）；支持导出 CSV（Excel 可打开）。
  */
 
+import { expandOrdersToDeliveryLines } from './finishedOutputs.js'
 import { formatFormedSizeStagesText } from './formedSizeStages.js'
 
 const slipCss = `
@@ -69,18 +70,27 @@ function groupByConsignee(rows) {
 
 function buildOneSheet(consignee, items, sheetDateStr, showCutHeadCol) {
   let qtySum = 0
+  let weightSum = 0
+  let anyWeight = false
   const body = items
     .map((it) => {
-      const q = Number(it.quantity)
-      const n = Number.isFinite(q) && q >= 1 ? Math.floor(q) : 1
-      qtySum += n
+      qtySum += 1
+      const w = it.weight_return
+      const wn = parseFloat(String(w ?? '').replace(/,/g, ''))
+      if (Number.isFinite(wn)) {
+        weightSum += wn
+        anyWeight = true
+      }
       const forgeReq = it.forging_requirements ?? ''
       const note = it.remark ?? ''
+      const formed = formatFormedSizeStagesText(it.formed_size) || it.formed_size || ''
       return `<tr>
       <td>${esc(it.material_grade)}</td>
       <td>${esc(it.spec_incoming)}</td>
-      <td>${esc(formatFormedSizeStagesText(it.formed_size) || it.formed_size || '')}</td>
-      <td class="num">${n}</td>
+      <td class="num">${esc(it.piece_code || '—')}</td>
+      <td>${esc(it.spec || '—')}</td>
+      <td>${esc(formed)}</td>
+      <td class="num">1</td>
       <td class="num">${esc(weightCell(it))}</td>
       ${showCutHeadCol ? `<td class="num">${esc(cutHeadWeightCell(it))}</td>` : ''}
       <td>${esc(forgeReq)}</td>
@@ -89,7 +99,8 @@ function buildOneSheet(consignee, items, sheetDateStr, showCutHeadCol) {
     })
     .join('')
 
-  const totalTailColSpan = showCutHeadCol ? 4 : 3
+  const totalTailColSpan = showCutHeadCol ? 3 : 2
+  const weightTotalCell = anyWeight ? esc(String(weightSum)) : ''
   return `
 <section class="delivery-sheet">
   <div class="company-title">江阴市汇金机械有限公司</div>
@@ -103,7 +114,9 @@ function buildOneSheet(consignee, items, sheetDateStr, showCutHeadCol) {
       <tr>
         <th>材质</th>
         <th>来料规格</th>
-        <th>成型尺寸（工序）</th>
+        <th>件号</th>
+        <th>成品规格</th>
+        <th>成品成型尺寸</th>
         <th>数量</th>
         <th>发回重量</th>
         ${showCutHeadCol ? '<th>切头重量</th>' : ''}
@@ -114,8 +127,9 @@ function buildOneSheet(consignee, items, sheetDateStr, showCutHeadCol) {
     <tbody>
       ${body}
       <tr class="total-row">
-        <td colspan="3">合计</td>
+        <td colspan="5">合计</td>
         <td class="num">${qtySum}</td>
+        <td class="num">${weightTotalCell}</td>
         <td colspan="${totalTailColSpan}"></td>
       </tr>
     </tbody>
@@ -142,25 +156,9 @@ export function buildDeliverySlipDocument(rows, options = {}) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>送货单</title><style>${slipCss}</style></head><body>${inner}</body></html>`
 }
 
-/** 从任务列表行得到可编辑送货单行（仅打印/导出用） */
-export function normalizeDeliveryDraftRow(r) {
-  const remark =
-    (r.delivery_remark ?? '').trim() ||
-    (r.remark ?? '').trim() ||
-    (r.order_remark ?? '').trim() ||
-    ''
-  return {
-    customer_name: r.customer_name ?? '',
-    material_grade: r.material_grade ?? '',
-    spec_incoming: r.spec_incoming ?? '',
-    formed_size: r.formed_size ?? '',
-    quantity: r.quantity ?? 1,
-    weight_return: r.weight_return ?? r.weight_incoming ?? '',
-    weight_incoming: r.weight_incoming,
-    cut_head_weight: r.cut_head_weight ?? '',
-    forging_requirements: r.forging_requirements ?? '',
-    remark,
-  }
+/** 从任务列表行得到可编辑送货单行（按成品展开，一行一件） */
+export function normalizeDeliveryDraftRows(orderRows) {
+  return expandOrdersToDeliveryLines(orderRows)
 }
 
 function csvEscape(v) {
@@ -177,7 +175,9 @@ export function exportDeliveryRowsToExcelCsv(rows, options = {}) {
     '收货单位',
     '材质',
     '来料规格',
-    '成型尺寸（工序）',
+    '件号',
+    '成品规格',
+    '成品成型尺寸',
     '数量',
     '发回重量',
     ...(showCutHeadCol ? ['切头重量'] : []),
@@ -187,11 +187,14 @@ export function exportDeliveryRowsToExcelCsv(rows, options = {}) {
   const lines = [headers.join(',')]
   for (const r of rows) {
     const w = r.weight_return ?? r.weight_incoming ?? ''
+    const formed = formatFormedSizeStagesText(r.formed_size) || r.formed_size || ''
     const base = [
       csvEscape(r.customer_name),
       csvEscape(r.material_grade),
       csvEscape(r.spec_incoming),
-      csvEscape(r.formed_size),
+      csvEscape(r.piece_code),
+      csvEscape(r.spec),
+      csvEscape(formed),
       csvEscape(r.quantity),
       csvEscape(w),
     ]
@@ -243,13 +246,14 @@ function readDraftFromTable(tbody) {
   const out = []
   for (const tr of tbody.querySelectorAll('tr[data-delivery-row]')) {
     const g = (name) => tr.querySelector(`[name="${name}"]`)?.value ?? ''
-    const qty = parseInt(String(g('quantity')), 10)
     out.push({
       customer_name: g('customer_name'),
       material_grade: g('material_grade'),
       spec_incoming: g('spec_incoming'),
+      piece_code: g('piece_code'),
+      spec: g('spec'),
       formed_size: g('formed_size'),
-      quantity: Number.isFinite(qty) && qty >= 1 ? qty : 1,
+      quantity: 1,
       weight_return: g('weight_return') || null,
       weight_incoming: null,
       cut_head_weight: tr.querySelector('[name="cut_head_weight"]') ? g('cut_head_weight') || null : null,
@@ -268,7 +272,7 @@ export function openDeliverySlipPreview(outboundRows) {
   }
   ensureModalStyles()
   const showCutHeadCol = outboundRows.some((r) => hasCutHeadWeight(r))
-  const draft = outboundRows.map(normalizeDeliveryDraftRow)
+  const draft = normalizeDeliveryDraftRows(outboundRows)
 
   const backdrop = document.createElement('div')
   backdrop.className = 'delivery-print-modal-backdrop'
@@ -285,7 +289,7 @@ export function openDeliverySlipPreview(outboundRows) {
     '</div>' +
     '<div class="delivery-edit-scroll">' +
     '<table class="delivery-edit-table"><thead><tr>' +
-    '<th>收货单位</th><th>材质</th><th>来料规格</th><th>成型尺寸（工序）</th><th style="width:4rem">数量</th><th style="width:6rem">发回重量</th>' +
+    '<th>收货单位</th><th>材质</th><th>来料规格</th><th>件号</th><th>成品规格</th><th>成品成型</th><th style="width:3rem">数</th><th style="width:5rem">发回重量</th>' +
     headCut +
     '<th>锻造要求</th><th>备注</th>' +
     '</tr></thead><tbody class="delivery-edit-tbody"></tbody></table>' +
@@ -304,8 +308,10 @@ export function openDeliverySlipPreview(outboundRows) {
       <td><input type="text" name="customer_name" autocomplete="off" /></td>
       <td><input type="text" name="material_grade" autocomplete="off" /></td>
       <td><input type="text" name="spec_incoming" autocomplete="off" /></td>
+      <td><input type="text" name="piece_code" autocomplete="off" /></td>
+      <td><input type="text" name="spec" autocomplete="off" /></td>
       <td><input type="text" name="formed_size" autocomplete="off" /></td>
-      <td><input type="number" name="quantity" min="1" step="1" /></td>
+      <td><input type="hidden" name="quantity" value="1" />
       <td><input type="text" name="weight_return" autocomplete="off" /></td>
       ${showCutHeadCol ? '<td><input type="text" name="cut_head_weight" autocomplete="off" /></td>' : ''}
       <td><textarea name="forging_requirements" rows="2"></textarea></td>
@@ -314,8 +320,9 @@ export function openDeliverySlipPreview(outboundRows) {
     tr.querySelector('[name="customer_name"]').value = r.customer_name
     tr.querySelector('[name="material_grade"]').value = r.material_grade
     tr.querySelector('[name="spec_incoming"]').value = r.spec_incoming
-    tr.querySelector('[name="formed_size"]').value = r.formed_size
-    tr.querySelector('[name="quantity"]').value = String(r.quantity)
+    tr.querySelector('[name="piece_code"]').value = r.piece_code ?? ''
+    tr.querySelector('[name="spec"]').value = r.spec ?? ''
+    tr.querySelector('[name="formed_size"]').value = r.formed_size ?? ''
     tr.querySelector('[name="weight_return"]').value =
       r.weight_return === null || r.weight_return === undefined ? '' : String(r.weight_return)
     if (showCutHeadCol) {

@@ -32,6 +32,11 @@ from app.schemas_business import (
     WorkOrderCreate,
 )
 
+from app.order_item_finished import (
+    load_finished_outputs_map,
+    replace_finished_outputs,
+    resolve_finished_outputs,
+)
 from app.processing_codes import ensure_order_item_processing_codes, sync_processing_codes_length
 
 router = APIRouter()
@@ -244,10 +249,16 @@ def list_task_items(
         for item in proc_items:
             db.refresh(item)
 
+    outputs_map = load_finished_outputs_map(db, item_ids)
+
     out: list[TaskItemOut] = []
     for item, cust_name in rows:
         base = OrderItemOut.model_validate(item).model_dump()
         oid = item.id
+        fo = outputs_map.get(oid)
+        if fo is None:
+            fo = resolve_finished_outputs(db, item)
+        base["finished_outputs"] = fo
         out.append(
             TaskItemOut(
                 **base,
@@ -274,7 +285,9 @@ def create_work_order(
     payload = body.model_dump()
     cust_id = payload.pop("customer_id")
     order_remark = payload.pop("order_remark", None)
+    finished_outputs = payload.pop("finished_outputs", None)
     item_fields = OrderItemCreate(**payload).model_dump()
+    item_fields.pop("finished_outputs", None)
     if item_fields.get("incoming_date") is None:
         item_fields["incoming_date"] = date.today()
 
@@ -303,10 +316,19 @@ def create_work_order(
     if row is None:
         raise HTTPException(status_code=500, detail="无法生成唯一订单编号，请重试")
 
+    fo = replace_finished_outputs(db, row, finished_outputs)
+    if row.production_status not in ("在库中", "已发回"):
+        sync_processing_codes_length(row)
+        ensure_order_item_processing_codes(db, row)
+    db.commit()
+    db.refresh(row)
+
     cust = db.get(Customer, cust_id)
     assert cust is not None
+    base = OrderItemOut.model_validate(row).model_dump()
+    base["finished_outputs"] = fo
     return TaskItemOut(
-        **OrderItemOut.model_validate(row).model_dump(),
+        **base,
         customer_name=cust.name,
         order_created_at=row.created_at,
         order_status=_single_row_order_status(row),

@@ -16,6 +16,7 @@ from app.permissions import (
     required_perm_for_batch,
     required_perm_for_item_patch,
 )
+from app.order_item_finished import replace_finished_outputs, resolve_finished_outputs
 from app.processing_codes import (
     ensure_order_item_processing_codes,
     sync_processing_codes_length,
@@ -220,8 +221,12 @@ def patch_order_item(
         data.pop("in_today_queue", None)
         data.pop("in_tomorrow_queue", None)
     had_explicit_production_status = "production_status" in data
+    finished_raw = data.pop("finished_outputs", None)
+    had_finished_outputs = finished_raw is not None
     for k, v in data.items():
         setattr(row, k, v)
+    if had_finished_outputs:
+        replace_finished_outputs(db, row, finished_raw)
     # 列入今日处理且未指定状态时：仅将「在库中」视为待下车间，默认锻造中（避免覆盖修磨中等工序）
     if data.get("in_today_queue") is True and not had_explicit_production_status:
         if row.production_status in ("在库中",):
@@ -254,13 +259,19 @@ def patch_order_item(
     fresh = db.get(OrderItem, row.id)
     if fresh is not None:
         db.refresh(fresh)
-        return fresh
-    if base_order_no and gid:
+        row = fresh
+    elif base_order_no and gid:
         merged = db.scalar(select(OrderItem).where(OrderItem.order_no == base_order_no))
         if merged is not None:
             db.refresh(merged)
-            return merged
-    raise HTTPException(status_code=404, detail="订单已合并或不存在")
+            row = merged
+        else:
+            raise HTTPException(status_code=404, detail="订单已合并或不存在")
+    else:
+        raise HTTPException(status_code=404, detail="订单已合并或不存在")
+    out = OrderItemOutSchema.model_validate(row).model_dump()
+    out["finished_outputs"] = resolve_finished_outputs(db, row)
+    return OrderItemOutSchema(**out)
 
 
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)

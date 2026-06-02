@@ -81,6 +81,32 @@ def ensure_order_item_cut_head_weight() -> None:
         )
 
 
+def ensure_order_item_finished_outputs_table() -> None:
+    inspector = inspect(engine)
+    if "order_item_finished_outputs" in inspector.get_table_names():
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE order_item_finished_outputs (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    order_item_id INT NOT NULL,
+                    sort_order INT NOT NULL DEFAULT 0,
+                    piece_code VARCHAR(64) NULL,
+                    spec VARCHAR(256) NULL,
+                    formed_size VARCHAR(512) NULL,
+                    weight_return DECIMAL(18,3) NULL,
+                    remark TEXT NULL,
+                    INDEX ix_oifo_order_item_id (order_item_id),
+                    CONSTRAINT fk_oifo_order_item
+                        FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE CASCADE
+                )
+                """
+            )
+        )
+
+
 def ensure_order_item_split_columns() -> None:
     inspector = inspect(engine)
     if "order_items" not in inspector.get_table_names():
@@ -250,8 +276,12 @@ def init_db() -> None:
     ensure_order_item_remark_images()
     ensure_order_item_cut_head_weight()
     ensure_order_item_split_columns()
+    ensure_order_item_finished_outputs_table()
     db = SessionLocal()
     try:
         seed_admin(db)
+        from app.order_item_finished import backfill_finished_outputs_from_items
+
+        backfill_finished_outputs_from_items(db)
     finally:
         db.close()

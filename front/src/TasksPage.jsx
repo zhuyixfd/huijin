@@ -12,7 +12,14 @@ import {
 import { openDeliverySlipPreview } from './deliverySheetPrint.js'
 import { openWorkshopProductionPreview } from './workshopSheetPrint.js'
 import { apiUrl } from './config.js'
+import { FinishedOutputsEditor, FinishedOutputsView } from './FinishedOutputs.jsx'
 import { FormedSizeStagesEditor, FormedSizeStagesView } from './FormedSizeStages.jsx'
+import {
+  emptyFinishedOutput,
+  normalizeFinishedOutputsForApi,
+  parseFinishedOutputsFromItem,
+  sumFinishedOutputWeights,
+} from './finishedOutputs.js'
 import { FORMED_SIZE_FIELD_LABEL } from './formedSizeStages.js'
 import { can, PERM } from './permissions.js'
 
@@ -170,7 +177,7 @@ function dtLocal(val) {
 }
 
 const GS = 'task-col-group-start'
-const COL_COUNT = 21
+const COL_COUNT = 22
 const PAGE_SIZE_OPTIONS = [20, 50, 100]
 
 function listPageTitle(preset) {
@@ -256,6 +263,8 @@ export default function TasksPage({
 
   const [itemModal, setItemModal] = useState(null)
   const [itemForm, setItemForm] = useState(emptyItemForm)
+  const [itemFinishedOutputs, setItemFinishedOutputs] = useState(() => [emptyFinishedOutput()])
+  const [newWorkFinishedOutputs, setNewWorkFinishedOutputs] = useState(() => [emptyFinishedOutput()])
 
   const [cutHeadModalOpen, setCutHeadModalOpen] = useState(false)
   const [cutHeadPickQ, setCutHeadPickQ] = useState('')
@@ -724,6 +733,7 @@ export default function TasksPage({
         customer_id: Number(newWork.customer_id),
         order_remark: newWork.order_remark || null,
         ...normalizeItemPayload(newWork),
+        finished_outputs: normalizeFinishedOutputsForApi(newWorkFinishedOutputs),
       }
       const created = await postJson('/api/tasks/work-orders', payload)
       let mergedImages = Array.isArray(newWork.remark_images) ? [...newWork.remark_images] : []
@@ -736,6 +746,7 @@ export default function TasksPage({
       }
       setWorkOrderModal(false)
       setNewWork(emptyWorkOrderForm())
+      setNewWorkFinishedOutputs([emptyFinishedOutput()])
       setNewWorkRemarkFiles([])
       loadTasks()
       await refreshDetail(created.id)
@@ -779,6 +790,7 @@ export default function TasksPage({
         ? String(it.cutting_time).slice(0, 16).replace('T', 'T')
         : todayDatetimeLocal(),
     })
+    setItemFinishedOutputs(parseFinishedOutputsFromItem(it))
     setItemModal({ itemId: it.id })
   }
 
@@ -786,7 +798,10 @@ export default function TasksPage({
     e.preventDefault()
     if (!detail || !itemModal) return
     setErr(null)
-    const payload = normalizeItemPayload(itemForm)
+    const payload = {
+      ...normalizeItemPayload(itemForm),
+      finished_outputs: normalizeFinishedOutputsForApi(itemFinishedOutputs),
+    }
     try {
       await patchJson(`/api/order-items/${itemModal.itemId}`, payload)
       setItemModal(null)
@@ -1524,6 +1539,9 @@ export default function TasksPage({
       <td className="text-cell formed-size-stages-cell">
         <FormedSizeStagesView value={it.formed_size} variant="compact" />
       </td>
+      <td className="text-cell finished-outputs-cell">
+        <FinishedOutputsView outputs={it.finished_outputs} variant="compact" />
+      </td>
       <td className={`text-cell ${GS}`}>{fmtNum(it.forging_requirements)}</td>
       <td className="text-cell">{fmtNum(it.remark)}</td>
       {showCuttingReturnDateCols ? (
@@ -1649,6 +1667,7 @@ export default function TasksPage({
         <th className={GS}>发回重量</th>
         {showCutHeadWeightColInList ? <th className={GS}>切头重量</th> : null}
         <th>{FORMED_SIZE_FIELD_LABEL}</th>
+        <th>成品明细</th>
         <th className={GS}>锻造要求</th>
         <th>备注</th>
         {showCuttingReturnDateCols ? <th>下料/锻造时间</th> : null}
@@ -1796,6 +1815,7 @@ export default function TasksPage({
                 className="btn btn-primary"
                 onClick={() => {
                   setNewWork(emptyWorkOrderForm())
+                  setNewWorkFinishedOutputs([emptyFinishedOutput()])
                   setNewWorkRemarkFiles([])
                   setWorkOrderModal(true)
                 }}
@@ -2729,6 +2749,20 @@ export default function TasksPage({
                     ) : null}
                   </section>
 
+                  {detail.items?.[0]?.finished_outputs?.length ? (
+                    <section className="card order-section">
+                      <h2 className="order-section-title">成品明细</h2>
+                      <p className="muted" style={{ marginTop: 0 }}>
+                        同一来料对应 {detail.items[0].finished_outputs.length}{' '}
+                        个成品；送货单按成品一行打印。
+                      </p>
+                      <FinishedOutputsView
+                        outputs={detail.items[0].finished_outputs}
+                        variant="table"
+                      />
+                    </section>
+                  ) : null}
+
                   <section className="card order-section">
                     <h2 className="order-section-title">操作记录</h2>
                     <p className="muted order-section-desc">修磨等环节登记</p>
@@ -3122,15 +3156,20 @@ export default function TasksPage({
                 <input
                   type="number"
                   min={1}
-                  value={newWork.quantity}
-                  onChange={(e) => setNewWork((o) => ({ ...o, quantity: e.target.value }))}
+                  value={newWorkFinishedOutputs.length || newWork.quantity}
+                  readOnly
+                  title="由下方成品明细条数自动汇总"
                 />
               </label>
               <label>
-                发回重量
+                发回重量（合计）
                 <input
-                  value={newWork.weight_return}
-                  onChange={(e) => setNewWork((o) => ({ ...o, weight_return: e.target.value }))}
+                  value={
+                    sumFinishedOutputWeights(newWorkFinishedOutputs) ??
+                    newWork.weight_return
+                  }
+                  readOnly
+                  title="由成品明细发回重量自动合计"
                 />
               </label>
               <div className="full">
@@ -3138,6 +3177,13 @@ export default function TasksPage({
                 <FormedSizeStagesEditor
                   value={newWork.formed_size}
                   onChange={(v) => setNewWork((o) => ({ ...o, formed_size: v }))}
+                />
+              </div>
+              <div className="full">
+                <span className="form-field-label">成品明细</span>
+                <FinishedOutputsEditor
+                  rows={newWorkFinishedOutputs}
+                  onChange={setNewWorkFinishedOutputs}
                 />
               </div>
               <label className="full">
@@ -3383,15 +3429,18 @@ export default function TasksPage({
                 <input
                   type="number"
                   min={1}
-                  value={itemForm.quantity}
-                  onChange={(e) => setItemForm((f) => ({ ...f, quantity: e.target.value }))}
+                  value={itemFinishedOutputs.length || itemForm.quantity}
+                  readOnly
+                  title="由成品明细条数自动汇总"
                 />
               </label>
               <label>
-                发回重量
+                发回重量（合计）
                 <input
-                  value={itemForm.weight_return}
-                  onChange={(e) => setItemForm((f) => ({ ...f, weight_return: e.target.value }))}
+                  value={
+                    sumFinishedOutputWeights(itemFinishedOutputs) ?? itemForm.weight_return
+                  }
+                  readOnly
                 />
               </label>
               <div className="full">
@@ -3399,6 +3448,13 @@ export default function TasksPage({
                 <FormedSizeStagesEditor
                   value={itemForm.formed_size}
                   onChange={(v) => setItemForm((f) => ({ ...f, formed_size: v }))}
+                />
+              </div>
+              <div className="full">
+                <span className="form-field-label">成品明细</span>
+                <FinishedOutputsEditor
+                  rows={itemFinishedOutputs}
+                  onChange={setItemFinishedOutputs}
                 />
               </div>
               <label className="full">

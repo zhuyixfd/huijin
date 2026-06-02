@@ -62,6 +62,23 @@ class CustomerOut(BaseModel):
     created_at: datetime | None = None
 
 
+class FinishedOutputIn(BaseModel):
+    """成品明细（同一来料下的一个成品）。"""
+
+    piece_code: str | None = Field(None, description="件号")
+    spec: str | None = Field(None, description="成品规格")
+    formed_size: str | None = Field(None, description="成品成型尺寸（可与工序尺寸不同）")
+    weight_return: Decimal | None = Field(None, description="该成品发回重量")
+    remark: str | None = None
+
+
+class FinishedOutputOut(FinishedOutputIn):
+    model_config = {"from_attributes": True}
+
+    id: int
+    sort_order: int = 0
+
+
 class OrderItemCreate(BaseModel):
     incoming_no: str | None = None
     material_grade: str | None = None
@@ -78,6 +95,10 @@ class OrderItemCreate(BaseModel):
     return_date: date | None = None
     incoming_date: date | None = None
     cutting_time: datetime | None = None
+    finished_outputs: list[FinishedOutputIn] | None = Field(
+        default=None,
+        description="成品明细；不传则保存时用主行字段生成一条",
+    )
 
     @field_validator("production_status")
     @classmethod
@@ -117,6 +138,7 @@ class OrderItemUpdate(BaseModel):
     return_date: date | None = None
     incoming_date: date | None = None
     cutting_time: datetime | None = None
+    finished_outputs: list[FinishedOutputIn] | None = None
 
     @field_validator("production_status")
     @classmethod
@@ -159,6 +181,7 @@ class OrderItemOut(BaseModel):
     split_group_id: str | None = None
     split_base_order_no: str | None = None
     split_seq: int | None = None
+    finished_outputs: list[FinishedOutputOut] = Field(default_factory=list)
 
 
 class GrindLogCreate(BaseModel):

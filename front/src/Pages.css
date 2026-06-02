@@ -1419,3 +1419,103 @@ td.task-col-group-start {
 td .formed-size-stages-view--compact {
   white-space: normal;
 }
+
+/* 成品明细 */
+.finished-outputs-editor__card {
+  border: 1px solid var(--border, #ddd);
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  margin: 0;
+}
+
+.finished-outputs-editor__card legend {
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0 0.35rem;
+}
+
+.finished-outputs-editor__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 0.65rem;
+  margin-bottom: 0.5rem;
+}
+
+.finished-outputs-editor__grid .full {
+  grid-column: 1 / -1;
+}
+
+.finished-outputs-editor__grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.88rem;
+}
+
+.finished-outputs-editor__grid input {
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #ddd);
+}
+
+.finished-outputs-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.finished-outputs-editor__sum {
+  font-size: 0.9rem;
+}
+
+.finished-outputs-view--compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.finished-outputs-view__card {
+  border-left: 3px solid rgba(22, 163, 74, 0.45);
+  padding-left: 0.45rem;
+}
+
+.finished-outputs-view__title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #166534;
+}
+
+.finished-outputs-view__dl {
+  margin: 0.15rem 0 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.finished-outputs-view__dl dt {
+  margin: 0;
+  color: #666;
+}
+
+.finished-outputs-view__dl dd {
+  margin: 0;
+}
+
+.finished-outputs-mini-table {
+  font-size: 0.9rem;
+}
+
+.finished-outputs-cell {
+  min-width: 10rem;
+  max-width: 14rem;
+}
+
+@media (max-width: 640px) {
+  .finished-outputs-editor__grid {
+    grid-template-columns: 1fr;
+  }
+}

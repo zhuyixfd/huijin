@@ -96,6 +96,31 @@ class OrderItem(Base):
         back_populates="item",
         cascade="all, delete-orphan",
     )
+    finished_outputs: Mapped[list["OrderItemFinishedOutput"]] = relationship(
+        back_populates="order_item",
+        cascade="all, delete-orphan",
+        order_by="OrderItemFinishedOutput.sort_order, OrderItemFinishedOutput.id",
+    )
+
+
+class OrderItemFinishedOutput(Base):
+    """成品明细：同一来料订单下的多个成品（件号/规格/重量可不同）。"""
+
+    __tablename__ = "order_item_finished_outputs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    order_item_id: Mapped[int] = mapped_column(
+        ForeignKey("order_items.id", ondelete="CASCADE"),
+        index=True,
+    )
+    sort_order: Mapped[int] = mapped_column(Integer, server_default="0")
+    piece_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    spec: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    formed_size: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    weight_return: Mapped[Decimal | None] = mapped_column(Numeric(18, 3), nullable=True)
+    remark: Mapped[str | None] = mapped_column(Text(), nullable=True)
+
+    order_item: Mapped["OrderItem"] = relationship(back_populates="finished_outputs")
 
 
 class CaseStudy(Base):
