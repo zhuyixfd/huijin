@@ -1,4 +1,4 @@
-"""处理中单件编号：32 日字母轮回 + 全库惟一数字后缀；已写入的编号永久保留。"""
+"""处理中单件编号：按自然月日序分配首字母（1 日 A、2 日 B…）+ 全库惟一数字后缀；已写入的编号永久保留。"""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.models import OrderItem
 
-# 共 32 个：A～Z 依次 + abcdef（与车间件号字母排序一致）
-DAY_CODE_CYCLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef"
+# 共 31 个：每月 1 日 A … 26 日 Z、27 日 a … 31 日 e；每月 1 日重新从 A 起（区分大小写）
+DAY_CODE_CYCLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcde"
 
 
 def count_processing_piece_strip(db: Session) -> list[tuple[str, int]]:
@@ -42,8 +42,10 @@ def count_processing_piece_strip(db: Session) -> list[tuple[str, int]]:
 
 
 def day_code_char(ref: date | None = None) -> str:
+    """当日件号首字母：按当月第几天取轮回表（非跨月连续）。"""
     d = ref or date.today()
-    return DAY_CODE_CYCLE[d.toordinal() % len(DAY_CODE_CYCLE)]
+    dom = max(1, min(int(d.day), len(DAY_CODE_CYCLE)))
+    return DAY_CODE_CYCLE[dom - 1]
 
 
 def _suffix_int(label: str) -> int | None:

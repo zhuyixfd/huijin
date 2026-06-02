@@ -124,6 +124,14 @@ function buildTodaySlotPiecePool(expandedBands) {
   })
 }
 
+/** 件号首字母筛选（区分大小写：A 与 a 不同） */
+function pieceLabelMatchesLetterFilter(unitLabel, letterKey) {
+  if (!letterKey) return true
+  const label = String(unitLabel ?? '').trim()
+  if (!label || label === '—') return false
+  return label[0] === letterKey
+}
+
 /** 今日处理折叠行：件号显示首件 + 省略，如 A1… */
 function todayClusterPieceLabelShort(clusterBands) {
   const codes = clusterBands
@@ -1016,20 +1024,18 @@ export default function TasksPage({
 
   const processingPieceLetterFilter =
     tasksPreset === 'processing' ? String(processingPieceLetter ?? '').trim() : ''
-  const processingPieceLetterNorm = useMemo(() => {
+  /** 件号首字母筛选（区分大小写：A 与 a 不同） */
+  const processingPieceLetterKey = useMemo(() => {
     const s = String(processingPieceLetterFilter ?? '').trim()
-    return s ? s[0].toUpperCase() : ''
+    return s ? s[0] : ''
   }, [processingPieceLetterFilter])
 
   const filteredTodayQueueExpandedBands = useMemo(() => {
-    if (!processingPieceLetterNorm) return todayQueueExpandedBands
+    if (!processingPieceLetterKey) return todayQueueExpandedBands
     return todayQueueExpandedBands.filter((row) =>
-      String(row.unitLabel ?? '')
-        .trim()
-        .toUpperCase()
-        .startsWith(processingPieceLetterNorm),
+      pieceLabelMatchesLetterFilter(row.unitLabel, processingPieceLetterKey),
     )
-  }, [todayQueueExpandedBands, processingPieceLetterNorm])
+  }, [todayQueueExpandedBands, processingPieceLetterKey])
 
   const filteredTodayQueueClusters = useMemo(() => {
     const flat = filteredTodayQueueExpandedBands
@@ -1138,14 +1144,11 @@ export default function TasksPage({
   }, [restProcessingExpandedBands])
 
   const filteredRestProcessingExpandedBands = useMemo(() => {
-    if (!processingPieceLetterNorm) return restProcessingExpandedBands
+    if (!processingPieceLetterKey) return restProcessingExpandedBands
     return restProcessingExpandedBands.filter((row) =>
-      String(row.unitLabel ?? '')
-        .trim()
-        .toUpperCase()
-        .startsWith(processingPieceLetterNorm),
+      pieceLabelMatchesLetterFilter(row.unitLabel, processingPieceLetterKey),
     )
-  }, [restProcessingExpandedBands, processingPieceLetterNorm])
+  }, [restProcessingExpandedBands, processingPieceLetterKey])
 
   const filteredRestProcessingClusters = useMemo(() => {
     const flat = filteredRestProcessingExpandedBands
@@ -1202,17 +1205,14 @@ export default function TasksPage({
   }, [tasksPreset, tomorrowQueueRows])
 
   const filteredTomorrowQueueExpandedBands = useMemo(() => {
-    if (!processingPieceLetterNorm) return tomorrowQueueExpandedBands
+    if (!processingPieceLetterKey) return tomorrowQueueExpandedBands
     return tomorrowQueueExpandedBands.filter((row) =>
-      String(row.unitLabel ?? '')
-        .trim()
-        .toUpperCase()
-        .startsWith(processingPieceLetterNorm),
+      pieceLabelMatchesLetterFilter(row.unitLabel, processingPieceLetterKey),
     )
-  }, [tomorrowQueueExpandedBands, processingPieceLetterNorm])
+  }, [tomorrowQueueExpandedBands, processingPieceLetterKey])
 
   const showProcessingPieceFilter =
-    tasksPreset === 'processing' && Boolean(processingPieceLetterNorm)
+    tasksPreset === 'processing' && Boolean(processingPieceLetterKey)
   const filteredTodayOrderCount = useMemo(() => {
     const s = new Set()
     for (const row of filteredTodayQueueExpandedBands) s.add(String(row.it.order_no ?? ''))
@@ -2173,17 +2173,14 @@ export default function TasksPage({
                       tabIndex={0}
                       aria-pressed={
                         showProcessingPieceFilter &&
-                        String(letter ?? '')
-                          .trim()
-                          .toUpperCase()
-                          .startsWith(processingPieceLetterNorm)
+                        String(letter ?? '').trim() === processingPieceLetterKey
                       }
                       onClick={() => {
                         const next = String(letter ?? '').trim()
                         setProcessingPieceLetter((prev) => {
                           const cur = String(prev ?? '').trim()
                           if (!next) return ''
-                          if (cur && cur[0]?.toUpperCase() === next[0]?.toUpperCase()) return ''
+                          if (cur && cur[0] === next) return ''
                           return next
                         })
                       }}
@@ -2194,7 +2191,7 @@ export default function TasksPage({
                         setProcessingPieceLetter((prev) => {
                           const cur = String(prev ?? '').trim()
                           if (!next) return ''
-                          if (cur && cur[0]?.toUpperCase() === next[0]?.toUpperCase()) return ''
+                          if (cur && cur[0] === next) return ''
                           return next
                         })
                       }}
@@ -2202,10 +2199,7 @@ export default function TasksPage({
                         'tasks-processing-piece-cell',
                         count === 0 ? 'is-muted' : '',
                         showProcessingPieceFilter &&
-                        String(letter ?? '')
-                          .trim()
-                          .toUpperCase()
-                          .startsWith(processingPieceLetterNorm)
+                        String(letter ?? '').trim() === processingPieceLetterKey
                           ? 'is-active'
                           : '',
                       ]
@@ -2299,7 +2293,7 @@ export default function TasksPage({
                 <h3 id="task-queue-today-heading" className="task-queue-panel-title">
                   今日处理 ·{' '}
                   {showProcessingPieceFilter
-                    ? `${processingPieceLetterNorm} · ${filteredTodayOrderCount}个订单，${filteredTodayQueueExpandedBands.length}件`
+                    ? `${processingPieceLetterKey} · ${filteredTodayOrderCount}个订单，${filteredTodayQueueExpandedBands.length}件`
                     : `${todayQueueRows.length}个订单，${todayQueueQtySum}件`}
                 </h3>
                 <div className="task-queue-panel-actions">
@@ -2409,7 +2403,7 @@ export default function TasksPage({
                 <h3 id="task-queue-tomorrow-heading" className="task-queue-panel-title">
                   明日处理 ·{' '}
                   {showProcessingPieceFilter
-                    ? `${processingPieceLetterNorm} · ${filteredTomorrowOrderCount}个订单，${filteredTomorrowQueueExpandedBands.length}件`
+                    ? `${processingPieceLetterKey} · ${filteredTomorrowOrderCount}个订单，${filteredTomorrowQueueExpandedBands.length}件`
                     : `${tomorrowQueueRows.length}个订单，${tomorrowQueueQtySum}件`}
                 </h3>
               </div>
@@ -2461,7 +2455,7 @@ export default function TasksPage({
                 <h3 id="task-queue-rest-heading" className="task-queue-panel-title">
                   待完成 ·{' '}
                   {showProcessingPieceFilter
-                    ? `${processingPieceLetterNorm} · ${filteredRestOrderCount}个订单，${filteredRestProcessingExpandedBands.length}件`
+                    ? `${processingPieceLetterKey} · ${filteredRestOrderCount}个订单，${filteredRestProcessingExpandedBands.length}件`
                     : `${restProcessingRows.length}个订单，${restQueueQtySum}件`}
                 </h3>
                 <div className="task-queue-panel-actions">

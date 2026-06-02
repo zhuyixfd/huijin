@@ -360,7 +360,7 @@ class TaskNavCountsOut(BaseModel):
     done: int
     processing_piece_strip: list[ProcessingLetterPieceCount] = Field(
         default_factory=list,
-        description="处理中（不含待发回）按件号首字母统计，顺序与轮回表一致",
+        description="处理中（不含待发回）按件号首字母统计，顺序与当月日序轮回表一致（A/a 区分）",
     )
 
 
