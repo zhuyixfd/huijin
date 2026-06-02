@@ -3160,13 +3160,6 @@ export default function TasksPage({
                 />
               </label>
               <div className="full">
-                <span className="form-field-label">{FORMED_SIZE_FIELD_LABEL}</span>
-                <FormedSizeStagesEditor
-                  value={newWork.formed_size}
-                  onChange={(v) => setNewWork((o) => ({ ...o, formed_size: v }))}
-                />
-              </div>
-              <div className="full">
                 <span className="form-field-label">成品明细</span>
                 <FinishedOutputsEditor
                   rows={newWorkFinishedOutputs}
@@ -3285,6 +3278,13 @@ export default function TasksPage({
                   }
                 />
               </label>
+              <div className="full">
+                <span className="form-field-label">{FORMED_SIZE_FIELD_LABEL}</span>
+                <FormedSizeStagesEditor
+                  value={newWork.formed_size}
+                  onChange={(v) => setNewWork((o) => ({ ...o, formed_size: v }))}
+                />
+              </div>
               {err ? <p className="err full">{err}</p> : null}
               <div className="form-actions full">
                 <button type="submit" className="btn btn-primary">
