@@ -805,52 +805,7 @@
 }
 
 .tasks-processing-strip-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.65rem 1rem;
   margin-bottom: 0.45rem;
-}
-
-.tasks-today-piece-letter-block {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-  padding: 0.35rem 0.55rem 0.45rem;
-  background: var(--accent-bg);
-  border: 1px solid var(--accent-border);
-  border-radius: 10px;
-}
-
-.tasks-today-piece-letter-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1.1;
-  color: var(--text-h);
-  opacity: 0.88;
-  white-space: nowrap;
-}
-
-.tasks-today-piece-letter-value {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.5rem;
-  font-family: var(--mono);
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1.1;
-  color: var(--text-h);
-}
-
-.tasks-processing-piece-today-tag {
-  font-size: 0.52rem;
-  font-weight: 600;
-  line-height: 1;
-  color: var(--text-h);
-  opacity: 0.9;
-  white-space: nowrap;
 }
 
 .tasks-processing-strip-title {
@@ -860,10 +815,43 @@
   opacity: 0.92;
 }
 
-.tasks-processing-piece-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.35rem;
+.tasks-processing-piece-grid {
+  overflow-x: auto;
+  padding-bottom: 0.15rem;
+}
+
+.tasks-processing-day-row,
+.tasks-processing-letter-row {
+  display: grid;
+  grid-template-columns: repeat(31, minmax(1.05rem, 1fr));
+  gap: 0.15rem 0.2rem;
+  align-items: end;
+  min-width: min(100%, 31 * 1.25rem);
+}
+
+.tasks-processing-day-num {
+  text-align: center;
+  font-size: 0.58rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  opacity: 0.72;
+}
+
+.tasks-processing-day-num.is-today-col {
+  font-weight: 700;
+  color: var(--text-h);
+  opacity: 1;
+}
+
+.tasks-processing-day-divider {
+  height: 1px;
+  margin: 0.2rem 0 0.28rem;
+  background: #d4d4d8;
+  opacity: 0.85;
+}
+
+.tasks-processing-letter-row {
   align-items: flex-start;
 }
 
@@ -871,7 +859,10 @@
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  min-width: 1.1rem;
+  justify-self: center;
+  min-width: 0;
+  width: 100%;
+  max-width: 1.35rem;
   font-size: 0.65rem;
   line-height: 1.12;
   font-variant-numeric: tabular-nums;
@@ -896,12 +887,12 @@
   border-color: var(--accent-border);
 }
 
-.tasks-processing-piece-cell.is-today-letter {
+.tasks-processing-piece-cell.is-today-col {
   border-color: var(--accent-border);
   box-shadow: 0 0 0 1px var(--accent-border);
 }
 
-.tasks-processing-piece-cell.is-today-letter .tasks-processing-piece-letter {
+.tasks-processing-piece-cell.is-today-col .tasks-processing-piece-letter {
   color: var(--accent, var(--text-h));
 }
 

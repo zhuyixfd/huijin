@@ -22,7 +22,7 @@ import {
   sumFinishedOutputWeights,
 } from './finishedOutputs.js'
 import { FORMED_SIZE_FIELD_LABEL } from './formedSizeStages.js'
-import { dayCodeCharForDate } from './processingDayCode.js'
+import { buildProcessingDayColumns } from './processingDayCode.js'
 import { can, PERM } from './permissions.js'
 
 function todayDateISO() {
@@ -1031,11 +1031,12 @@ export default function TasksPage({
     return s ? s[0] : ''
   }, [processingPieceLetterFilter])
 
-  const todayProcessingLetter = useMemo(() => {
-    const fromApi = String(taskNavCounts?.today_processing_letter ?? '').trim()
-    if (fromApi) return fromApi
-    return tasksPreset === 'processing' ? dayCodeCharForDate() : ''
-  }, [taskNavCounts?.today_processing_letter, tasksPreset])
+  const processingDayColumns = useMemo(
+    () => buildProcessingDayColumns(taskNavCounts?.processing_piece_strip),
+    [taskNavCounts?.processing_piece_strip],
+  )
+
+  const todayDayOfMonth = new Date().getDate()
 
   const filteredTodayQueueExpandedBands = useMemo(() => {
     if (!processingPieceLetterKey) return todayQueueExpandedBands
@@ -2163,87 +2164,87 @@ export default function TasksPage({
           </div>
         ) : tasksPreset === 'processing' ? (
           <>
-            {todayProcessingLetter ||
-            (Array.isArray(taskNavCounts?.processing_piece_strip) &&
-              taskNavCounts.processing_piece_strip.length > 0) ? (
-              <div
-                className="card tasks-processing-strip-card"
-                aria-label="处理中件号首字母件数统计"
-              >
-                <div className="tasks-processing-strip-head">
-                  {todayProcessingLetter ? (
-                    <div
-                      className="tasks-today-piece-letter-block"
-                      title="当日新排产件号首字母（按本月第几天）"
-                    >
-                      <span className="tasks-today-piece-letter-label">今日件号</span>
-                      <span className="tasks-today-piece-letter-value">{todayProcessingLetter}</span>
-                    </div>
-                  ) : null}
-                  <span className="tasks-processing-strip-title">件号字母（在制件数）</span>
-                </div>
-                <div className="tasks-processing-piece-strip">
-                  {(taskNavCounts?.processing_piece_strip ?? []).map(({ letter, count }) => {
-                    const isTodayLetter =
-                      todayProcessingLetter &&
-                      String(letter ?? '').trim() === todayProcessingLetter
-                    return (
+            <div
+              className="card tasks-processing-strip-card"
+              aria-label="处理中件号首字母件数统计"
+            >
+              <div className="tasks-processing-strip-head">
+                <span className="tasks-processing-strip-title">件号字母（在制件数）</span>
+              </div>
+              <div className="tasks-processing-piece-grid">
+                <div className="tasks-processing-day-row" aria-hidden="false">
+                  {processingDayColumns.map(({ day }) => (
                     <span
-                      key={letter}
-                      role="button"
-                      tabIndex={0}
-                      aria-pressed={
-                        showProcessingPieceFilter &&
-                        String(letter ?? '').trim() === processingPieceLetterKey
-                      }
-                      onClick={() => {
-                        const next = String(letter ?? '').trim()
-                        setProcessingPieceLetter((prev) => {
-                          const cur = String(prev ?? '').trim()
-                          if (!next) return ''
-                          if (cur && cur[0] === next) return ''
-                          return next
-                        })
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key !== 'Enter' && e.key !== ' ') return
-                        e.preventDefault()
-                        const next = String(letter ?? '').trim()
-                        setProcessingPieceLetter((prev) => {
-                          const cur = String(prev ?? '').trim()
-                          if (!next) return ''
-                          if (cur && cur[0] === next) return ''
-                          return next
-                        })
-                      }}
+                      key={`d-${day}`}
                       className={[
-                        'tasks-processing-piece-cell',
-                        count === 0 ? 'is-muted' : '',
-                        isTodayLetter ? 'is-today-letter' : '',
-                        showProcessingPieceFilter &&
-                        String(letter ?? '').trim() === processingPieceLetterKey
-                          ? 'is-active'
-                          : '',
+                        'tasks-processing-day-num',
+                        day === todayDayOfMonth ? 'is-today-col' : '',
                       ]
                         .filter(Boolean)
                         .join(' ')}
-                      title={
-                        isTodayLetter
-                          ? `今日件号 ${letter}：${count}件`
-                          : `${letter}：${count}件`
-                      }
                     >
-                      {isTodayLetter ? (
-                        <span className="tasks-processing-piece-today-tag">今日</span>
-                      ) : null}
-                      <span className="tasks-processing-piece-letter">{letter}</span>
-                      <span className="tasks-processing-piece-num">{count}</span>
+                      {day}
                     </span>
+                  ))}
+                </div>
+                <div className="tasks-processing-day-divider" aria-hidden="true" />
+                <div className="tasks-processing-letter-row">
+                  {processingDayColumns.map(({ day, letter, count }) => {
+                    const isTodayCol = day === todayDayOfMonth
+                    return (
+                      <span
+                        key={letter}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={
+                          showProcessingPieceFilter &&
+                          String(letter ?? '').trim() === processingPieceLetterKey
+                        }
+                        onClick={() => {
+                          const next = String(letter ?? '').trim()
+                          setProcessingPieceLetter((prev) => {
+                            const cur = String(prev ?? '').trim()
+                            if (!next) return ''
+                            if (cur && cur[0] === next) return ''
+                            return next
+                          })
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key !== 'Enter' && e.key !== ' ') return
+                          e.preventDefault()
+                          const next = String(letter ?? '').trim()
+                          setProcessingPieceLetter((prev) => {
+                            const cur = String(prev ?? '').trim()
+                            if (!next) return ''
+                            if (cur && cur[0] === next) return ''
+                            return next
+                          })
+                        }}
+                        className={[
+                          'tasks-processing-piece-cell',
+                          count === 0 ? 'is-muted' : '',
+                          isTodayCol ? 'is-today-col' : '',
+                          showProcessingPieceFilter &&
+                          String(letter ?? '').trim() === processingPieceLetterKey
+                            ? 'is-active'
+                            : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        title={
+                          isTodayCol
+                            ? `今日（${day}日）${letter}：${count}件`
+                            : `${day}日 ${letter}：${count}件`
+                        }
+                      >
+                        <span className="tasks-processing-piece-letter">{letter}</span>
+                        <span className="tasks-processing-piece-num">{count}</span>
+                      </span>
                     )
                   })}
                 </div>
               </div>
-            ) : null}
+            </div>
             {tasksPreset === 'processing' ? (
               <section className="card today-slot-order-bar" aria-label="今日件号排序">
                 <div className="today-slot-order-head">
