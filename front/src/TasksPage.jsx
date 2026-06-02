@@ -22,6 +22,7 @@ import {
   sumFinishedOutputWeights,
 } from './finishedOutputs.js'
 import { FORMED_SIZE_FIELD_LABEL } from './formedSizeStages.js'
+import { dayCodeCharForDate } from './processingDayCode.js'
 import { can, PERM } from './permissions.js'
 
 function todayDateISO() {
@@ -1029,6 +1030,12 @@ export default function TasksPage({
     const s = String(processingPieceLetterFilter ?? '').trim()
     return s ? s[0] : ''
   }, [processingPieceLetterFilter])
+
+  const todayProcessingLetter = useMemo(() => {
+    const fromApi = String(taskNavCounts?.today_processing_letter ?? '').trim()
+    if (fromApi) return fromApi
+    return tasksPreset === 'processing' ? dayCodeCharForDate() : ''
+  }, [taskNavCounts?.today_processing_letter, tasksPreset])
 
   const filteredTodayQueueExpandedBands = useMemo(() => {
     if (!processingPieceLetterKey) return todayQueueExpandedBands
@@ -2156,7 +2163,7 @@ export default function TasksPage({
           </div>
         ) : tasksPreset === 'processing' ? (
           <>
-            {taskNavCounts?.today_processing_letter ||
+            {todayProcessingLetter ||
             (Array.isArray(taskNavCounts?.processing_piece_strip) &&
               taskNavCounts.processing_piece_strip.length > 0) ? (
               <div
@@ -2164,23 +2171,22 @@ export default function TasksPage({
                 aria-label="处理中件号首字母件数统计"
               >
                 <div className="tasks-processing-strip-head">
-                  {taskNavCounts?.today_processing_letter ? (
-                    <div className="tasks-today-piece-letter-row">
+                  {todayProcessingLetter ? (
+                    <div
+                      className="tasks-today-piece-letter-block"
+                      title="当日新排产件号首字母（按本月第几天）"
+                    >
                       <span className="tasks-today-piece-letter-label">今日件号</span>
-                      <span
-                        className="tasks-today-piece-letter-value"
-                        title="当日新排产件号首字母（按本月第几天）"
-                      >
-                        {taskNavCounts.today_processing_letter}
-                      </span>
+                      <span className="tasks-today-piece-letter-value">{todayProcessingLetter}</span>
                     </div>
                   ) : null}
                   <span className="tasks-processing-strip-title">件号字母（在制件数）</span>
                 </div>
                 <div className="tasks-processing-piece-strip">
                   {(taskNavCounts?.processing_piece_strip ?? []).map(({ letter, count }) => {
-                    const todayLetter = String(taskNavCounts?.today_processing_letter ?? '').trim()
-                    const isTodayLetter = todayLetter && String(letter ?? '').trim() === todayLetter
+                    const isTodayLetter =
+                      todayProcessingLetter &&
+                      String(letter ?? '').trim() === todayProcessingLetter
                     return (
                     <span
                       key={letter}
@@ -2227,6 +2233,9 @@ export default function TasksPage({
                           : `${letter}：${count}件`
                       }
                     >
+                      {isTodayLetter ? (
+                        <span className="tasks-processing-piece-today-tag">今日</span>
+                      ) : null}
                       <span className="tasks-processing-piece-letter">{letter}</span>
                       <span className="tasks-processing-piece-num">{count}</span>
                     </span>
