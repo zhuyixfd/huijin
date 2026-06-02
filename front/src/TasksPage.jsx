@@ -12,6 +12,7 @@ import {
 import { openDeliverySlipPreview } from './deliverySheetPrint.js'
 import { openWorkshopProductionPreview } from './workshopSheetPrint.js'
 import { apiUrl } from './config.js'
+import Modal, { preventModalFormEnterSubmit } from './Modal.jsx'
 import { FinishedOutputsEditor, FinishedOutputsView } from './FinishedOutputs.jsx'
 import { FormedSizeStagesEditor, FormedSizeStagesView } from './FormedSizeStages.jsx'
 import {
@@ -754,21 +755,6 @@ export default function TasksPage({
     } catch (e) {
       setErr(e instanceof Error ? e.message : '创建失败')
     }
-  }
-
-  function onNewWorkModalKeyDown(e) {
-    if (e.key !== 'Enter') return
-    const t = e.target
-    if (!(t instanceof HTMLElement)) return
-    if (t instanceof HTMLTextAreaElement) return
-    if (t instanceof HTMLSelectElement) return
-    if (t instanceof HTMLButtonElement) return
-    if (t instanceof HTMLInputElement) {
-      const tp = String(t.type || '').toLowerCase()
-      if (tp === 'submit' || tp === 'button' || tp === 'file' || tp === 'checkbox' || tp === 'radio') return
-    }
-    e.preventDefault()
-    t.blur?.()
   }
 
   function openEditItem(it) {
@@ -2910,10 +2896,13 @@ export default function TasksPage({
       )}
 
       {splitModalOpen ? (
-        <div className="modal-backdrop" onClick={() => setSplitModalOpen(false)} role="presentation">
-          <div className="modal-card wide" onClick={(e) => e.stopPropagation()} role="dialog">
-            <h2>拆分订单（今日不处理）</h2>
-            <form className="form-grid" onSubmit={submitSplit}>
+        <Modal
+          open
+          wide
+          title="拆分订单（今日不处理）"
+          onClose={() => setSplitModalOpen(false)}
+        >
+            <form className="form-grid" onSubmit={submitSplit} onKeyDown={preventModalFormEnterSubmit}>
               <label className="full">
                 选择今日处理订单 *
                 <select
@@ -2987,9 +2976,6 @@ export default function TasksPage({
                 )}
               </fieldset>
               <div className="row-actions full" style={{ justifyContent: 'flex-end' }}>
-                <button type="button" className="btn" onClick={() => setSplitModalOpen(false)}>
-                  取消
-                </button>
                 <button
                   type="submit"
                   className="btn btn-primary"
@@ -3008,19 +2994,12 @@ export default function TasksPage({
                 拆分后订单号将变为「原订单号-1」与「原订单号-2」，切头重量会按件数比例分摊；当两单再次处于同一阶段（不晚于等待出库）会自动合并。
               </p>
             </form>
-          </div>
-        </div>
+        </Modal>
       ) : null}
 
       {cutHeadModalOpen ? (
-        <div
-          className="modal-backdrop"
-          onClick={() => setCutHeadModalOpen(false)}
-          role="presentation"
-        >
-          <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog">
-            <h2>新建切头</h2>
-            <form className="form-grid" onSubmit={submitCutHead}>
+        <Modal open title="新建切头" onClose={() => setCutHeadModalOpen(false)}>
+            <form className="form-grid" onSubmit={submitCutHead} onKeyDown={preventModalFormEnterSubmit}>
               <label className="full">
                 搜索（订单号/来料编号）
                 <input
@@ -3062,9 +3041,6 @@ export default function TasksPage({
                 />
               </label>
               <div className="row-actions full" style={{ justifyContent: 'flex-end' }}>
-                <button type="button" className="btn" onClick={() => setCutHeadModalOpen(false)}>
-                  取消
-                </button>
                 <button
                   type="submit"
                   className="btn btn-primary"
@@ -3074,33 +3050,19 @@ export default function TasksPage({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       ) : null}
 
       {workOrderModal ? (
-        <div className="modal-backdrop" onClick={() => setWorkOrderModal(false)} role="presentation">
-          <div
-            className="modal-card wide"
-            onMouseDownCapture={(e) => {
-              if (e.button !== 0) return
-              const t = e.target
-              if (!(t instanceof HTMLElement)) return
-              if (t.closest('input,textarea,select')) return
-              if (t.closest('button,a')) {
-                e.preventDefault()
-                return
-              }
-              e.preventDefault()
-            }}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-          >
-            <h2>新建来料订单</h2>
+        <Modal open wide title="新建来料订单" onClose={() => setWorkOrderModal(false)}>
             <p className="muted" style={{ marginTop: '-0.5rem', marginBottom: '0.5rem' }}>
               一单一条来料；订单号由服务端按 hj + 该客户的「客户缩写」+ 日期 + 流水 自动生成。
             </p>
-            <form className="form-grid item-form-grid" onSubmit={submitWorkOrder} onKeyDown={onNewWorkModalKeyDown}>
+            <form
+              className="form-grid item-form-grid"
+              onSubmit={submitWorkOrder}
+              onKeyDown={preventModalFormEnterSubmit}
+            >
               <label>
                 客户 *
                 <select
@@ -3300,102 +3262,44 @@ export default function TasksPage({
               </label>
               {err ? <p className="err full">{err}</p> : null}
               <div className="form-actions full">
-                <button type="button" className="btn" onClick={() => setWorkOrderModal(false)}>
-                  取消
-                </button>
                 <button type="submit" className="btn btn-primary">
                   创建
                 </button>
               </div>
             </form>
-            {newWorkRemarkPreviewOpen ? (
-              <div
-                role="presentation"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setNewWorkRemarkPreviewOpen(null)
-                }}
-                style={{
-                  position: 'fixed',
-                  inset: 0,
-                  zIndex: 10001,
-                  background: 'rgba(0,0,0,.6)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 12,
-                  boxSizing: 'border-box',
-                }}
-              >
-                <div
-                  role="dialog"
-                  aria-label="图片预览"
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    width: 'min(1100px, 100%)',
-                    maxHeight: '92vh',
-                    background: 'var(--bg)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 12,
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: '0.65rem 0.85rem',
-                      borderBottom: '1px solid var(--border)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '0.75rem',
-                    }}
-                  >
-                    <span className="muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {newWorkRemarkPreviewOpen.name || '预览'}
-                    </span>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => setNewWorkRemarkPreviewOpen(null)}
-                    >
-                      关闭
-                    </button>
-                  </div>
-                  <div
-                    style={{
-                      padding: 12,
-                      overflow: 'auto',
-                      background: 'rgba(0,0,0,.04)',
-                      flex: '1 1 auto',
-                    }}
-                  >
-                    <img
-                      src={newWorkRemarkPreviewOpen.src}
-                      alt=""
-                      style={{
-                        width: '100%',
-                        height: 'auto',
-                        display: 'block',
-                        borderRadius: 10,
-                        border: '1px solid var(--border)',
-                        background: '#fff',
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
+        </Modal>
+      ) : null}
+
+      {newWorkRemarkPreviewOpen ? (
+        <Modal
+          open
+          wide
+          zIndex={60}
+          title={newWorkRemarkPreviewOpen.name || '图片预览'}
+          onClose={() => setNewWorkRemarkPreviewOpen(null)}
+        >
+          <img
+            src={newWorkRemarkPreviewOpen.src}
+            alt=""
+            style={{
+              width: '100%',
+              height: 'auto',
+              display: 'block',
+              borderRadius: 10,
+              border: '1px solid var(--border)',
+              background: '#fff',
+            }}
+          />
+        </Modal>
       ) : null}
 
       {itemModal ? (
-        <div className="modal-backdrop" onClick={() => setItemModal(null)} role="presentation">
-          <div className="modal-card wide" onClick={(e) => e.stopPropagation()} role="dialog">
-            <h2>编辑来料</h2>
-            <form className="form-grid item-form-grid" onSubmit={submitItem}>
+        <Modal open wide title="编辑来料" onClose={() => setItemModal(null)}>
+            <form
+              className="form-grid item-form-grid"
+              onSubmit={submitItem}
+              onKeyDown={preventModalFormEnterSubmit}
+            >
               <label>
                 来料编号
                 <input
@@ -3568,27 +3472,21 @@ export default function TasksPage({
               </label>
               {err ? <p className="err full">{err}</p> : null}
               <div className="form-actions full">
-                <button type="button" className="btn" onClick={() => setItemModal(null)}>
-                  取消
-                </button>
                 <button type="submit" className="btn btn-primary">
                   保存
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       ) : null}
 
       {caseModal ? (
-        <div className="modal-backdrop" onClick={() => setCaseModal(null)} role="presentation">
-          <div className="modal-card wide" onClick={(e) => e.stopPropagation()} role="dialog">
-            <h2>添加生产案例</h2>
+        <Modal open wide title="添加生产案例" onClose={() => setCaseModal(null)}>
             <p className="muted">
               明细 {caseModal.it.id} · {caseModal.it.order_no}
               {caseModal.unitLabel ? ` · ${caseModal.unitLabel}` : ''}
             </p>
-            <form className="form-grid" onSubmit={submitCaseStudy}>
+            <form className="form-grid" onSubmit={submitCaseStudy} onKeyDown={preventModalFormEnterSubmit}>
               <label className="full">
                 文字备注
                 <textarea
@@ -3611,27 +3509,22 @@ export default function TasksPage({
               ) : null}
               {err ? <p className="err full">{err}</p> : null}
               <div className="form-actions full">
-                <button type="button" className="btn" onClick={() => setCaseModal(null)}>
-                  取消
-                </button>
                 <button type="submit" className="btn btn-primary" disabled={caseSubmitting}>
                   {caseSubmitting ? '提交中…' : '保存'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       ) : null}
 
       {slotOrderModalOpen ? (
-        <div className="modal-backdrop" onClick={() => setSlotOrderModalOpen(false)} role="presentation">
-          <div
-            className="modal-card wide today-slot-order-modal"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-labelledby="slot-order-modal-title"
-          >
-            <h2 id="slot-order-modal-title">今日件号排序</h2>
+        <Modal
+          open
+          wide
+          className="today-slot-order-modal"
+          title="今日件号排序"
+          onClose={() => setSlotOrderModalOpen(false)}
+        >
             <p className="muted" style={{ marginTop: '-0.35rem' }}>
               先点选一排（高亮），再点上方的件号：可连续点多个件号排进同一排（用两个空格分隔）；同一排再点已选件号会从该排去掉。非「未编号」的件号仍不可同时出现在两排。
             </p>
@@ -3744,9 +3637,6 @@ export default function TasksPage({
               </div>
             </div>
             <div className="form-actions" style={{ marginTop: '0.75rem' }}>
-              <button type="button" className="btn" onClick={() => setSlotOrderModalOpen(false)}>
-                取消
-              </button>
               <button
                 type="button"
                 className="btn btn-ghost"
@@ -3758,28 +3648,25 @@ export default function TasksPage({
                 保存
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       ) : null}
 
       {grindItem ? (
-        <div
-          className="modal-backdrop"
-          onClick={() => {
+        <Modal
+          open
+          title="修磨记录"
+          onClose={() => {
             setGrindItem(null)
             setGrindUnitIndex(null)
           }}
-          role="presentation"
         >
-          <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog">
-            <h2>修磨记录</h2>
             <p className="muted">
               订单 {grindItem.order_no} · 来料编号 {grindItem.incoming_no ?? '—'}
               {grindUnitIndex !== null && grindUnitIndex !== undefined
                 ? ` · 第 ${grindUnitIndex + 1} 件`
                 : ''}
             </p>
-            <form className="form-grid" onSubmit={submitGrind}>
+            <form className="form-grid" onSubmit={submitGrind} onKeyDown={preventModalFormEnterSubmit}>
               <label className="full">
                 备注（可选）
                 <textarea
@@ -3790,23 +3677,12 @@ export default function TasksPage({
               </label>
               {err ? <p className="err">{err}</p> : null}
               <div className="form-actions">
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => {
-                    setGrindItem(null)
-                    setGrindUnitIndex(null)
-                  }}
-                >
-                  取消
-                </button>
                 <button type="submit" className="btn btn-primary">
                   保存记录
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       ) : null}
     </div>
   )

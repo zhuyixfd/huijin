@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import './Pages.css'
 import { deleteReq, getJson, patchJson, postJson } from './api.js'
+import Modal, { preventModalFormEnterSubmit } from './Modal.jsx'
 
 export default function CustomersPage() {
   const [rows, setRows] = useState([])
@@ -173,14 +174,8 @@ export default function CustomersPage() {
       </div>
 
       {modal === 'create' ? (
-        <div className="modal-backdrop" role="presentation" onClick={() => setModal(null)}>
-          <div
-            className="modal-card"
-            role="dialog"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2>新建客户</h2>
-            <form className="form-grid" onSubmit={submitCreate}>
+        <Modal open title="新建客户" onClose={() => setModal(null)}>
+            <form className="form-grid" onSubmit={submitCreate} onKeyDown={preventModalFormEnterSubmit}>
               <label>
                 客户名称 *
                 <input
@@ -230,27 +225,17 @@ export default function CustomersPage() {
               </label>
               {err ? <p className="err">{err}</p> : null}
               <div className="form-actions">
-                <button type="button" className="btn" onClick={() => setModal(null)}>
-                  取消
-                </button>
                 <button type="submit" className="btn btn-primary">
                   保存
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       ) : null}
 
       {modal?.editId ? (
-        <div className="modal-backdrop" role="presentation" onClick={() => setModal(null)}>
-          <div
-            className="modal-card"
-            role="dialog"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2>编辑客户</h2>
-            <form className="form-grid" onSubmit={submitEdit}>
+        <Modal open title="编辑客户" onClose={() => setModal(null)}>
+            <form className="form-grid" onSubmit={submitEdit} onKeyDown={preventModalFormEnterSubmit}>
               <label>
                 客户名称 *
                 <input
@@ -299,16 +284,12 @@ export default function CustomersPage() {
               </label>
               {err ? <p className="err">{err}</p> : null}
               <div className="form-actions">
-                <button type="button" className="btn" onClick={() => setModal(null)}>
-                  取消
-                </button>
                 <button type="submit" className="btn btn-primary">
                   保存
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       ) : null}
     </div>
   )

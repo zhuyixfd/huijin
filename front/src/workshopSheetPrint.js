@@ -247,7 +247,8 @@ function ensureModalStyles() {
   el.textContent = `
 .workshop-print-modal-backdrop { position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; }
 .workshop-print-modal { background: #fff; border-radius: 10px; width: min(920px, 100%); max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,.25); overflow: hidden; }
-.workshop-print-toolbar { flex: 0 0 auto; padding: 10px 12px; border-bottom: 1px solid var(--border, #ddd); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.workshop-print-toolbar { flex: 0 0 auto; padding: 10px 12px 10px 2.5rem; border-bottom: 1px solid var(--border, #ddd); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; align-items: center; position: relative; }
+.workshop-print-toolbar .workshop-print-btn-close { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); }
 .workshop-print-toolbar .btn { font: inherit; padding: 0.45rem 0.9rem; border-radius: 8px; border: 1px solid #ccc; background: #f4f4f5; cursor: pointer; }
 .workshop-print-toolbar .workshop-print-btn-print { background: #2563eb; color: #fff; border-color: #1d4ed8; }
 .workshop-print-toolbar .workshop-print-workshop { margin-right: auto; display: flex; align-items: center; gap: 6px; }
@@ -286,7 +287,7 @@ export function openWorkshopProductionPreview(todayQueueRows, previewOptions = {
     '</select>' +
     '</div>' +
     '<button type="button" class="btn workshop-print-btn-print">打印</button>' +
-    '<button type="button" class="btn workshop-print-btn-close">关闭</button>' +
+    '<button type="button" class="modal-close-x workshop-print-btn-close" aria-label="关闭">×</button>' +
     '</div>' +
     '<iframe class="workshop-print-frame" title="汇金加工生产单"></iframe>' +
     '</div>'
@@ -321,9 +322,6 @@ export function openWorkshopProductionPreview(todayQueueRows, previewOptions = {
     iframe.contentWindow?.print()
   })
   backdrop.querySelector('.workshop-print-btn-close').addEventListener('click', close)
-  backdrop.addEventListener('click', (e) => {
-    if (e.target === backdrop) close()
-  })
 
   /* 必须先挂到文档树，否则 iframe.contentDocument / contentWindow 常为 null */
   document.body.appendChild(backdrop)

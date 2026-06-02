@@ -227,7 +227,8 @@ function ensureModalStyles() {
   el.textContent = `
 .delivery-print-modal-backdrop { position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; }
 .delivery-print-modal { background: #fff; border-radius: 10px; width: min(1100px, 100%); max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,.25); overflow: hidden; }
-.delivery-print-toolbar { flex: 0 0 auto; padding: 10px 12px; border-bottom: 1px solid var(--border, #ddd); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; align-items: center; }
+.delivery-print-toolbar { flex: 0 0 auto; padding: 10px 12px; border-bottom: 1px solid var(--border, #ddd); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; align-items: center; position: relative; padding-left: 2.5rem; }
+.delivery-print-toolbar .delivery-print-btn-close { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); }
 .delivery-print-toolbar .btn { font: inherit; padding: 0.45rem 0.9rem; border-radius: 8px; border: 1px solid #ccc; background: #f4f4f5; cursor: pointer; }
 .delivery-print-toolbar .delivery-print-btn-print { background: #2563eb; color: #fff; border-color: #1d4ed8; }
 .delivery-print-toolbar .delivery-print-hint { margin-right: auto; font-size: 13px; color: #555; }
@@ -285,7 +286,7 @@ export function openDeliverySlipPreview(outboundRows) {
     '<span class="delivery-print-hint">以下为打印预览数据，可直接修改；修改仅用于本次打印与导出，不会保存到系统。</span>' +
     '<button type="button" class="btn delivery-print-btn-export">导出 Excel</button>' +
     '<button type="button" class="btn delivery-print-btn-print">打印</button>' +
-    '<button type="button" class="btn delivery-print-btn-close">关闭</button>' +
+    '<button type="button" class="modal-close-x delivery-print-btn-close" aria-label="关闭">×</button>' +
     '</div>' +
     '<div class="delivery-edit-scroll">' +
     '<table class="delivery-edit-table"><thead><tr>' +
@@ -361,9 +362,6 @@ export function openDeliverySlipPreview(outboundRows) {
     exportDeliveryRowsToExcelCsv(rows, { showCutHeadCol })
   })
   backdrop.querySelector('.delivery-print-btn-close').addEventListener('click', close)
-  backdrop.addEventListener('click', (e) => {
-    if (e.target === backdrop) close()
-  })
 
   document.body.appendChild(backdrop)
   return true

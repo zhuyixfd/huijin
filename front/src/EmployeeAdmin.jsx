@@ -3,6 +3,7 @@ import './EmployeeAdmin.css'
 import './Pages.css'
 import { patchJson } from './api.js'
 import { authFetch, formatApiError } from './auth.js'
+import Modal, { preventModalFormEnterSubmit } from './Modal.jsx'
 import { PERM_OPTIONS } from './permissions.js'
 
 function fmtDateTime(iso) {
@@ -290,17 +291,16 @@ export default function EmployeeAdmin() {
       </div>
 
       {pwdTarget ? (
-        <div
-          className="modal-backdrop"
-          onClick={() => setPwdTarget(null)}
-          role="presentation"
+        <Modal
+          open
+          title={`修改密码 · ${pwdTarget.username}`}
+          titleAs="h3"
+          onClose={() => setPwdTarget(null)}
         >
-          <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog">
-            <h3 style={{ marginTop: 0 }}>修改密码 · {pwdTarget.username}</h3>
             <p className="muted" style={{ marginBottom: '1rem' }}>
               为员工设置新的登录密码（至少 6 位）。
             </p>
-            <form className="form-grid" onSubmit={submitPwd}>
+            <form className="form-grid" onSubmit={submitPwd} onKeyDown={preventModalFormEnterSubmit}>
               <label>
                 新密码
                 <input
@@ -318,36 +318,23 @@ export default function EmployeeAdmin() {
                 <button type="submit" className="btn btn-primary" disabled={pwdLoading}>
                   {pwdLoading ? '保存中…' : '保存'}
                 </button>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => setPwdTarget(null)}
-                  disabled={pwdLoading}
-                >
-                  取消
-                </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       ) : null}
 
       {permTarget ? (
-        <div
-          className="modal-backdrop"
-          onClick={() => !permLoading && setPermTarget(null)}
-          role="presentation"
+        <Modal
+          open
+          wide
+          title={`业务权限 · ${permTarget.username}`}
+          titleAs="h3"
+          onClose={() => !permLoading && setPermTarget(null)}
         >
-          <div
-            className="modal-card wide"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-          >
-            <h3 style={{ marginTop: 0 }}>业务权限 · {permTarget.username}</h3>
             <p className="muted" style={{ marginBottom: '1rem' }}>
               未在数据库中单独配置过权限的帐号，仍视为拥有全部四项权限。保存后将以当前勾选为准；若全部不勾选并保存，该帐号将不能进行任何订单相关操作。
             </p>
-            <form className="form-grid" onSubmit={submitPerm}>
+            <form className="form-grid" onSubmit={submitPerm} onKeyDown={preventModalFormEnterSubmit}>
               {PERM_OPTIONS.map(([code, label]) => (
                 <label
                   key={code}
@@ -367,18 +354,9 @@ export default function EmployeeAdmin() {
                 <button type="submit" className="btn btn-primary" disabled={permLoading}>
                   {permLoading ? '保存中…' : '保存'}
                 </button>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => setPermTarget(null)}
-                  disabled={permLoading}
-                >
-                  取消
-                </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       ) : null}
     </section>
   )
