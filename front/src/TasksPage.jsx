@@ -248,6 +248,7 @@ export default function TasksPage({
 
   const [workOrderModal, setWorkOrderModal] = useState(false)
   const [newWork, setNewWork] = useState(emptyWorkOrderForm)
+  const [newWorkFormedSizes, setNewWorkFormedSizes] = useState(() => [''])
   const [newWorkRemarkFiles, setNewWorkRemarkFiles] = useState([])
   const [newWorkRemarkPreviews, setNewWorkRemarkPreviews] = useState([])
   const [newWorkRemarkPreviewOpen, setNewWorkRemarkPreviewOpen] = useState(null)
@@ -718,10 +719,14 @@ export default function TasksPage({
     e.preventDefault()
     setErr(null)
     try {
+      const formedSizeJoined = (Array.isArray(newWorkFormedSizes) ? newWorkFormedSizes : [])
+        .map((x) => String(x ?? '').trim())
+        .filter(Boolean)
+        .join(',')
       const payload = {
         customer_id: Number(newWork.customer_id),
         order_remark: newWork.order_remark || null,
-        ...normalizeItemPayload(newWork),
+        ...normalizeItemPayload({ ...newWork, formed_size: formedSizeJoined }),
       }
       const created = await postJson('/api/tasks/work-orders', payload)
       let mergedImages = Array.isArray(newWork.remark_images) ? [...newWork.remark_images] : []
@@ -734,6 +739,7 @@ export default function TasksPage({
       }
       setWorkOrderModal(false)
       setNewWork(emptyWorkOrderForm())
+      setNewWorkFormedSizes([''])
       setNewWorkRemarkFiles([])
       loadTasks()
       await refreshDetail(created.id)
@@ -741,6 +747,21 @@ export default function TasksPage({
     } catch (e) {
       setErr(e instanceof Error ? e.message : '创建失败')
     }
+  }
+
+  function onNewWorkModalKeyDown(e) {
+    if (e.key !== 'Enter') return
+    const t = e.target
+    if (!(t instanceof HTMLElement)) return
+    if (t instanceof HTMLTextAreaElement) return
+    if (t instanceof HTMLSelectElement) return
+    if (t instanceof HTMLButtonElement) return
+    if (t instanceof HTMLInputElement) {
+      const tp = String(t.type || '').toLowerCase()
+      if (tp === 'submit' || tp === 'button' || tp === 'file' || tp === 'checkbox' || tp === 'radio') return
+    }
+    e.preventDefault()
+    t.blur?.()
   }
 
   function openEditItem(it) {
@@ -1777,6 +1798,7 @@ export default function TasksPage({
                 className="btn btn-primary"
                 onClick={() => {
                   setNewWork(emptyWorkOrderForm())
+                  setNewWorkFormedSizes([''])
                   setNewWorkRemarkFiles([])
                   setWorkOrderModal(true)
                 }}
@@ -3045,7 +3067,7 @@ export default function TasksPage({
             <p className="muted" style={{ marginTop: '-0.5rem', marginBottom: '0.5rem' }}>
               一单一条来料；订单号由服务端按 hj + 该客户的「客户缩写」+ 日期 + 流水 自动生成。
             </p>
-            <form className="form-grid item-form-grid" onSubmit={submitWorkOrder}>
+            <form className="form-grid item-form-grid" onSubmit={submitWorkOrder} onKeyDown={onNewWorkModalKeyDown}>
               <label>
                 客户 *
                 <select
@@ -3114,10 +3136,30 @@ export default function TasksPage({
               </label>
               <label>
                 成型尺寸
-                <input
-                  value={newWork.formed_size}
-                  onChange={(e) => setNewWork((o) => ({ ...o, formed_size: e.target.value }))}
-                />
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: '1 1 auto' }}>
+                    {(Array.isArray(newWorkFormedSizes) ? newWorkFormedSizes : ['']).map((v, idx) => (
+                      <input
+                        key={idx}
+                        value={v}
+                        onChange={(e) => {
+                          const next = Array.isArray(newWorkFormedSizes) ? [...newWorkFormedSizes] : ['']
+                          next[idx] = e.target.value
+                          setNewWorkFormedSizes(next)
+                          setNewWork((o) => ({ ...o, formed_size: next.map((x) => String(x ?? '').trim()).filter(Boolean).join(',') }))
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    aria-label="添加成型尺寸"
+                    onClick={() => setNewWorkFormedSizes((prev) => [...(Array.isArray(prev) ? prev : ['']), ''])}
+                  >
+                    +
+                  </button>
+                </div>
               </label>
               <label className="full">
                 锻造要求
