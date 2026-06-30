@@ -25,8 +25,8 @@ def generate_next_order_no(db: Session, *, customer_id: int) -> str:
     max_n = 0
     for num in nos:
         suf = num[len(prefix) :]
-        try:
-            max_n = max(max_n, int(suf))
-        except ValueError:
+        head = suf[:5]
+        if len(head) != 5 or not head.isdigit():
             continue
+        max_n = max(max_n, int(head))
     return f"{prefix}{max_n + 1:05d}"

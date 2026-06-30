@@ -68,6 +68,19 @@ def ensure_order_item_remark_images() -> None:
         conn.execute(text("ALTER TABLE order_items ADD COLUMN remark_images JSON NULL"))
 
 
+def ensure_order_item_incoming_sheet_images() -> None:
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_items")}
+    if "incoming_sheet_images" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text("ALTER TABLE order_items ADD COLUMN incoming_sheet_images JSON NULL")
+        )
+
+
 def ensure_order_item_cut_head_weight() -> None:
     inspector = inspect(engine)
     if "order_items" not in inspector.get_table_names():
@@ -96,7 +109,9 @@ def ensure_order_item_finished_outputs_table() -> None:
                     piece_code VARCHAR(64) NULL,
                     spec VARCHAR(256) NULL,
                     formed_size VARCHAR(512) NULL,
+                    pieces INT NULL,
                     weight_return DECIMAL(18,3) NULL,
+                    return_date DATE NULL,
                     remark TEXT NULL,
                     INDEX ix_oifo_order_item_id (order_item_id),
                     CONSTRAINT fk_oifo_order_item
@@ -105,6 +120,116 @@ def ensure_order_item_finished_outputs_table() -> None:
                 """
             )
         )
+
+
+def ensure_order_item_finished_outputs_return_date() -> None:
+    inspector = inspect(engine)
+    if "order_item_finished_outputs" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_item_finished_outputs")}
+    if "return_date" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE order_item_finished_outputs ADD COLUMN return_date DATE NULL"))
+
+
+def ensure_order_item_finished_outputs_pieces() -> None:
+    inspector = inspect(engine)
+    if "order_item_finished_outputs" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_item_finished_outputs")}
+    if "pieces" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text("ALTER TABLE order_item_finished_outputs ADD COLUMN pieces INT NULL")
+        )
+
+
+def ensure_order_item_finished_outputs_pieces_nullable() -> None:
+    inspector = inspect(engine)
+    if "order_item_finished_outputs" not in inspector.get_table_names():
+        return
+    cols = {c["name"]: c for c in inspector.get_columns("order_item_finished_outputs")}
+    col = cols.get("pieces")
+    if not col:
+        return
+    with engine.begin() as conn:
+        if not bool(col.get("nullable")):
+            conn.execute(text("ALTER TABLE order_item_finished_outputs MODIFY COLUMN pieces INT NULL"))
+        conn.execute(text("ALTER TABLE order_item_finished_outputs ALTER pieces DROP DEFAULT"))
+
+
+def ensure_order_item_incoming_quantity() -> None:
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_items")}
+    if "incoming_quantity" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text("ALTER TABLE order_items ADD COLUMN incoming_quantity INT NOT NULL DEFAULT 1")
+        )
+
+
+def ensure_order_item_quantity_nullable() -> None:
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    cols = {c["name"]: c for c in inspector.get_columns("order_items")}
+    col = cols.get("quantity")
+    if not col:
+        return
+    with engine.begin() as conn:
+        if not bool(col.get("nullable")):
+            conn.execute(text("ALTER TABLE order_items MODIFY COLUMN quantity INT NULL"))
+        conn.execute(text("ALTER TABLE order_items ALTER quantity DROP DEFAULT"))
+
+
+def ensure_order_item_promised_return_date() -> None:
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_items")}
+    if "promised_return_date" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE order_items ADD COLUMN promised_return_date DATE NULL"))
+        conn.execute(
+            text(
+                "UPDATE order_items SET promised_return_date = return_date "
+                "WHERE promised_return_date IS NULL AND return_date IS NOT NULL"
+            )
+        )
+
+
+def ensure_order_item_returned_at() -> None:
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_items")}
+    if "returned_at" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE order_items ADD COLUMN returned_at DATETIME NULL"))
+        conn.execute(
+            text(
+                "UPDATE order_items SET returned_at = CONCAT(return_date, ' 00:00:00') "
+                "WHERE returned_at IS NULL AND return_date IS NOT NULL AND production_status = '已发回'"
+            )
+        )
+
+
+def ensure_order_item_unit_production_statuses() -> None:
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("order_items")}
+    if "unit_production_statuses" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE order_items ADD COLUMN unit_production_statuses JSON NULL"))
 
 
 def ensure_order_item_split_columns() -> None:
@@ -274,9 +399,18 @@ def init_db() -> None:
     drop_order_item_legacy_production_columns()
     ensure_user_permission_codes_column()
     ensure_order_item_remark_images()
+    ensure_order_item_incoming_sheet_images()
     ensure_order_item_cut_head_weight()
+    ensure_order_item_incoming_quantity()
+    ensure_order_item_quantity_nullable()
+    ensure_order_item_promised_return_date()
+    ensure_order_item_returned_at()
+    ensure_order_item_unit_production_statuses()
     ensure_order_item_split_columns()
     ensure_order_item_finished_outputs_table()
+    ensure_order_item_finished_outputs_return_date()
+    ensure_order_item_finished_outputs_pieces()
+    ensure_order_item_finished_outputs_pieces_nullable()
     db = SessionLocal()
     try:
         seed_admin(db)

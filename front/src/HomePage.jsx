@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './Pages.css'
-import { getJson } from './api.js'
+import { deleteReq, getJson, putFormData } from './api.js'
 import { apiUrl } from './config.js'
+import CaseStudyEditorModal from './CaseStudyEditorModal.jsx'
 
 const CASE_PAGE = 20
 
@@ -24,42 +25,152 @@ export default function HomePage() {
   const [casePage, setCasePage] = useState(1)
   const [casesLoading, setCasesLoading] = useState(true)
   const [casesErr, setCasesErr] = useState(null)
+  const [caseEditor, setCaseEditor] = useState(null)
+  const [caseEditorNote, setCaseEditorNote] = useState('')
+  const [caseEditorFiles, setCaseEditorFiles] = useState([])
+  const [caseEditorFilePreviews, setCaseEditorFilePreviews] = useState([])
+  const [caseEditorExistingImages, setCaseEditorExistingImages] = useState([])
+  const [caseEditorSubmitting, setCaseEditorSubmitting] = useState(false)
+  const [caseEditorErr, setCaseEditorErr] = useState(null)
+  const restoreScrollYRef = useRef(null)
 
-  useEffect(() => {
-    let cancelled = false
-    getJson('/api/dashboard/summary')
-      .then((d) => {
-        if (!cancelled) setSummary(d)
-      })
-      .catch((e) => {
-        if (!cancelled) setErr(e instanceof Error ? e.message : '加载失败')
-      })
-    return () => {
-      cancelled = true
+  const loadSummary = useCallback(async () => {
+    setErr(null)
+    try {
+      const d = await getJson('/api/dashboard/summary')
+      setSummary(d)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '加载失败')
+    }
+  }, [])
+
+  const loadCases = useCallback(async (page) => {
+    const nextPage = Math.max(1, Number(page) || 1)
+    const skip = (nextPage - 1) * CASE_PAGE
+    setCasesLoading(true)
+    setCasesErr(null)
+    try {
+      const d = await getJson(`/api/case-studies?skip=${skip}&limit=${CASE_PAGE}`)
+      setCases(Array.isArray(d.items) ? d.items : [])
+      setCaseTotal(typeof d.total === 'number' ? d.total : 0)
+    } catch (e) {
+      setCasesErr(e instanceof Error ? e.message : '案例加载失败')
+    } finally {
+      setCasesLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    let cancelled = false
-    const skip = (casePage - 1) * CASE_PAGE
-    setCasesLoading(true)
-    setCasesErr(null)
-    getJson(`/api/case-studies?skip=${skip}&limit=${CASE_PAGE}`)
-      .then((d) => {
-        if (cancelled) return
-        setCases(Array.isArray(d.items) ? d.items : [])
-        setCaseTotal(typeof d.total === 'number' ? d.total : 0)
-      })
-      .catch((e) => {
-        if (!cancelled) setCasesErr(e instanceof Error ? e.message : '案例加载失败')
-      })
-      .finally(() => {
-        if (!cancelled) setCasesLoading(false)
-      })
+    void loadCases(casePage)
+  }, [casePage, loadCases])
+
+  useEffect(() => {
+    const y = restoreScrollYRef.current
+    if (y === null || y === undefined) return
+    if (casesLoading) return
+    restoreScrollYRef.current = null
+    requestAnimationFrame(() => window.scrollTo({ top: y }))
+  }, [casesLoading, cases])
+
+  const caseFileKey = useCallback((f) => `${f?.name ?? ''}::${f?.size ?? ''}::${f?.lastModified ?? ''}`, [])
+
+  useEffect(() => {
+    const previews = caseEditorFiles
+      .filter((f) => String(f?.type ?? '').startsWith('image/'))
+      .map((f) => ({ key: caseFileKey(f), name: f.name, url: URL.createObjectURL(f) }))
+    setCaseEditorFilePreviews(previews)
     return () => {
-      cancelled = true
+      for (const p of previews) URL.revokeObjectURL(p.url)
     }
-  }, [casePage])
+  }, [caseEditorFiles, caseFileKey])
+
+  const closeCaseEditor = useCallback(() => {
+    setCaseEditor(null)
+    setCaseEditorNote('')
+    setCaseEditorFiles([])
+    setCaseEditorExistingImages([])
+    setCaseEditorErr(null)
+  }, [])
+
+  const openCaseEditor = useCallback((row) => {
+    setCaseEditor(row)
+    setCaseEditorNote(row?.note ?? '')
+    setCaseEditorFiles([])
+    setCaseEditorExistingImages(Array.isArray(row?.images) ? row.images : [])
+    setCaseEditorErr(null)
+  }, [])
+
+  const appendCaseEditorFiles = useCallback(
+    (picked) => {
+      const arr = Array.isArray(picked) ? picked : []
+      if (arr.length === 0) return
+      setCaseEditorFiles((prev) => {
+        const m = new Map()
+        for (const f of prev) m.set(caseFileKey(f), f)
+        for (const f of arr) m.set(caseFileKey(f), f)
+        return [...m.values()]
+      })
+    },
+    [caseFileKey],
+  )
+
+  const removeCaseEditorFile = useCallback(
+    (key) => {
+      setCaseEditorFiles((prev) => prev.filter((f) => caseFileKey(f) !== key))
+    },
+    [caseFileKey],
+  )
+
+  const removeExistingCaseEditorImage = useCallback((src) => {
+    setCaseEditorExistingImages((prev) => prev.filter((it) => it !== src))
+  }, [])
+
+  async function submitCaseEditor(e) {
+    e.preventDefault()
+    if (!caseEditor) return
+    setCaseEditorErr(null)
+    setCaseEditorSubmitting(true)
+    try {
+      const fd = new FormData()
+      fd.append('note', caseEditorNote)
+      fd.append('keep_images', JSON.stringify(caseEditorExistingImages))
+      for (const f of caseEditorFiles) {
+        fd.append('files', f)
+      }
+      await putFormData(`/api/case-studies/${caseEditor.id}`, fd)
+      closeCaseEditor()
+      await loadCases(casePage)
+      await loadSummary()
+    } catch (e) {
+      setCaseEditorErr(e instanceof Error ? e.message : '保存失败')
+    } finally {
+      setCaseEditorSubmitting(false)
+    }
+  }
+
+  async function removeCaseStudy(row) {
+    if (!row) return
+    if (!window.confirm(`删除案例「${row.order_no} / 明细 ${row.order_item_id}」？`)) return
+    setCaseEditorErr(null)
+    try {
+      restoreScrollYRef.current = window.scrollY
+      await deleteReq(`/api/case-studies/${row.id}`)
+      if (cases.length === 1 && casePage > 1) {
+        setCasePage((p) => Math.max(1, p - 1))
+      } else {
+        await loadCases(casePage)
+      }
+      await loadSummary()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '删除失败'
+      setCaseEditorErr(msg)
+      setCasesErr(msg)
+    }
+  }
+
+  useEffect(() => {
+    void loadSummary()
+  }, [loadSummary])
 
   const casePages = Math.max(1, Math.ceil(caseTotal / CASE_PAGE))
 
@@ -145,12 +256,34 @@ export default function HomePage() {
             {cases.map((c) => (
               <li key={c.id} className="home-case-card">
                 <div className="home-case-card-head">
-                  <span className="home-case-card-title">
-                    {c.order_no} · {c.customer_name}
-                  </span>
-                  <time className="home-case-card-time" dateTime={c.created_at}>
-                    {fmtDateTime(c.created_at)}
-                  </time>
+                  <div className="home-case-card-head-main">
+                    <span className="home-case-card-title">
+                      {c.order_no} · {c.customer_name}
+                    </span>
+                    <time className="home-case-card-time" dateTime={c.created_at}>
+                      {fmtDateTime(c.created_at)}
+                    </time>
+                  </div>
+                  <div className="home-case-card-actions">
+                    <button
+                      type="button"
+                      className="case-action-icon"
+                      title="编辑案例"
+                      aria-label="编辑案例"
+                      onClick={() => openCaseEditor(c)}
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      className="case-action-icon danger"
+                      title="删除案例"
+                      aria-label="删除案例"
+                      onClick={() => void removeCaseStudy(c)}
+                    >
+                      🗑
+                    </button>
+                  </div>
                 </div>
                 <p className="muted home-case-card-sub">
                   明细ID {c.order_item_id}
@@ -202,6 +335,31 @@ export default function HomePage() {
           </div>
         ) : null}
       </section>
+      <CaseStudyEditorModal
+        open={Boolean(caseEditor)}
+        title="编辑生产案例"
+        subtitle={
+          caseEditor
+            ? `订单 ${caseEditor.order_no} · 明细 ${caseEditor.order_item_id}${
+                caseEditor.unit_index !== null && caseEditor.unit_index !== undefined
+                  ? ` · 支点（件）#${caseEditor.unit_index}`
+                  : ''
+              }`
+            : ''
+        }
+        note={caseEditorNote}
+        onNoteChange={setCaseEditorNote}
+        onSubmit={submitCaseEditor}
+        onClose={closeCaseEditor}
+        onFilesPicked={appendCaseEditorFiles}
+        existingImages={caseEditorExistingImages}
+        onRemoveExistingImage={removeExistingCaseEditorImage}
+        filePreviews={caseEditorFilePreviews}
+        onRemoveFile={removeCaseEditorFile}
+        error={caseEditorErr}
+        submitting={caseEditorSubmitting}
+        submitLabel="保存修改"
+      />
     </div>
   )
 }

@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -22,6 +22,18 @@ class User(Base):
     permission_codes: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class UserUiPreference(Base):
+    __tablename__ = "user_ui_preferences"
+    __table_args__ = (UniqueConstraint("user_id", "pref_key", name="uq_user_ui_preferences_user_key"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    pref_key: Mapped[str] = mapped_column(String(128), index=True)
+    pref_value: Mapped[dict | list | str | int | float | bool | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class Customer(Base):
@@ -49,6 +61,7 @@ class OrderItem(Base):
     order_no: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    returned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     order_remark: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
     sort_order: Mapped[int] = mapped_column(Integer, server_default="0")
@@ -57,13 +70,15 @@ class OrderItem(Base):
     material_grade: Mapped[str | None] = mapped_column(String(128), nullable=True)
     spec_incoming: Mapped[str | None] = mapped_column(String(256), nullable=True)
     weight_incoming: Mapped[Decimal | None] = mapped_column(Numeric(18, 3), nullable=True)
-    quantity: Mapped[int] = mapped_column(Integer, server_default="1")
+    incoming_quantity: Mapped[int] = mapped_column(Integer, server_default="1")
+    quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
     weight_return: Mapped[Decimal | None] = mapped_column(Numeric(18, 3), nullable=True)
     cut_head_weight: Mapped[Decimal | None] = mapped_column(Numeric(18, 3), nullable=True)
     formed_size: Mapped[str | None] = mapped_column(String(256), nullable=True)
     forging_requirements: Mapped[str | None] = mapped_column(Text(), nullable=True)
     remark: Mapped[str | None] = mapped_column(Text(), nullable=True)
     remark_images: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    incoming_sheet_images: Mapped[list | None] = mapped_column(JSON, nullable=True)
     production_status: Mapped[str] = mapped_column(
         String(32), server_default="在库中", index=True
     )
@@ -74,10 +89,12 @@ class OrderItem(Base):
         Boolean(), server_default="0", default=False
     )
     processing_unit_codes: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    unit_production_statuses: Mapped[list | None] = mapped_column(JSON, nullable=True)
     split_group_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
     split_base_order_no: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     split_seq: Mapped[int | None] = mapped_column(Integer, nullable=True)
     return_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    promised_return_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     incoming_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     cutting_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -117,7 +134,9 @@ class OrderItemFinishedOutput(Base):
     piece_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     spec: Mapped[str | None] = mapped_column(String(256), nullable=True)
     formed_size: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    pieces: Mapped[int | None] = mapped_column(Integer, nullable=True)
     weight_return: Mapped[Decimal | None] = mapped_column(Numeric(18, 3), nullable=True)
+    return_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     remark: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
     order_item: Mapped["OrderItem"] = relationship(back_populates="finished_outputs")

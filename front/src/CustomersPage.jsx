@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import './Pages.css'
 import { deleteReq, getJson, patchJson, postJson } from './api.js'
-import Modal, { preventModalFormEnterSubmit } from './Modal.jsx'
+import Modal from './Modal.jsx'
+import { preventModalFormEnterSubmit } from './modalUtils.js'
 
 export default function CustomersPage() {
   const [rows, setRows] = useState([])

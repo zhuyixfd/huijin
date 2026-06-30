@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field, computed_field, field_validator
 
@@ -68,3 +69,13 @@ class UserOut(BaseModel):
     @computed_field
     def password(self) -> str:
         return "******"
+
+
+class UiPrefUpsert(BaseModel):
+    value: Any = None
+
+
+class UiPrefOut(BaseModel):
+    key: str
+    value: Any = None
+    updated_at: datetime | None = None

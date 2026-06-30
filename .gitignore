@@ -16,3 +16,5 @@ dist/
 # IDE
 .idea/
 .vscode/
+backend/app/uploads/*
+*.log

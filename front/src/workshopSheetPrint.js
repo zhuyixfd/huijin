@@ -4,6 +4,7 @@
 
 import { formatFormedSizeStagesText } from './formedSizeStages.js'
 import { formatSlotPiecesDisplay } from './todaySlotOrderStorage.js'
+import { formatForgingSpecHtml } from './finishedOutputs.js'
 
 const sheetCss = `
   * { box-sizing: border-box; }
@@ -48,15 +49,28 @@ function esc(s) {
 
 function fmtWeight(v) {
   if (v === null || v === undefined || v === '') return ''
+  const n = Number(v)
+  if (Number.isFinite(n)) return n.toFixed(2)
   return String(v)
+}
+
+function compareOrderNo(a, b) {
+  const sa = String(a ?? '')
+  const sb = String(b ?? '')
+  const pa = sa.match(/^(.*?)-(\d+)$/)
+  const pb = sb.match(/^(.*?)-(\d+)$/)
+  const ba = pa ? pa[1] : sa
+  const bb = pb ? pb[1] : sb
+  const baseCmp = ba.localeCompare(bb, 'zh-CN')
+  if (baseCmp !== 0) return baseCmp
+  if (pa && pb) return Number(pa[2]) - Number(pb[2])
+  return sa.localeCompare(sb, 'zh-CN')
 }
 
 /** 与 TasksPage 一致：按订单号排序后按件展开 */
 export function expandTodayQueueForSheet(todayQueueRows) {
   const sorted = [...todayQueueRows].sort((a, b) => {
-    const ao = String(a.order_no ?? '')
-    const bo = String(b.order_no ?? '')
-    const cmp = ao.localeCompare(bo, 'zh-CN')
+    const cmp = compareOrderNo(a.order_no, b.order_no)
     if (cmp !== 0) return cmp
     return a.id - b.id
   })
@@ -65,11 +79,13 @@ export function expandTodayQueueForSheet(todayQueueRows) {
     const rawQ = Number(it.quantity)
     const units = Number.isFinite(rawQ) && rawQ >= 1 ? Math.floor(rawQ) : 1
     const codes = Array.isArray(it.processing_unit_codes) ? it.processing_unit_codes : []
+    const outputsByPiece = expandFinishedOutputsByPiece(it)
     for (let u = 0; u < units; u += 1) {
       out.push({
         item: it,
         unitIndex: u,
         pieceLabel: codes[u] ?? '—',
+        finishedOutput: outputsByPiece[u] ?? outputsByPiece[outputsByPiece.length - 1] ?? null,
       })
     }
   }
@@ -82,7 +98,7 @@ function fmtSheetDate(d = new Date()) {
   return `${t.getFullYear()}.${t.getMonth() + 1}.${t.getDate()}`
 }
 
-/** 排位置嵌套表 9 列：1、5 为「第x排」；2～4、6～9 合并；主表明细另含「生产状态」共 10 列 */
+/** 排位置嵌套表 9 列：1、5 为「第x排」；2～4、6～9 合并；主表明细共 9 列 */
 const MID34 = '<td colspan="3" class="mid"></td>'
 const MID69 = '<td colspan="4" class="mid"></td>'
 
@@ -117,6 +133,25 @@ function buildPositionInnerTableRows() {
       ${MID69}
     </tr>`
   return html
+}
+
+function expandFinishedOutputsByPiece(item) {
+  const outputs =
+    Array.isArray(item?.finished_outputs) && item.finished_outputs.length
+      ? item.finished_outputs
+      : [{ spec: item?.spec_incoming ?? '', remark: '' }]
+  const out = []
+  for (const fo of outputs) {
+    const rawPieces = Number(fo?.pieces)
+    const pieces = Number.isFinite(rawPieces) && rawPieces >= 1 ? Math.floor(rawPieces) : 1
+    for (let i = 0; i < pieces; i += 1) {
+      out.push({
+        spec: fo?.spec ?? '',
+        remark: fo?.remark ?? '',
+      })
+    }
+  }
+  return out
 }
 
 /** 第1～10排件号写入合并格（与 TasksPage 排序一致） */
@@ -156,20 +191,22 @@ function buildPositionInnerTableRowsSlotLabels(labels) {
 
 function buildDataRows(rows) {
   return rows
-    .map(({ item, pieceLabel }) => {
-      const spec = item.spec_incoming ?? ''
+    .map(({ item, pieceLabel, finishedOutput }) => {
+      const incomingSpec = item.spec_incoming ?? ''
+      const formedSpec = finishedOutput?.spec ?? ''
+      const remark = finishedOutput?.remark ?? ''
+      const formedText = formatFormedSizeStagesText(formedSpec) || formedSpec || ''
       const qty = 1
       return `<tr>
         <td class="num">${esc(pieceLabel)}</td>
-        <td>${esc(item.production_status ?? '')}</td>
         <td>${esc(item.customer_name ?? '')}</td>
         <td>${esc(item.material_grade ?? '')}</td>
-        <td>${esc(formatFormedSizeStagesText(item.formed_size) || item.formed_size || '')}</td>
-        <td>${esc(spec)}</td>
+        <td>${esc(incomingSpec)}</td>
+        <td>${formatForgingSpecHtml(formedText, '')}</td>
         <td class="num sheet-col-qty">${qty}</td>
         <td class="num">${esc(fmtWeight(item.weight_incoming))}</td>
-        <td class="num"></td>
-        <td>${esc(item.remark ?? '')}</td>
+        <td>${esc(item.incoming_no ?? '')}</td>
+        <td>${esc(remark)}</td>
       </tr>`
     })
     .join('')
@@ -183,11 +220,10 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows, options = {}) {
 
   const headerCols = [
     '件号',
-    '生产状态',
     '客户名称',
     '材质',
-    '成型尺寸（工序）',
     '规格',
+    '成型尺寸（工序）',
     '数量',
     '重量',
     '炉号',
@@ -200,7 +236,7 @@ export function buildWorkshopProductionSheetHtml(todayQueueRows, options = {}) {
     Array.isArray(slotLabels) && slotLabels.length === 10
       ? buildPositionInnerTableRowsSlotLabels(slotLabels)
       : buildPositionInnerTableRows()
-  body += `<tr class="sheet-pos-wrap"><td colspan="10" class="sheet-pos-cell"><table class="sheet-pos-only"><tbody>${posInner}</tbody></table></td></tr>`
+  body += `<tr class="sheet-pos-wrap"><td colspan="9" class="sheet-pos-cell"><table class="sheet-pos-only"><tbody>${posInner}</tbody></table></td></tr>`
   const qtyColIdx = headerCols.indexOf('数量')
   body += `<tr>${headerCols
     .map((h, i) =>

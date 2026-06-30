@@ -32,7 +32,6 @@ function buildNavItems(user) {
     }
     if (isAdmin || canNavProcessing(user)) {
       children.push({ key: 'tasks-processing', label: '处理中' })
-      children.push({ key: 'tasks-cut-head', label: '切头' })
     }
     if (isAdmin || canNavReadyOutbound(user)) {
       children.push({ key: 'tasks-ready-outbound', label: '待出库' })
@@ -98,8 +97,6 @@ export default function DashboardShell({
                           ? 'pending'
                           : c.key === 'tasks-processing'
                             ? 'processing'
-                            : c.key === 'tasks-cut-head'
-                              ? 'cut_head'
                             : c.key === 'tasks-split-merge-logs'
                               ? null
                             : c.key === 'tasks-ready-outbound'

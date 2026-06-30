@@ -151,8 +151,7 @@ def create_order(
         )
         db.add(row)
         try:
-            db.commit()
-            db.refresh(row)
+            db.flush()
             break
         except IntegrityError:
             db.rollback()

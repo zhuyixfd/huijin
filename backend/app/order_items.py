@@ -133,6 +133,7 @@ def _guard_split_group_status_change(
 
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent
 UPLOAD_REMARK_DIR = _BACKEND_ROOT / "uploads" / "order_remarks"
+UPLOAD_INCOMING_SHEET_DIR = _BACKEND_ROOT / "uploads" / "incoming_sheets"
 ALLOWED_SUFFIX = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_REMARK_FILES = 12
 MAX_REMARK_BYTES = 8 * 1024 * 1024
@@ -140,6 +141,12 @@ MAX_REMARK_BYTES = 8 * 1024 * 1024
 
 def _ensure_remark_upload_dir(item_id: int) -> Path:
     d = UPLOAD_REMARK_DIR / str(item_id)
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _ensure_incoming_sheet_upload_dir(item_id: int) -> Path:
+    d = UPLOAD_INCOMING_SHEET_DIR / str(item_id)
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -346,4 +353,35 @@ async def upload_order_item_remark_images(
         name = f"{uuid.uuid4().hex}{ext}"
         (dest_dir / name).write_bytes(raw)
         saved.append(f"/uploads/order_remarks/{item_id}/{name}")
+    return saved
+
+
+@router.post("/{item_id}/incoming-sheet-images", response_model=list[str])
+async def upload_order_item_incoming_sheet_images(
+    item_id: int,
+    files: Annotated[list[UploadFile] | None, File()] = None,
+    _: UserModel = Depends(require_permission(PERM_ORDER_PROCESS)),
+    db: Session = Depends(get_db),
+):
+    row = db.get(OrderItem, item_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="明细不存在")
+    upload_list = [f for f in (files or []) if getattr(f, "filename", None)]
+    if not upload_list:
+        raise HTTPException(status_code=400, detail="请选择图片文件")
+    dest_dir = _ensure_incoming_sheet_upload_dir(item_id)
+    saved: list[str] = []
+    for uf in upload_list[:MAX_REMARK_FILES]:
+        if not uf.filename:
+            continue
+        raw = await uf.read()
+        if len(raw) > MAX_REMARK_BYTES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"单文件过大（>{MAX_REMARK_BYTES // 1024 // 1024}MB）",
+            )
+        ext = _safe_suffix(uf.filename)
+        name = f"{uuid.uuid4().hex}{ext}"
+        (dest_dir / name).write_bytes(raw)
+        saved.append(f"/uploads/incoming_sheets/{item_id}/{name}")
     return saved

@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
+from pydantic import ValidationError
 
 from app.models import OrderItem, OrderItemFinishedOutput
+from app.processing_codes import sync_unit_production_statuses_length
 from app.schemas_business import FinishedOutputIn, FinishedOutputOut
 
 def _sum_weights(outputs: list[FinishedOutputIn]) -> Decimal | None:
@@ -25,16 +28,34 @@ def _normalize_inputs(raw: list[FinishedOutputIn] | None) -> list[FinishedOutput
         return []
     out: list[FinishedOutputIn] = []
     for o in raw:
+        if o is None:
+            continue
+        has_pieces = False
+        if not isinstance(o, FinishedOutputIn):
+            if isinstance(o, dict):
+                has_pieces = "pieces" in o
+            try:
+                o = FinishedOutputIn.model_validate(o)
+            except ValidationError:
+                continue
+        else:
+            has_pieces = o.pieces is not None
         if not any(
             [
                 o.spec and str(o.spec).strip(),
                 o.weight_return is not None,
+                o.return_date is not None,
                 o.remark and str(o.remark).strip(),
+                has_pieces,
             ]
         ):
             continue
         out.append(o)
     return out
+
+
+def normalize_finished_output_inputs(raw: list[FinishedOutputIn] | None) -> list[FinishedOutputIn]:
+    return _normalize_inputs(raw)
 
 
 def _piece_code_for_index(item: OrderItem, sort_order: int) -> str | None:
@@ -71,13 +92,17 @@ def finished_outputs_to_out(
 
 def legacy_output_from_item(item: OrderItem) -> list[FinishedOutputOut]:
     """无成品明细表数据时，用订单主行合成一条（兼容旧单）。"""
+    qty = item.quantity
+    pieces = max(1, int(qty)) if qty is not None else None
     return [
         FinishedOutputOut(
             id=0,
             sort_order=0,
             piece_code=_piece_code_for_index(item, 0),
             spec=item.spec_incoming,
+            pieces=pieces,
             weight_return=item.weight_return,
+            return_date=item.return_date,
             remark=None,
         )
     ]
@@ -121,8 +146,14 @@ def load_finished_outputs_map(
 def sync_item_from_outputs(item: OrderItem, outputs: list[FinishedOutputIn]) -> None:
     n = len(outputs)
     if n > 0:
-        item.quantity = n
+        pieces_vals = [o.pieces for o in outputs if o.pieces is not None]
+        if pieces_vals:
+            item.quantity = sum(max(1, int(p)) for p in pieces_vals)
+        else:
+            item.quantity = None
         item.weight_return = _sum_weights(outputs)
+        ds = [o.return_date for o in outputs if o.return_date is not None]
+        item.return_date = max(ds) if ds else None
 
 
 def sync_output_piece_codes_store(db: Session, item: OrderItem) -> None:
@@ -144,10 +175,14 @@ def replace_finished_outputs(
 ) -> list[FinishedOutputOut]:
     outputs = _normalize_inputs(raw)
     if not outputs and not allow_empty:
+        qty = item.quantity
+        pieces = max(1, int(qty)) if qty is not None else None
         outputs = [
             FinishedOutputIn(
                 spec=item.spec_incoming,
+                pieces=pieces,
                 weight_return=item.weight_return,
+                return_date=item.return_date,
                 remark=None,
             )
         ]
@@ -158,6 +193,7 @@ def replace_finished_outputs(
         )
     )
     for i, o in enumerate(outputs):
+        pieces_val = None if o.pieces is None else max(1, int(o.pieces))
         db.add(
             OrderItemFinishedOutput(
                 order_item_id=item.id,
@@ -165,11 +201,14 @@ def replace_finished_outputs(
                 piece_code=None,
                 spec=(str(o.spec).strip() if o.spec else None) or None,
                 formed_size=None,
+                pieces=pieces_val,
                 weight_return=o.weight_return,
+                return_date=o.return_date,
                 remark=(str(o.remark).strip() if o.remark else None) or None,
             )
         )
     sync_item_from_outputs(item, outputs)
+    sync_unit_production_statuses_length(item)
     db.flush()
     sync_output_piece_codes_store(db, item)
     return resolve_finished_outputs(db, item)
@@ -185,13 +224,17 @@ def backfill_finished_outputs_from_items(db: Session) -> int:
     for item in items:
         if item.id in existing:
             continue
+        qty = item.quantity
+        pieces = max(1, int(qty)) if qty is not None else None
         replace_finished_outputs(
             db,
             item,
             [
                 FinishedOutputIn(
                     spec=item.spec_incoming,
+                    pieces=pieces,
                     weight_return=item.weight_return,
+                    return_date=item.return_date,
                     remark=None,
                 )
             ],

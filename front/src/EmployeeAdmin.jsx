@@ -3,7 +3,8 @@ import './EmployeeAdmin.css'
 import './Pages.css'
 import { patchJson } from './api.js'
 import { authFetch, formatApiError } from './auth.js'
-import Modal, { preventModalFormEnterSubmit } from './Modal.jsx'
+import Modal from './Modal.jsx'
+import { preventModalFormEnterSubmit } from './modalUtils.js'
 import { PERM_OPTIONS } from './permissions.js'
 
 function fmtDateTime(iso) {

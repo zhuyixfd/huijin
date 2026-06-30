@@ -1,7 +1,5 @@
 /** 四种单据：来料单、生产单、出库单、发回单（成品交回客户） */
 
-import { FORMED_SIZE_FIELD_LABEL, formatFormedSizeStagesText } from './formedSizeStages.js'
-
 const printCss = `
   * { box-sizing: border-box; }
   body { font-family: system-ui, "Segoe UI", Roboto, sans-serif; padding: 16px; color: #111; }
@@ -40,13 +38,13 @@ export function buildSlipHtml(kind, { order, customer, item }) {
   const pairs = [
     ['订单编号', ono],
     ['客户名称', cname],
-    ['来料编号', item?.incoming_no],
+    ['炉号', item?.incoming_no],
     ['材质', item?.material_grade],
     ['来料规格', item?.spec_incoming],
     ['来料重', item?.weight_incoming],
-    ['个数', item?.quantity],
+    ['来料个数', item?.incoming_quantity],
+    ['支数', item?.quantity],
     ['发回重量', item?.weight_return],
-    [FORMED_SIZE_FIELD_LABEL, formatFormedSizeStagesText(item?.formed_size) || item?.formed_size],
     ['锻造要求', item?.forging_requirements],
     ['备注', item?.remark],
     ['生产状态', item?.production_status],

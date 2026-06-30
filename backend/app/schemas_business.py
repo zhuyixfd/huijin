@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
+import re
 from pydantic import BaseModel, Field, field_validator
 
 from app.constants_metal import PRODUCTION_STATUSES
@@ -66,7 +67,9 @@ class FinishedOutputIn(BaseModel):
     """成品明细（同一来料下的一个成品）；件号由排产/处理中自动生成，不可手填。"""
 
     spec: str | None = Field(None, description="成品规格")
+    pieces: int | None = Field(default=None, ge=1, description="支数（可为空）")
     weight_return: Decimal | None = Field(None, description="该成品发回重量")
+    return_date: date | None = Field(None, description="该成品发回日期")
     remark: str | None = None
 
 
@@ -86,7 +89,8 @@ class OrderItemCreate(BaseModel):
     material_grade: str | None = None
     spec_incoming: str | None = None
     weight_incoming: Decimal | None = None
-    quantity: int = Field(default=1, ge=1)
+    incoming_quantity: int = Field(default=1, ge=1)
+    quantity: int | None = Field(default=None, ge=1)
     weight_return: Decimal | None = None
     cut_head_weight: Decimal | None = None
     formed_size: str | None = None
@@ -95,6 +99,7 @@ class OrderItemCreate(BaseModel):
     remark_images: list[str] | None = None
     production_status: str = "在库中"
     return_date: date | None = None
+    promised_return_date: date | None = None
     incoming_date: date | None = None
     cutting_time: datetime | None = None
     finished_outputs: list[FinishedOutputIn] | None = Field(
@@ -127,6 +132,7 @@ class OrderItemUpdate(BaseModel):
     material_grade: str | None = None
     spec_incoming: str | None = None
     weight_incoming: Decimal | None = None
+    incoming_quantity: int | None = Field(None, ge=1)
     quantity: int | None = Field(None, ge=1)
     weight_return: Decimal | None = None
     cut_head_weight: Decimal | None = None
@@ -134,10 +140,12 @@ class OrderItemUpdate(BaseModel):
     forging_requirements: str | None = None
     remark: str | None = None
     remark_images: list[str] | None = None
+    incoming_sheet_images: list[str] | None = None
     production_status: str | None = None
     in_today_queue: bool | None = None
     in_tomorrow_queue: bool | None = None
     return_date: date | None = None
+    promised_return_date: date | None = None
     incoming_date: date | None = None
     cutting_time: datetime | None = None
     finished_outputs: list[FinishedOutputIn] | None = None
@@ -150,6 +158,43 @@ class OrderItemUpdate(BaseModel):
         return _status_ok(v)
 
 
+class OrderItemUnitProductionStatusesUpdate(BaseModel):
+    unit_statuses: list[str] | None = None
+    unit_codes: list[str] | None = None
+    set_all: str | None = None
+
+    @field_validator("unit_statuses")
+    @classmethod
+    def validate_unit_statuses(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        return [_status_ok(s) for s in v]
+
+    @field_validator("unit_codes")
+    @classmethod
+    def validate_unit_codes(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        out: list[str] = []
+        for s in v:
+            t = str(s).strip()
+            if not t:
+                raise ValueError("件号不能为空")
+            m = re.match(r"^(.+?)(?:-(\d+))?$", t)
+            prefix = m.group(1) if m else t
+            if not re.match(r"^([A-Z]|[a-e])\d+$", prefix):
+                raise ValueError("件号格式必须为：1 个字母 + 数字；字母仅允许 A-Z 或 a-e")
+            out.append(t)
+        return out
+
+    @field_validator("set_all")
+    @classmethod
+    def validate_set_all(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return _status_ok(v)
+
+
 class OrderItemOut(BaseModel):
     model_config = {"from_attributes": True}
 
@@ -157,29 +202,34 @@ class OrderItemOut(BaseModel):
     order_no: str
     customer_id: int
     created_at: datetime | None = None
+    returned_at: datetime | None = None
     order_remark: str | None = None
     sort_order: int = 0
     incoming_no: str | None = None
     material_grade: str | None = None
     spec_incoming: str | None = None
     weight_incoming: Decimal | None = None
-    quantity: int
+    incoming_quantity: int = 1
+    quantity: int | None = None
     weight_return: Decimal | None = None
     cut_head_weight: Decimal | None = None
     formed_size: str | None = None
     forging_requirements: str | None = None
     remark: str | None = None
     remark_images: list[str] | None = None
+    incoming_sheet_images: list[str] | None = None
     production_status: str
     in_today_queue: bool = False
     in_tomorrow_queue: bool = False
     return_date: date | None = None
+    promised_return_date: date | None = None
     incoming_date: date | None = None
     cutting_time: datetime | None = None
     processing_unit_codes: list[str] | None = Field(
         default=None,
         description="处理中单件编号（与个数等长），生成后永久保留",
     )
+    unit_production_statuses: list[str] | None = None
     split_group_id: str | None = None
     split_base_order_no: str | None = None
     split_seq: int | None = None
@@ -265,6 +315,10 @@ class WorkOrderCreate(OrderItemCreate):
     order_remark: str | None = Field(None, description="订单备注（抬头）")
 
 
+class WorkOrderCreateOut(BaseModel):
+    items: list["TaskItemOut"] = Field(default_factory=list)
+
+
 class TaskItemOut(OrderItemOut):
     """来料订单列表行（表连接补充客户名、展示用状态）。"""
 
@@ -314,7 +368,7 @@ class CutHeadLogListOut(BaseModel):
 
 class SplitOrderBody(BaseModel):
     order_item_id: int
-    move_unit_indexes: list[int] = Field(min_length=1, max_length=500)
+    move_unit_indexes: list[int] = Field(default_factory=list, max_length=500)
 
 
 class SplitOrderOut(BaseModel):
@@ -323,6 +377,11 @@ class SplitOrderOut(BaseModel):
     order_no_2: str
     item_id_1: int
     item_id_2: int
+
+
+class OrderItemBatchProcessingCodes(BaseModel):
+    item_ids: list[int] = Field(min_length=1, max_length=500)
+    day_of_month: int = Field(ge=1, le=31)
 
 
 class SplitMergeLogRow(BaseModel):

@@ -4,12 +4,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import require_admin
-from app.models import User
+from app.deps import get_current_user, require_admin
+from app.models import User, UserUiPreference
 from app.schemas import (
     EmployeeCreate,
     EmployeePasswordSet,
     EmployeePermissionsUpdate,
+    UiPrefOut,
+    UiPrefUpsert,
     UserOut,
 )
 from app.security import hash_password
@@ -90,3 +92,49 @@ def set_employee_permissions(
     db.commit()
     db.refresh(u)
     return u
+
+
+@router.get("/me/ui-prefs/{pref_key}", response_model=UiPrefOut)
+def get_ui_pref(
+    pref_key: str,
+    current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    key = (pref_key or "").strip()
+    if not key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="pref_key 不能为空")
+    row = db.scalars(
+        select(UserUiPreference).where(
+            UserUiPreference.user_id == current.id,
+            UserUiPreference.pref_key == key,
+        )
+    ).first()
+    if row is None:
+        return UiPrefOut(key=key, value=None, updated_at=None)
+    return UiPrefOut(key=row.pref_key, value=row.pref_value, updated_at=row.updated_at)
+
+
+@router.put("/me/ui-prefs/{pref_key}", response_model=UiPrefOut)
+def upsert_ui_pref(
+    pref_key: str,
+    body: UiPrefUpsert,
+    current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    key = (pref_key or "").strip()
+    if not key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="pref_key 不能为空")
+    row = db.scalars(
+        select(UserUiPreference).where(
+            UserUiPreference.user_id == current.id,
+            UserUiPreference.pref_key == key,
+        )
+    ).first()
+    if row is None:
+        row = UserUiPreference(user_id=current.id, pref_key=key, pref_value=body.value)
+        db.add(row)
+    else:
+        row.pref_value = body.value
+    db.commit()
+    db.refresh(row)
+    return UiPrefOut(key=row.pref_key, value=row.pref_value, updated_at=row.updated_at)

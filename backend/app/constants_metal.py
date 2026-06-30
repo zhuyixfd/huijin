@@ -17,3 +17,22 @@ PRODUCTION_STATUSES: tuple[str, ...] = (
     "固溶",
     "切割",
 )
+
+PRODUCTION_STATUS_RANK: dict[str, int] = {s: i for i, s in enumerate(PRODUCTION_STATUSES)}
+
+
+def slowest_production_status(statuses: list[str] | None, *, fallback: str = "在库中") -> str:
+    if not statuses:
+        return fallback
+    best = None
+    for s in statuses:
+        if not s:
+            continue
+        r = PRODUCTION_STATUS_RANK.get(s)
+        if r is None:
+            continue
+        if best is None or r < best:
+            best = r
+    if best is None:
+        return fallback
+    return PRODUCTION_STATUSES[best]

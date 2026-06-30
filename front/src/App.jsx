@@ -5,7 +5,7 @@ import DashboardShell from './DashboardShell.jsx'
 import EmployeeAdmin from './EmployeeAdmin.jsx'
 import HomePage from './HomePage.jsx'
 import Login from './Login.jsx'
-import TasksPage from './TasksPage.jsx'
+import TasksPage, { NewWorkOrderPopup } from './TasksPage.jsx'
 import { authFetch, clearToken, getToken } from './auth.js'
 import { getJson } from './api.js'
 import {
@@ -21,6 +21,10 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [activeNav, setActiveNav] = useState('home')
   const [taskNavCounts, setTaskNavCounts] = useState(null)
+  const popupMode =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('popup')
+      : null
 
   const refreshUser = useCallback(() => {
     const token = getToken()
@@ -74,28 +78,26 @@ export default function App() {
     setActiveNav(key)
   }
 
-  const resolvedNav =
+  const resolvedNavBase =
     activeNav === 'orders'
       ? 'tasks-all'
       : user?.role !== 'admin' && activeNav === 'accounts'
         ? 'home'
         : activeNav
-  const showAccounts = user?.role === 'admin' && resolvedNav === 'accounts'
-
-  useEffect(() => {
-    if (!sessionChecked || !user) return
-    if (user.role === 'admin') return
+  const resolvedNav = (() => {
+    if (!sessionChecked || !user) return resolvedNavBase
+    if (user.role === 'admin') return resolvedNavBase
     let deny = false
-    if ((resolvedNav === 'tasks' || resolvedNav === 'tasks-all') && !canAnyOrderNav(user)) {
+    if ((resolvedNavBase === 'tasks' || resolvedNavBase === 'tasks-all') && !canAnyOrderNav(user)) {
       deny = true
     }
-    if (resolvedNav === 'tasks-pending' && !canNavPending(user)) deny = true
-    if (resolvedNav === 'tasks-processing' && !canNavProcessing(user)) deny = true
-    if (resolvedNav === 'tasks-cut-head' && !canNavProcessing(user)) deny = true
-    if (resolvedNav === 'tasks-ready-outbound' && !canNavReadyOutbound(user)) deny = true
-    if (resolvedNav === 'tasks-done' && !canNavDone(user)) deny = true
-    if (deny) setActiveNav('home')
-  }, [sessionChecked, user, resolvedNav])
+    if (resolvedNavBase === 'tasks-pending' && !canNavPending(user)) deny = true
+    if (resolvedNavBase === 'tasks-processing' && !canNavProcessing(user)) deny = true
+    if (resolvedNavBase === 'tasks-ready-outbound' && !canNavReadyOutbound(user)) deny = true
+    if (resolvedNavBase === 'tasks-done' && !canNavDone(user)) deny = true
+    return deny ? 'home' : resolvedNavBase
+  })()
+  const showAccounts = user?.role === 'admin' && resolvedNav === 'accounts'
 
   if (!sessionChecked) {
     return (
@@ -109,12 +111,19 @@ export default function App() {
     return <Login onLoggedIn={refreshUser} />
   }
 
+  if (popupMode === 'new-workorder') {
+    return (
+      <div className="app">
+        <NewWorkOrderPopup user={user} />
+      </div>
+    )
+  }
+
   const TASKS_PAGE_KEYS = new Set([
     'tasks',
     'tasks-all',
     'tasks-pending',
     'tasks-processing',
-    'tasks-cut-head',
     'tasks-split-merge-logs',
     'tasks-ready-outbound',
     'tasks-done',
@@ -126,7 +135,6 @@ export default function App() {
       'tasks-all': 'all',
       'tasks-pending': 'pending',
       'tasks-processing': 'processing',
-      'tasks-cut-head': 'cut_head',
       'tasks-split-merge-logs': 'split_merge_logs',
       'tasks-ready-outbound': 'ready_outbound',
       'tasks-done': 'done',
