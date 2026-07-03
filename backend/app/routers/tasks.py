@@ -405,21 +405,17 @@ def create_work_order(
                 replace_finished_outputs(db, row, finished_outputs)
                 created.append(row)
             else:
-                for i, fo in enumerate(outs, start=1):
-                    order_no = f"{base_no}-{i}"
-                    row = OrderItem(
-                        order_no=order_no,
-                        customer_id=cust_id,
-                        order_remark=order_remark,
-                        sort_order=0,
-                        split_base_order_no=base_no,
-                        split_seq=i,
-                        **item_fields,
-                    )
-                    db.add(row)
-                    db.flush()
-                    replace_finished_outputs(db, row, [fo])
-                    created.append(row)
+                row = OrderItem(
+                    order_no=base_no,
+                    customer_id=cust_id,
+                    order_remark=order_remark,
+                    sort_order=0,
+                    **item_fields,
+                )
+                db.add(row)
+                db.flush()
+                replace_finished_outputs(db, row, finished_outputs)
+                created.append(row)
             proc_items = [r for r in created if r.production_status not in ("在库中", "已发回")]
             if proc_items:
                 ensure_processing_codes_batch(db, proc_items)

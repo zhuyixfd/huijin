@@ -24,6 +24,7 @@ from app.order_item_finished import (
 )
 from app.processing_codes import (
     ensure_order_item_processing_codes,
+    ensure_processing_codes_for_items,
     reassign_processing_codes_batch,
     sync_processing_codes_length,
     set_all_unit_production_statuses,
@@ -32,6 +33,7 @@ from app.processing_codes import (
 from app.schemas_business import (
     GrindLogCreate,
     GrindLogOut,
+    OrderItemBatchEnsureProcessingCodes,
     OrderItemBatchProductionStatus,
     OrderItemBatchProcessingCodes,
     OrderItemUnitProductionStatusesUpdate,
@@ -556,12 +558,31 @@ def patch_unit_production_statuses(
     return list(row.unit_production_statuses or [])
 
 
+@router.post("/batch-ensure-processing-codes")
+def batch_ensure_processing_codes(
+    body: OrderItemBatchEnsureProcessingCodes,
+    _: UserModel = Depends(require_permission(PERM_ORDER_PROCESS)),
+    db: Session = Depends(get_db),
+):
+    """补齐件号空位；已有件号不会被改动。"""
+    ids = list(dict.fromkeys(body.item_ids))
+    if not ids:
+        raise HTTPException(status_code=400, detail="请至少选择一条明细")
+    items = db.scalars(select(OrderItem).where(OrderItem.id.in_(ids))).all()
+    if len(items) != len(ids):
+        raise HTTPException(status_code=404, detail="未找到所选明细")
+    ensure_processing_codes_for_items(db, list(items))
+    db.commit()
+    return {"ok": True, "count": len(ids)}
+
+
 @router.post("/batch-processing-codes")
 def batch_reassign_processing_codes(
     body: OrderItemBatchProcessingCodes,
     _: UserModel = Depends(require_permission(PERM_ORDER_PROCESS)),
     db: Session = Depends(get_db),
 ):
+    """手动件号重排：按指定日序字母覆盖所选明细的件号（慎用）。"""
     ids = list(dict.fromkeys(body.item_ids))
     if not ids:
         raise HTTPException(status_code=400, detail="请至少选择一条明细")

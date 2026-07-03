@@ -58,8 +58,26 @@ def normalize_finished_output_inputs(raw: list[FinishedOutputIn] | None) -> list
     return _normalize_inputs(raw)
 
 
-def _piece_code_for_index(item: OrderItem, sort_order: int) -> str | None:
+def _piece_code_for_index(
+    item: OrderItem,
+    sort_order: int,
+    *,
+    fo_rows: list[OrderItemFinishedOutput] | None = None,
+) -> str | None:
     codes = item.processing_unit_codes if isinstance(item.processing_unit_codes, list) else []
+    if fo_rows:
+        offset = 0
+        for r in sorted(fo_rows, key=lambda x: (x.sort_order, x.id)):
+            if int(r.sort_order) == int(sort_order):
+                if offset < 0 or offset >= len(codes):
+                    return None
+                raw = codes[offset]
+                if raw is None:
+                    return None
+                s = str(raw).strip()
+                return s if s else None
+            offset += max(1, int(r.pieces or 1))
+        return None
     if sort_order < 0 or sort_order >= len(codes):
         return None
     raw = codes[sort_order]
@@ -85,7 +103,7 @@ def finished_outputs_to_out(
     out: list[FinishedOutputOut] = []
     for r in rows:
         fo = FinishedOutputOut.model_validate(r)
-        fo.piece_code = _piece_code_for_index(item, r.sort_order)
+        fo.piece_code = _piece_code_for_index(item, r.sort_order, fo_rows=rows)
         out.append(fo)
     return out
 
@@ -157,12 +175,12 @@ def sync_item_from_outputs(item: OrderItem, outputs: list[FinishedOutputIn]) -> 
 
 
 def sync_output_piece_codes_store(db: Session, item: OrderItem) -> None:
-    """将已生成的 processing_unit_codes 写回成品明细件号列（便于查询/导出）。"""
+    """将已生成的 processing_unit_codes 写回成品明细件号列（每规格取该规格首支件号）。"""
     rows = load_finished_outputs(db, item.id)
     if not rows:
         return
     for r in rows:
-        r.piece_code = _piece_code_for_index(item, r.sort_order)
+        r.piece_code = _piece_code_for_index(item, r.sort_order, fo_rows=rows)
     db.flush()
 
 

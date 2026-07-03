@@ -305,17 +305,12 @@ function todayClusterPieceLabelShort(clusterBands) {
   return `${codes[0]}…`
 }
 
-async function ensureProcessingCodesForItems(itemIds, dayOfMonth = null) {
+/** 仅补齐尚无件号的空位；不覆盖已有件号（勿与手动「件号重排」混用） */
+async function ensureProcessingCodesForItems(itemIds) {
   const ids = Array.isArray(itemIds) ? itemIds.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0) : []
   if (ids.length === 0) return false
-  const day = Number(dayOfMonth)
-  const fallbackDay = new Date().getDate()
-  const dom = Number.isFinite(day) && day >= 1 && day <= 31 ? day : fallbackDay
   try {
-    await postJson('/api/order-items/batch-processing-codes', {
-      item_ids: ids,
-      day_of_month: dom,
-    })
+    await postJson('/api/order-items/batch-ensure-processing-codes', { item_ids: ids })
     return true
   } catch {
     return false

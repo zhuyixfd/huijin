@@ -379,6 +379,12 @@ class SplitOrderOut(BaseModel):
     item_id_2: int
 
 
+class OrderItemBatchEnsureProcessingCodes(BaseModel):
+    """仅补齐尚无件号的空位，不覆盖已有件号。"""
+
+    item_ids: list[int] = Field(min_length=1, max_length=500)
+
+
 class OrderItemBatchProcessingCodes(BaseModel):
     item_ids: list[int] = Field(min_length=1, max_length=500)
     day_of_month: int = Field(ge=1, le=31)

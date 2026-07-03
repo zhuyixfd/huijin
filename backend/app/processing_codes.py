@@ -54,6 +54,30 @@ def day_code_char_by_dom(day_of_month: int) -> str:
     return DAY_CODE_CYCLE[dom - 1]
 
 
+def _anchor_date_for_piece_code(row: OrderItem) -> date:
+    """新分配件号首字母时：优先用下料/来料/创建日，避免跨月后误用当天字母。"""
+    ct = row.cutting_time
+    if ct is not None:
+        try:
+            return ct.date() if hasattr(ct, "date") else date.today()
+        except (TypeError, ValueError):
+            pass
+    inc = row.incoming_date
+    if inc is not None:
+        return inc
+    ca = row.created_at
+    if ca is not None:
+        try:
+            return ca.date() if hasattr(ca, "date") else date.today()
+        except (TypeError, ValueError):
+            pass
+    return date.today()
+
+
+def _day_char_for_item(row: OrderItem) -> str:
+    return day_code_char(_anchor_date_for_piece_code(row))
+
+
 def _suffix_int(label: str) -> int | None:
     m = re.match(r"^[A-Za-z](\d+)(?:-\d+)?$", label.strip())
     return int(m.group(1)) if m else None
@@ -121,22 +145,10 @@ def ensure_order_item_processing_codes(db: Session, row: OrderItem) -> None:
     codes = _normalize_codes_list(row.processing_unit_codes, qty)
     seed = next((c for c in codes if isinstance(c, str) and str(c).strip()), None)
     if seed:
-        s = str(seed).strip()
-        m = re.match(r"^(.+?)-\d+$", s)
-        prefix = m.group(1) if m else s
+        prefix = _extract_code_prefix(str(seed).strip())
     else:
-        day_char = day_code_char()
-        next_n = _max_numeric_suffix_db(db) + 1
-        prefix = f"{day_char}{next_n}"
-    changed = False
-    for i in range(qty):
-        if codes[i]:
-            continue
-        codes[i] = prefix if qty == 1 else f"{prefix}-{i + 1}"
-        changed = True
-    if changed:
-        row.processing_unit_codes = [c for c in codes]
-    _sync_finished_piece_codes(db, row)
+        prefix = None
+    _assign_continuous_codes_for_group(db, [row], next_n=_max_numeric_suffix_db(db) + 1, force_prefix=prefix)
 
 
 def _sync_finished_piece_codes(db: Session, row: OrderItem) -> None:
@@ -145,8 +157,85 @@ def _sync_finished_piece_codes(db: Session, row: OrderItem) -> None:
     sync_output_piece_codes_store(db, row)
 
 
+def _extract_code_prefix(label: str) -> str:
+    s = label.strip()
+    m = re.match(r"^(.+?)-\d+$", s)
+    return m.group(1) if m else s
+
+
+def _family_group_key(row: OrderItem) -> str | None:
+    """同一来料拆出的多规格子单（旧数据）共用连续件号。"""
+    base = str(row.split_base_order_no or "").strip()
+    if base and row.split_group_id is None:
+        return base
+    return None
+
+
+def _max_suffix_in_codes(codes: list[str | None]) -> int:
+    m = 0
+    for c in codes:
+        if not c:
+            continue
+        hit = re.match(r"^.+-(\d+)$", str(c).strip())
+        if hit:
+            m = max(m, int(hit.group(1)))
+    return m
+
+
+def _assign_continuous_codes_for_group(
+    db: Session,
+    items: list[OrderItem],
+    *,
+    next_n: int,
+    force_prefix: str | None = None,
+    force_day_char: str | None = None,
+) -> int:
+    """一组订单（通常同一来料）共用前缀，件号为 prefix-1、prefix-2… 连续编号。"""
+    if not items:
+        return next_n
+    items = sorted(items, key=lambda r: (int(r.split_seq or 0), int(r.id or 0)))
+
+    prefix = force_prefix
+    if not prefix:
+        for row in items:
+            for c in row.processing_unit_codes or []:
+                if isinstance(c, str) and str(c).strip():
+                    prefix = _extract_code_prefix(str(c).strip())
+                    break
+            if prefix:
+                break
+    if not prefix:
+        day_char = force_day_char or _day_char_for_item(items[0])
+        prefix = f"{day_char}{next_n}"
+        next_n += 1
+
+    seq = 0
+    for row in items:
+        qty = max(1, int(row.quantity or 1))
+        codes = _normalize_codes_list(row.processing_unit_codes, qty)
+        seq = max(seq, _max_suffix_in_codes([c for c in codes if c]))
+
+    total_slots = sum(max(1, int(r.quantity or 1)) for r in items)
+    use_suffix = total_slots > 1
+
+    for row in items:
+        qty = max(1, int(row.quantity or 1))
+        codes = _normalize_codes_list(row.processing_unit_codes, qty)
+        changed = False
+        for i in range(qty):
+            if codes[i]:
+                continue
+            seq += 1
+            codes[i] = f"{prefix}-{seq}" if use_suffix else prefix
+            changed = True
+        if changed:
+            row.processing_unit_codes = [c for c in codes]
+        _sync_finished_piece_codes(db, row)
+    return next_n
+
+
 def ensure_processing_codes_batch(db: Session, items: list[OrderItem]) -> None:
-    """同一事务内批量分配，后缀连续递增。"""
+    """同一事务内批量分配；同一来料（多规格）共用一件号前缀，支号连续。"""
     rows: list[OrderItem] = []
     for r in items:
         if r.production_status == "已发回":
@@ -172,28 +261,28 @@ def ensure_processing_codes_batch(db: Session, items: list[OrderItem]) -> None:
             rows.append(r)
     if not rows:
         return
-    next_n = _max_numeric_suffix_db(db) + 1
-    day_char = day_code_char()
+
+    by_family: dict[str, list[OrderItem]] = {}
+    standalone: list[OrderItem] = []
     for row in rows:
-        qty = max(1, int(row.quantity or 1))
-        codes = _normalize_codes_list(row.processing_unit_codes, qty)
-        seed = next((c for c in codes if isinstance(c, str) and str(c).strip()), None)
-        if seed:
-            s = str(seed).strip()
-            m = re.match(r"^(.+?)-\d+$", s)
-            prefix = m.group(1) if m else s
+        fk = _family_group_key(row)
+        if fk:
+            by_family.setdefault(fk, []).append(row)
         else:
-            prefix = f"{day_char}{next_n}"
-            next_n += 1
-        changed = False
-        for i in range(qty):
-            if codes[i]:
-                continue
-            codes[i] = prefix if qty == 1 else f"{prefix}-{i + 1}"
-            changed = True
-        if changed:
-            row.processing_unit_codes = [c for c in codes]
-        _sync_finished_piece_codes(db, row)
+            standalone.append(row)
+
+    groups: list[list[OrderItem]] = list(by_family.values()) + [[r] for r in standalone]
+    next_n = _max_numeric_suffix_db(db) + 1
+    for group in groups:
+        next_n = _assign_continuous_codes_for_group(db, group, next_n=next_n)
+
+
+def ensure_processing_codes_for_items(db: Session, items: list[OrderItem]) -> int:
+    """仅补齐空位，不覆盖已有件号。"""
+    before = _max_numeric_suffix_db(db)
+    ensure_processing_codes_batch(db, items)
+    after = _max_numeric_suffix_db(db)
+    return max(0, after - before)
 
 
 def reassign_processing_codes_batch(
@@ -206,16 +295,23 @@ def reassign_processing_codes_batch(
     rows = [r for r in items if r is not None and r.production_status not in ("在库中", "已发回", "待发回", "出库中")]
     if not rows:
         return
+    by_family: dict[str, list[OrderItem]] = {}
+    standalone: list[OrderItem] = []
+    for row in rows:
+        fk = _family_group_key(row)
+        if fk:
+            by_family.setdefault(fk, []).append(row)
+        else:
+            standalone.append(row)
+    groups: list[list[OrderItem]] = list(by_family.values()) + [[r] for r in standalone]
     next_n = _max_numeric_suffix_db(db) + 1
     day_char = day_code_char_by_dom(day_of_month)
-    for row in rows:
-        qty = max(1, int(row.quantity or 1))
-        prefix = f"{day_char}{next_n}"
-        next_n += 1
-        row.processing_unit_codes = (
-            [prefix] if qty == 1 else [f"{prefix}-{i + 1}" for i in range(qty)]
+    for group in groups:
+        for row in group:
+            row.processing_unit_codes = None
+        next_n = _assign_continuous_codes_for_group(
+            db, group, next_n=next_n, force_day_char=day_char
         )
-        _sync_finished_piece_codes(db, row)
 
 
 def sync_processing_codes_length(row: OrderItem) -> None:
