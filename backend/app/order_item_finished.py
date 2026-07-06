@@ -58,20 +58,21 @@ def normalize_finished_output_inputs(raw: list[FinishedOutputIn] | None) -> list
     return _normalize_inputs(raw)
 
 
-EARLY_FINISHED_OUTPUT_EDIT_STATUSES = frozenset({"在库中", "锻造中", "开坯", "切割"})
+EARLY_PROCESSING_STATUSES = frozenset({"锻造中", "开坯", "切割"})
 
 
 def can_add_finished_output_rows(item: OrderItem) -> bool:
     """新建后、尚未进入修磨等后续工序时，允许在编辑来料中新增锻造规格。"""
-    fallback = str(item.production_status or "").strip() or "在库中"
-    if fallback not in EARLY_FINISHED_OUTPUT_EDIT_STATUSES:
+    main = str(item.production_status or "").strip() or "在库中"
+    if main == "在库中":
+        return True
+    if main not in EARLY_PROCESSING_STATUSES:
         return False
     raw = item.unit_production_statuses
     if not isinstance(raw, list) or not raw:
         return True
-    return all(
-        (str(s or "").strip() or fallback) in EARLY_FINISHED_OUTPUT_EDIT_STATUSES for s in raw
-    )
+    allowed = frozenset({"在库中", *EARLY_PROCESSING_STATUSES})
+    return all((str(s or "").strip() or main) in allowed for s in raw)
 
 
 def _piece_code_for_index(

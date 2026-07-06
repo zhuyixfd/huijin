@@ -429,17 +429,20 @@ export function expandOrdersToDeliveryLines(orderRows) {
 }
 
 /** 新建后、尚未进入修磨等后续工序时，编辑来料可新增锻造规格行 */
-const EARLY_FINISHED_OUTPUT_EDIT_STATUSES = new Set(['在库中', '锻造中', '开坯', '切割'])
+const EARLY_PROCESSING_STATUSES = new Set(['锻造中', '开坯', '切割'])
 
 export function canAddFinishedOutputRows(it) {
   if (!it) return false
-  const fallback = String(it.production_status ?? '').trim() || '在库中'
-  if (!EARLY_FINISHED_OUTPUT_EDIT_STATUSES.has(fallback)) return false
+  const main = String(it.production_status ?? '').trim() || '在库中'
+  // 未处理（在库中）始终允许新增锻造规格
+  if (main === '在库中') return true
+  if (!EARLY_PROCESSING_STATUSES.has(main)) return false
   const raw = Array.isArray(it.unit_production_statuses) ? it.unit_production_statuses : null
   if (!raw || raw.length === 0) return true
+  const allowed = new Set(['在库中', ...EARLY_PROCESSING_STATUSES])
   return raw.every((s) => {
-    const st = String(s ?? '').trim() || fallback
-    return EARLY_FINISHED_OUTPUT_EDIT_STATUSES.has(st)
+    const st = String(s ?? '').trim() || main
+    return allowed.has(st)
   })
 }
 

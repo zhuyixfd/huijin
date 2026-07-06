@@ -2842,10 +2842,22 @@ export default function TasksPage({
     setItemFinishedOutputs(parsedOutputs)
     setItemModal({
       itemId: it.id,
+      editSource: it,
       split_base_order_no: it?.split_base_order_no ?? null,
       split_group_id: it?.split_group_id ?? null,
       split_seq: it?.split_seq ?? null,
     })
+  }
+
+  function itemEditSourceForModal() {
+    if (!itemModal?.itemId) return null
+    const id = Number(itemModal.itemId)
+    if (itemModal.editSource) return itemModal.editSource
+    return (
+      rows.find((r) => Number(r.id) === id) ||
+      detail?.items?.find((r) => Number(r.id) === id) ||
+      null
+    )
   }
 
   async function submitItem(e) {
@@ -7034,10 +7046,10 @@ export default function TasksPage({
                   rows={itemFinishedOutputs}
                   onChange={setItemFinishedOutputs}
                   defaultPieces=""
-                  allowAddRow={canAddFinishedOutputRows(
-                    rows.find((r) => r.id === itemModal?.itemId) ||
-                      detail?.items?.find((r) => r.id === itemModal?.itemId),
-                  )}
+                  allowAddRow={canAddFinishedOutputRows({
+                    ...itemEditSourceForModal(),
+                    production_status: itemForm.production_status,
+                  })}
                   showWeightReturn
                   showReturnDate
                   showRemark
