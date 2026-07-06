@@ -20,7 +20,6 @@ import {
   formatForgingSpecHtml,
   normalizeFinishedOutputsForApi,
   parseFinishedOutputsFromItem,
-  canAddFinishedOutputRows,
 } from './finishedOutputs.js'
 import { buildProcessingDayColumns } from './processingDayCode.js'
 import { can, PERM } from './permissions.js'
@@ -221,6 +220,17 @@ function inferPieceCodePrefixFromUnitCodes(unitCodes) {
   const first = prefixes[0]
   const allSame = prefixes.every((p) => p === first)
   return allSame ? first : first
+}
+
+function parseFinishedOutputsForEdit(it) {
+  const inferredPrefix = inferPieceCodePrefixFromUnitCodes(it?.processing_unit_codes)
+  return parseFinishedOutputsFromItem(it).map((r) => {
+    const pcRaw = String(r?.piece_code ?? '').trim()
+    const pc = pcRaw ? stripUnitCodeSuffix(pcRaw) : ''
+    if (pc) return { ...r, piece_code: pc }
+    if (!inferredPrefix) return { ...r, piece_code: '' }
+    return { ...r, piece_code: stripUnitCodeSuffix(inferredPrefix) }
+  })
 }
 
 function buildUnitCodesFromPrefix(prefix, qty) {
@@ -1883,6 +1893,8 @@ export default function TasksPage({
   const [itemFinishedOutputs, setItemFinishedOutputs] = useState(() => [
     { ...emptyFinishedOutput(), pieces: '' },
   ])
+  const [detailForgingRows, setDetailForgingRows] = useState(null)
+  const [detailForgingSaving, setDetailForgingSaving] = useState(false)
 
   const [cutHeadModalOpen, setCutHeadModalOpen] = useState(false)
   const [cutHeadPickQ, setCutHeadPickQ] = useState('')
@@ -2571,6 +2583,38 @@ export default function TasksPage({
     setGrindLogs(Array.isArray(logs) ? logs : [])
   }
 
+  useEffect(() => {
+    const it = detail?.items?.[0]
+    if (!it) {
+      setDetailForgingRows(null)
+      return
+    }
+    const ps = String(it.production_status ?? '').trim() || '在库中'
+    if (ps === '在库中' && can(user, PERM.ORDER_PROCESS)) {
+      setDetailForgingRows(parseFinishedOutputsForEdit(it))
+    } else {
+      setDetailForgingRows(null)
+    }
+  }, [detail, user])
+
+  async function saveDetailForgingOutputs() {
+    const it = detail?.items?.[0]
+    if (!it || !detailForgingRows) return
+    setErr(null)
+    setDetailForgingSaving(true)
+    try {
+      await patchJson(`/api/order-items/${it.id}`, {
+        finished_outputs: normalizeFinishedOutputsForApi(detailForgingRows),
+      })
+      await refreshDetail(detail.id)
+      loadTasks()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '保存锻造规格失败')
+    } finally {
+      setDetailForgingSaving(false)
+    }
+  }
+
   async function enterDetail(row) {
     setErr(null)
     setView('detail')
@@ -2814,14 +2858,6 @@ export default function TasksPage({
   }
 
   function openEditItem(it) {
-    const inferredPrefix = inferPieceCodePrefixFromUnitCodes(it?.processing_unit_codes)
-    const parsedOutputs = parseFinishedOutputsFromItem(it).map((r) => {
-      const pcRaw = String(r?.piece_code ?? '').trim()
-      const pc = pcRaw ? stripUnitCodeSuffix(pcRaw) : ''
-      if (pc) return { ...r, piece_code: pc }
-      if (!inferredPrefix) return { ...r, piece_code: '' }
-      return { ...r, piece_code: stripUnitCodeSuffix(inferredPrefix) }
-    })
     setItemForm({
       incoming_no: it.incoming_no ?? '',
       material_grade: it.material_grade ?? '',
@@ -2839,7 +2875,7 @@ export default function TasksPage({
         ? String(it.cutting_time).slice(0, 16).replace('T', 'T')
         : todayDatetimeLocal(),
     })
-    setItemFinishedOutputs(parsedOutputs)
+    setItemFinishedOutputs(parseFinishedOutputsForEdit(it))
     setItemModal({
       itemId: it.id,
       editSource: it,
@@ -2847,17 +2883,6 @@ export default function TasksPage({
       split_group_id: it?.split_group_id ?? null,
       split_seq: it?.split_seq ?? null,
     })
-  }
-
-  function itemEditSourceForModal() {
-    if (!itemModal?.itemId) return null
-    const id = Number(itemModal.itemId)
-    if (itemModal.editSource) return itemModal.editSource
-    return (
-      rows.find((r) => Number(r.id) === id) ||
-      detail?.items?.find((r) => Number(r.id) === id) ||
-      null
-    )
   }
 
   async function submitItem(e) {
@@ -6653,13 +6678,39 @@ export default function TasksPage({
                   />
 
                   <section className="card order-section">
-                    <h2 className="order-section-title">锻造规格明细</h2>
-                    <FinishedOutputsView
-                      outputs={detail.items[0].finished_outputs}
-                      unitCodes={detail.items[0].processing_unit_codes}
-                      variant="table"
-                      emptyText="—"
-                    />
+                    <div className="order-detail-head" style={{ marginBottom: '0.75rem' }}>
+                      <h2 className="order-section-title" style={{ margin: 0 }}>
+                        锻造规格明细
+                      </h2>
+                      {detailForgingRows && can(user, PERM.ORDER_PROCESS) ? (
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          disabled={detailForgingSaving}
+                          onClick={() => void saveDetailForgingOutputs()}
+                        >
+                          {detailForgingSaving ? '保存中…' : '保存锻造规格'}
+                        </button>
+                      ) : null}
+                    </div>
+                    {detailForgingRows && can(user, PERM.ORDER_PROCESS) ? (
+                      <FinishedOutputsEditor
+                        rows={detailForgingRows}
+                        onChange={setDetailForgingRows}
+                        defaultPieces=""
+                        allowAddRow
+                        showWeightReturn
+                        showReturnDate
+                        showRemark
+                      />
+                    ) : (
+                      <FinishedOutputsView
+                        outputs={detail.items[0].finished_outputs}
+                        unitCodes={detail.items[0].processing_unit_codes}
+                        variant="table"
+                        emptyText="—"
+                      />
+                    )}
                   </section>
 
                   <section className="card order-section">
@@ -7046,10 +7097,7 @@ export default function TasksPage({
                   rows={itemFinishedOutputs}
                   onChange={setItemFinishedOutputs}
                   defaultPieces=""
-                  allowAddRow={canAddFinishedOutputRows({
-                    ...itemEditSourceForModal(),
-                    production_status: itemForm.production_status,
-                  })}
+                  allowAddRow
                   showWeightReturn
                   showReturnDate
                   showRemark
