@@ -55,7 +55,7 @@ def day_code_char_by_dom(day_of_month: int) -> str:
 
 
 def _anchor_date_for_piece_code(row: OrderItem) -> date:
-    """新分配件号首字母时：优先用下料/来料/创建日，避免跨月后误用当天字母。"""
+    """历史锚定日（下料/来料/创建）；新分配件号首字母已改用排产当日，见 _assign_continuous_codes_for_group。"""
     ct = row.cutting_time
     if ct is not None:
         try:
@@ -205,7 +205,7 @@ def _assign_continuous_codes_for_group(
             if prefix:
                 break
     if not prefix:
-        day_char = force_day_char or _day_char_for_item(items[0])
+        day_char = force_day_char or day_code_char(date.today())
         prefix = f"{day_char}{next_n}"
         next_n += 1
 

@@ -3,7 +3,7 @@
  */
 
 import { formatFormedSizeStagesText } from './formedSizeStages.js'
-import { formatSlotPiecesDisplay } from './todaySlotOrderStorage.js'
+import { formatSlotPiecesDisplay, parseSlotPieces } from './todaySlotOrderStorage.js'
 import { formatForgingSpecHtml } from './finishedOutputs.js'
 
 const sheetCss = `
@@ -54,26 +54,9 @@ function fmtWeight(v) {
   return String(v)
 }
 
-function compareOrderNo(a, b) {
-  const sa = String(a ?? '')
-  const sb = String(b ?? '')
-  const pa = sa.match(/^(.*?)-(\d+)$/)
-  const pb = sb.match(/^(.*?)-(\d+)$/)
-  const ba = pa ? pa[1] : sa
-  const bb = pb ? pb[1] : sb
-  const baseCmp = ba.localeCompare(bb, 'zh-CN')
-  if (baseCmp !== 0) return baseCmp
-  if (pa && pb) return Number(pa[2]) - Number(pb[2])
-  return sa.localeCompare(sb, 'zh-CN')
-}
-
-/** 与 TasksPage 一致：按订单号排序后按件展开 */
+/** 按加入今日队列先后（id）展开；有排号时再按 slotLabels 重排 */
 export function expandTodayQueueForSheet(todayQueueRows) {
-  const sorted = [...todayQueueRows].sort((a, b) => {
-    const cmp = compareOrderNo(a.order_no, b.order_no)
-    if (cmp !== 0) return cmp
-    return a.id - b.id
-  })
+  const sorted = [...todayQueueRows].sort((a, b) => a.id - b.id)
   const out = []
   for (const it of sorted) {
     const rawQ = Number(it.quantity)
@@ -90,6 +73,32 @@ export function expandTodayQueueForSheet(todayQueueRows) {
     }
   }
   return out
+}
+
+/** 有第1～10排件号时，明细行顺序与排位表一致 */
+function reorderExpandedBySlotLabels(expanded, slotLabels) {
+  if (!Array.isArray(slotLabels) || slotLabels.length !== 10) return expanded
+  const pieceToRow = new Map()
+  for (const row of expanded) {
+    const label = String(row.pieceLabel ?? '').trim()
+    if (!label || label === '—' || pieceToRow.has(label)) continue
+    pieceToRow.set(label, row)
+  }
+  const ordered = []
+  const used = new Set()
+  for (const slot of slotLabels) {
+    for (const piece of parseSlotPieces(slot)) {
+      const row = pieceToRow.get(piece)
+      if (row && !used.has(row)) {
+        ordered.push(row)
+        used.add(row)
+      }
+    }
+  }
+  for (const row of expanded) {
+    if (!used.has(row)) ordered.push(row)
+  }
+  return ordered
 }
 
 /** 日期：2026.5.4（年月日不补零） */
@@ -214,7 +223,10 @@ function buildDataRows(rows) {
 
 export function buildWorkshopProductionSheetHtml(todayQueueRows, options = {}) {
   const { toolbar = true, slotLabels, workshop = '快锻机' } = options
-  const expanded = expandTodayQueueForSheet(todayQueueRows)
+  let expanded = expandTodayQueueForSheet(todayQueueRows)
+  if (Array.isArray(slotLabels) && slotLabels.length === 10) {
+    expanded = reorderExpandedBySlotLabels(expanded, slotLabels)
+  }
 
   const todayStr = fmtSheetDate()
 

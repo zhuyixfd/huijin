@@ -18,6 +18,8 @@ from app.permissions import (
     required_perm_for_item_patch,
 )
 from app.order_item_finished import (
+    can_add_finished_output_rows,
+    normalize_finished_output_inputs,
     replace_finished_outputs,
     resolve_finished_outputs,
     sync_output_piece_codes_store,
@@ -640,6 +642,11 @@ def patch_order_item(
     for k, v in data.items():
         setattr(row, k, v)
     if had_finished_outputs:
+        if isinstance(finished_raw, list):
+            old_count = len(resolve_finished_outputs(db, row) or [])
+            new_count = len(normalize_finished_output_inputs(finished_raw))
+            if new_count > old_count and not can_add_finished_output_rows(row):
+                raise HTTPException(status_code=400, detail="已进入后续工序，不能新增锻造规格")
         replace_finished_outputs(db, row, finished_raw)
     # 列入今日处理且未指定状态时：仅将「在库中」视为待下车间，默认锻造中（避免覆盖修磨中等工序）
     if data.get("in_today_queue") is True and not had_explicit_production_status:

@@ -20,6 +20,7 @@ import {
   formatForgingSpecHtml,
   normalizeFinishedOutputsForApi,
   parseFinishedOutputsFromItem,
+  canAddFinishedOutputRows,
 } from './finishedOutputs.js'
 import { buildProcessingDayColumns } from './processingDayCode.js'
 import { can, PERM } from './permissions.js'
@@ -4090,8 +4091,15 @@ export default function TasksPage({
   function openSlotOrderModal() {
     const draft = [...todaySlotOrder]
     setSlotOrderDraft(draft)
+    const todaySlot = Math.min(Math.max(new Date().getDate() - 1, 0), 9)
     const firstEmpty = draft.findIndex((s) => !String(s).trim())
-    setSlotOrderActiveSlot(firstEmpty === -1 ? 0 : firstEmpty)
+    const preferred =
+      !String(draft[todaySlot] ?? '').trim()
+        ? todaySlot
+        : firstEmpty === -1
+          ? todaySlot
+          : firstEmpty
+    setSlotOrderActiveSlot(preferred)
     setSlotOrderModalOpen(true)
   }
 
@@ -7026,7 +7034,10 @@ export default function TasksPage({
                   rows={itemFinishedOutputs}
                   onChange={setItemFinishedOutputs}
                   defaultPieces=""
-                  allowAddRow={false}
+                  allowAddRow={canAddFinishedOutputRows(
+                    rows.find((r) => r.id === itemModal?.itemId) ||
+                      detail?.items?.find((r) => r.id === itemModal?.itemId),
+                  )}
                   showWeightReturn
                   showReturnDate
                   showRemark
