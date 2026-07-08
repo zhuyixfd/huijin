@@ -76,6 +76,8 @@ def _task_filter_conditions(
     created_from: date | None,
     created_to: date | None,
     exclude_completed: bool = False,
+    in_today_queue: bool | None = None,
+    in_tomorrow_queue: bool | None = None,
 ) -> list:
     conds: list = []
     if exclude_completed:
@@ -121,6 +123,11 @@ def _task_filter_conditions(
     if created_to is not None:
         end = datetime.combine(created_to, time.max)
         conds.append(OrderItem.created_at <= end)
+
+    if in_today_queue is True:
+        conds.append(OrderItem.in_today_queue.is_(True))
+    if in_tomorrow_queue is True:
+        conds.append(OrderItem.in_tomorrow_queue.is_(True))
 
     cat = (status_category or "all").strip().lower()
     if cat not in ("", "all"):
@@ -233,6 +240,14 @@ def list_task_items(
         False,
         description="为 True 时排除生产状态「已发回」（用于全部订单列表）",
     ),
+    in_today_queue: bool | None = Query(
+        None,
+        description="为 True 时仅返回 in_today_queue 标记为是的明细（用于今日处理全量列表/打印）",
+    ),
+    in_tomorrow_queue: bool | None = Query(
+        None,
+        description="为 True 时仅返回 in_tomorrow_queue 标记为是的明细",
+    ),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
 ):
@@ -248,6 +263,8 @@ def list_task_items(
         created_from=created_from,
         created_to=created_to,
         exclude_completed=exclude_completed,
+        in_today_queue=in_today_queue,
+        in_tomorrow_queue=in_tomorrow_queue,
     )
 
     def _matches_piece_letter(item: OrderItem, key: str) -> bool:

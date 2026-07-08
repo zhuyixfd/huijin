@@ -1868,6 +1868,7 @@ export default function TasksPage({
   const [q, setQ] = useState('')
 
   const [rows, setRows] = useState([])
+  const [allTodayQueueRows, setAllTodayQueueRows] = useState([])
   const [listTotal, setListTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(() => (tasksPreset === 'all' ? 10 : 20))
@@ -2443,6 +2444,25 @@ export default function TasksPage({
     getJson('/api/customers').then(setCustomers)
   }, [])
 
+  const loadAllTodayQueueRows = useCallback(() => {
+    if (tasksPreset !== 'processing') {
+      setAllTodayQueueRows([])
+      return Promise.resolve()
+    }
+    const p = new URLSearchParams()
+    p.set('status_category', 'in_progress')
+    p.set('in_today_queue', 'true')
+    p.set('skip', '0')
+    p.set('limit', '500')
+    return getJson(`/api/tasks/items?${p.toString()}`)
+      .then((d) => {
+        setAllTodayQueueRows(Array.isArray(d.items) ? d.items : [])
+      })
+      .catch(() => {
+        setAllTodayQueueRows([])
+      })
+  }, [tasksPreset])
+
   const loadTasks = useCallback(() => {
     setLoading(true)
     const p = new URLSearchParams()
@@ -2475,6 +2495,9 @@ export default function TasksPage({
         setRows(d.items)
         setListTotal(typeof d.total === 'number' ? d.total : 0)
         onTasksMutated?.()
+        if (tasksPreset === 'processing') {
+          return loadAllTodayQueueRows()
+        }
       })
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false))
@@ -2488,6 +2511,7 @@ export default function TasksPage({
     pageSize,
     tasksPreset,
     onTasksMutated,
+    loadAllTodayQueueRows,
   ])
 
   const loadCutHeadLogs = useCallback(() => {
@@ -3158,16 +3182,14 @@ export default function TasksPage({
     if (tasksPreset !== 'processing') {
       return { todayQueueRows: [], tomorrowQueueRows: [], restProcessingRows: [] }
     }
-    const t = []
     const m = []
     const r = []
     for (const row of rows) {
-      if (row.in_today_queue) t.push(row)
-      else if (row.in_tomorrow_queue) m.push(row)
-      else r.push(row)
+      if (row.in_tomorrow_queue) m.push(row)
+      else if (!row.in_today_queue) r.push(row)
     }
-    return { todayQueueRows: t, tomorrowQueueRows: m, restProcessingRows: r }
-  }, [rows, tasksPreset])
+    return { todayQueueRows: allTodayQueueRows, tomorrowQueueRows: m, restProcessingRows: r }
+  }, [rows, tasksPreset, allTodayQueueRows])
 
   const exportGroupKeyForItem = useCallback((it) => {
     const base = String(it?.split_base_order_no ?? '').trim()
