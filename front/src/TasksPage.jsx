@@ -1868,7 +1868,7 @@ export default function TasksPage({
   const [q, setQ] = useState('')
 
   const [rows, setRows] = useState([])
-  const [allTodayQueueRows, setAllTodayQueueRows] = useState([])
+  const [allProcessingQueueRows, setAllProcessingQueueRows] = useState([])
   const [listTotal, setListTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(() => (tasksPreset === 'all' ? 10 : 20))
@@ -2444,26 +2444,48 @@ export default function TasksPage({
     getJson('/api/customers').then(setCustomers)
   }, [])
 
-  const loadAllTodayQueueRows = useCallback(() => {
+  const loadAllProcessingQueueRows = useCallback(() => {
     if (tasksPreset !== 'processing') {
-      setAllTodayQueueRows([])
+      setAllProcessingQueueRows([])
       return Promise.resolve()
     }
     const p = new URLSearchParams()
     p.set('status_category', 'in_progress')
-    p.set('in_today_queue', 'true')
+    if (statusFilter) p.set('status', statusFilter)
+    const sv = String(searchValue ?? '').trim()
+    if (sv) {
+      p.set('search_col', String(searchCol ?? '').trim() || 'order_no')
+      p.set('search_value', sv)
+    }
+    const s = String(processingPieceLetter ?? '').trim()
+    if (s) p.set('piece_letter', s[0])
     p.set('skip', '0')
     p.set('limit', '500')
     return getJson(`/api/tasks/items?${p.toString()}`)
       .then((d) => {
-        setAllTodayQueueRows(Array.isArray(d.items) ? d.items : [])
+        const items = Array.isArray(d.items) ? d.items : []
+        setAllProcessingQueueRows(items)
+        setRows(items)
+        setListTotal(typeof d.total === 'number' ? d.total : items.length)
       })
       .catch(() => {
-        setAllTodayQueueRows([])
+        setAllProcessingQueueRows([])
+        setRows([])
+        setListTotal(0)
       })
-  }, [tasksPreset])
+  }, [tasksPreset, statusFilter, searchCol, searchValue, processingPieceLetter])
 
   const loadTasks = useCallback(() => {
+    if (tasksPreset === 'processing') {
+      setLoading(true)
+      return loadAllProcessingQueueRows()
+        .then(() => {
+          setErr(null)
+          onTasksMutated?.()
+        })
+        .catch((e) => setErr(e.message))
+        .finally(() => setLoading(false))
+    }
     setLoading(true)
     const p = new URLSearchParams()
     if (statusFilter) p.set('status', statusFilter)
@@ -2495,9 +2517,6 @@ export default function TasksPage({
         setRows(d.items)
         setListTotal(typeof d.total === 'number' ? d.total : 0)
         onTasksMutated?.()
-        if (tasksPreset === 'processing') {
-          return loadAllTodayQueueRows()
-        }
       })
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false))
@@ -2511,7 +2530,7 @@ export default function TasksPage({
     pageSize,
     tasksPreset,
     onTasksMutated,
-    loadAllTodayQueueRows,
+    loadAllProcessingQueueRows,
   ])
 
   const loadCutHeadLogs = useCallback(() => {
@@ -3182,14 +3201,16 @@ export default function TasksPage({
     if (tasksPreset !== 'processing') {
       return { todayQueueRows: [], tomorrowQueueRows: [], restProcessingRows: [] }
     }
+    const t = []
     const m = []
     const r = []
-    for (const row of rows) {
-      if (row.in_tomorrow_queue) m.push(row)
-      else if (!row.in_today_queue) r.push(row)
+    for (const row of allProcessingQueueRows) {
+      if (row.in_today_queue) t.push(row)
+      else if (row.in_tomorrow_queue) m.push(row)
+      else r.push(row)
     }
-    return { todayQueueRows: allTodayQueueRows, tomorrowQueueRows: m, restProcessingRows: r }
-  }, [rows, tasksPreset, allTodayQueueRows])
+    return { todayQueueRows: t, tomorrowQueueRows: m, restProcessingRows: r }
+  }, [tasksPreset, allProcessingQueueRows])
 
   const exportGroupKeyForItem = useCallback((it) => {
     const base = String(it?.split_base_order_no ?? '').trim()
@@ -5676,7 +5697,7 @@ export default function TasksPage({
 
       {err ? <p className="err">{err}</p> : null}
 
-      {view === 'list' ? (
+      {view === 'list' && tasksPreset !== 'processing' ? (
         <div className="tasks-pagination-bar toolbar">
           <label className="tasks-page-size">
             每页
