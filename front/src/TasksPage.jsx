@@ -376,6 +376,32 @@ function dtLocal(val) {
 
 const GS = 'task-col-group-start'
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
+const TASKS_LIST_FILTERS_STORAGE_PREFIX = 'hj.tasks.list_filters.v1'
+
+function listFiltersStorageKey(preset) {
+  return `${TASKS_LIST_FILTERS_STORAGE_PREFIX}.${preset}`
+}
+
+function readListFilters(preset) {
+  try {
+    if (typeof window === 'undefined') return null
+    const raw = window.sessionStorage.getItem(listFiltersStorageKey(preset))
+    if (!raw) return null
+    const o = JSON.parse(raw)
+    return o && typeof o === 'object' ? o : null
+  } catch {
+    return null
+  }
+}
+
+function writeListFilters(preset, data) {
+  try {
+    if (typeof window === 'undefined') return
+    window.sessionStorage.setItem(listFiltersStorageKey(preset), JSON.stringify(data ?? {}))
+  } catch {
+    return
+  }
+}
 
 const MEGA_COL_VIS_STORAGE_KEY = 'tasks.mega_cols_visibility.v1'
 const UI_PREF_KEY_MEGA_COL_ORDER = 'tasks.mega_cols_order.v1'
@@ -451,6 +477,12 @@ const MEGA_COL_DEFAULT_ORDER = [
   'task_actions',
 ]
 
+/** 待出库：下料/锻造时间放第一列 */
+const READY_OUTBOUND_COL_DEFAULT_ORDER = [
+  'cutting_time',
+  ...MEGA_COL_DEFAULT_ORDER.filter((k) => k !== 'cutting_time'),
+]
+
 const DETAIL_INCOMING_DEFAULT_ORDER = [
   'incoming_no',
   'material_grade',
@@ -510,6 +542,14 @@ function normalizeColOrder(saved, defaults) {
     if (!seen.has(k)) out.push(k)
   }
   return out
+}
+
+function megaColOrderForPreset(preset, savedOrder) {
+  const defaults =
+    preset === 'ready_outbound' ? READY_OUTBOUND_COL_DEFAULT_ORDER : MEGA_COL_DEFAULT_ORDER
+  const normalized = normalizeColOrder(savedOrder, defaults)
+  if (preset !== 'ready_outbound') return normalized
+  return ['cutting_time', ...normalized.filter((k) => k !== 'cutting_time')]
 }
 
 function insertBefore(list, activeKey, beforeKey) {
@@ -1888,6 +1928,8 @@ export default function TasksPage({
   const [activeWorkOrderTabId, setActiveWorkOrderTabId] = useState(null)
   const workOrderTabLabelRef = useRef(1)
   const workOrderTabIdRef = useRef(1)
+  const skipListPageResetRef = useRef(false)
+  const skipPersistFiltersOnceRef = useRef(false)
 
   const [itemModal, setItemModal] = useState(null)
   const [itemForm, setItemForm] = useState(emptyItemForm)
@@ -2256,12 +2298,67 @@ export default function TasksPage({
   })
 
   useEffect(() => {
-    if (tasksPreset !== 'all') return
-    queueMicrotask(() => {
+    const saved = readListFilters(tasksPreset)
+    skipListPageResetRef.current = true
+    skipPersistFiltersOnceRef.current = true
+    if (saved) {
+      if (typeof saved.searchCol === 'string' && saved.searchCol) setSearchCol(saved.searchCol)
+      if (typeof saved.searchValue === 'string') setSearchValue(saved.searchValue)
+      if (typeof saved.statusFilter === 'string') setStatusFilter(saved.statusFilter)
+      if (typeof saved.q === 'string') setQ(saved.q)
+      if (typeof saved.processingPieceLetter === 'string') {
+        setProcessingPieceLetter(saved.processingPieceLetter)
+      }
+      const ps = Number(saved.pageSize)
+      if (PAGE_SIZE_OPTIONS.includes(ps)) setPageSize(ps)
+      const pg = Number(saved.page)
+      setPage(Number.isFinite(pg) && pg >= 1 ? Math.floor(pg) : 1)
+    } else {
+      setStatusFilter('')
+      setSearchCol('order_no')
+      setSearchValue('')
+      setQ('')
+      setProcessingPieceLetter('')
       setPage(1)
-      setPageSize(10)
-    })
+      setPageSize(tasksPreset === 'all' ? 10 : 20)
+    }
   }, [tasksPreset])
+
+  useEffect(() => {
+    if (skipPersistFiltersOnceRef.current) {
+      skipPersistFiltersOnceRef.current = false
+      return
+    }
+    writeListFilters(tasksPreset, {
+      searchCol,
+      searchValue,
+      statusFilter,
+      q,
+      page,
+      pageSize,
+      processingPieceLetter,
+    })
+  }, [tasksPreset, searchCol, searchValue, statusFilter, q, page, pageSize, processingPieceLetter])
+
+  function toggleTodayOrderCollapse(orderNo) {
+    const key = String(orderNo ?? '')
+    setCollapsedTodayOrderNos((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  function toggleRestOrderCollapse(orderNo) {
+    const key = String(orderNo ?? '')
+    setCollapsedRestOrderNos((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   const colOn = useCallback(
     (key) => {
@@ -2344,45 +2441,23 @@ export default function TasksPage({
     [emptyCell],
   )
 
-  /* 侧栏切换预设时清空「按生产状态筛选」，避免与新区间的列表条件叠加 */
-  useEffect(() => {
-    queueMicrotask(() => setStatusFilter(''))
-  }, [tasksPreset])
-
-  function toggleTodayOrderCollapse(orderNo) {
-    const key = String(orderNo ?? '')
-    setCollapsedTodayOrderNos((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
-
-  function toggleRestOrderCollapse(orderNo) {
-    const key = String(orderNo ?? '')
-    setCollapsedRestOrderNos((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
-
+  /* 侧栏切换预设时重置批量勾选等 UI 状态（筛选条件由 sessionStorage 按预设恢复） */
   useEffect(() => {
     queueMicrotask(() => {
       setBulkSelectColumnVisible(false)
       setBatchProductionExpanded(false)
       setCollapsedTodayOrderNos(new Set())
       setCollapsedRestOrderNos(new Set())
-      setProcessingPieceLetter('')
     })
   }, [tasksPreset])
 
   useEffect(() => {
+    if (skipListPageResetRef.current) {
+      skipListPageResetRef.current = false
+      return
+    }
     queueMicrotask(() => setPage(1))
   }, [
-    tasksPreset,
     statusFilter,
     listStatusCategory,
     q,
@@ -4904,7 +4979,7 @@ export default function TasksPage({
     )
   }
 
-  const megaColOrderNormalized = normalizeColOrder(megaColOrder, MEGA_COL_DEFAULT_ORDER)
+  const megaColOrderNormalized = megaColOrderForPreset(tasksPreset, megaColOrder)
   const detailIncomingColOrderNormalized = normalizeColOrder(detailIncomingColOrder, DETAIL_INCOMING_DEFAULT_ORDER)
   const detailLogColOrderNormalized = normalizeColOrder(detailLogColOrder, DETAIL_LOG_DEFAULT_ORDER)
 
