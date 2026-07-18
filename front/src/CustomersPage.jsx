@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import './Pages.css'
 import { deleteReq, getJson, patchJson, postJson } from './api.js'
+import { exportIoDetailExcel } from './exportIoDetailExcel.js'
 import Modal from './Modal.jsx'
 import { preventModalFormEnterSubmit } from './modalUtils.js'
+
+function currentMonthValue() {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  return `${y}-${m}`
+}
 
 export default function CustomersPage() {
   const [rows, setRows] = useState([])
@@ -18,6 +26,10 @@ export default function CustomersPage() {
     remark: '',
   })
   const [err, setErr] = useState(null)
+  const [exportModal, setExportModal] = useState(null)
+  const [exportMonth, setExportMonth] = useState(currentMonthValue)
+  const [exportErr, setExportErr] = useState(null)
+  const [exportSubmitting, setExportSubmitting] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -56,6 +68,53 @@ export default function CustomersPage() {
       remark: row.remark ?? '',
     })
     setModal({ editId: row.id })
+  }
+
+  function openMonthlyExport(row) {
+    setExportErr(null)
+    setExportMonth(currentMonthValue())
+    setExportModal({ id: row.id, name: row.name })
+  }
+
+  async function submitMonthlyExport(e) {
+    e.preventDefault()
+    if (!exportModal) return
+    setExportErr(null)
+    const m = String(exportMonth ?? '').trim()
+    const match = m.match(/^(\d{4})-(\d{2})$/)
+    if (!match) {
+      setExportErr('请选择有效月份')
+      return
+    }
+    const year = Number(match[1])
+    const month = Number(match[2])
+    if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+      setExportErr('请选择有效月份')
+      return
+    }
+    setExportSubmitting(true)
+    try {
+      const resp = await getJson(
+        `/api/customers/${exportModal.id}/monthly-io-items?year=${year}&month=${month}`,
+      )
+      const items = Array.isArray(resp?.items) ? resp.items : []
+      if (items.length === 0) {
+        setExportErr('该月暂无出入明细')
+        return
+      }
+      const ym = `${year}${String(month).padStart(2, '0')}`
+      exportIoDetailExcel({
+        customerName: exportModal.name,
+        items,
+        fileName: `${exportModal.name}-出入明细-${ym}.xls`,
+        headerYear: year,
+      })
+      setExportModal(null)
+    } catch (ex) {
+      setExportErr(ex instanceof Error ? ex.message : '导出失败')
+    } finally {
+      setExportSubmitting(false)
+    }
   }
 
   async function submitCreate(e) {
@@ -160,6 +219,9 @@ export default function CustomersPage() {
                   <td>{r.address}</td>
                   <td>{r.remark}</td>
                   <td className="row-actions">
+                    <button type="button" className="btn btn-ghost" onClick={() => openMonthlyExport(r)}>
+                      按月导出
+                    </button>
                     <button type="button" className="btn btn-ghost" onClick={() => openEdit(r)}>
                       编辑
                     </button>
@@ -224,7 +286,7 @@ export default function CustomersPage() {
                   onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))}
                 />
               </label>
-              {err ? <p className="err">{err}</p> : null}
+              {err ? <p className="err full">{err}</p> : null}
               <div className="form-actions">
                 <button type="submit" className="btn btn-primary">
                   保存
@@ -283,13 +345,45 @@ export default function CustomersPage() {
                   onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))}
                 />
               </label>
-              {err ? <p className="err">{err}</p> : null}
+              {err ? <p className="err full">{err}</p> : null}
               <div className="form-actions">
                 <button type="submit" className="btn btn-primary">
                   保存
                 </button>
               </div>
             </form>
+        </Modal>
+      ) : null}
+
+      {exportModal ? (
+        <Modal
+          open
+          title={`按月导出出入明细 · ${exportModal.name}`}
+          onClose={() => {
+            if (exportSubmitting) return
+            setExportModal(null)
+          }}
+        >
+          <form className="form-grid" onSubmit={submitMonthlyExport} onKeyDown={preventModalFormEnterSubmit}>
+            <p className="muted full" style={{ marginTop: '-0.25rem' }}>
+              导出该客户「来料日期」或「送回日期」落在所选月份的明细（格式与处理中数据导出一致）。
+            </p>
+            <label>
+              月份
+              <input
+                type="month"
+                value={exportMonth}
+                onChange={(e) => setExportMonth(e.target.value)}
+                required
+              />
+            </label>
+            {exportErr ? <p className="err full">{exportErr}</p> : null}
+            <div className="form-actions full">
+              <button type="submit" className="btn btn-primary" disabled={exportSubmitting}>
+                {exportSubmitting ? '导出中…' : '导出'}
+              </button>
+            </div>
+          </form>
         </Modal>
       ) : null}
     </div>
