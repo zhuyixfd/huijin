@@ -83,17 +83,24 @@ def list_customer_monthly_io_items(
     customer_id: int,
     _: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
-    year: int = Query(..., ge=2000, le=2100, description="年份"),
-    month: int = Query(..., ge=1, le=12, description="月份 1–12"),
+    year_from: int = Query(..., ge=2000, le=2100, description="起始年份"),
+    month_from: int = Query(..., ge=1, le=12, description="起始月份 1–12"),
+    year_to: int | None = Query(None, ge=2000, le=2100, description="结束年份（默认同起始年）"),
+    month_to: int | None = Query(None, ge=1, le=12, description="结束月份（默认同起始月）"),
 ):
-    """按月导出出入明细：来料日期或送回日期落在该月的订单明细。"""
+    """按月范围导出出入明细：来料日期或送回日期落在所选月份区间内的订单明细。"""
     cust = db.get(Customer, customer_id)
     if cust is None:
         raise HTTPException(status_code=404, detail="客户不存在")
 
-    start = date(year, month, 1)
-    end = date(year, month, monthrange(year, month)[1])
-    fo_in_month = exists(
+    y2 = year_to if year_to is not None else year_from
+    m2 = month_to if month_to is not None else month_from
+    start = date(year_from, month_from, 1)
+    end = date(y2, m2, monthrange(y2, m2)[1])
+    if end < start:
+        raise HTTPException(status_code=400, detail="结束月份不能早于起始月份")
+
+    fo_in_range = exists(
         select(OrderItemFinishedOutput.id).where(
             OrderItemFinishedOutput.order_item_id == OrderItem.id,
             OrderItemFinishedOutput.return_date >= start,
@@ -105,7 +112,7 @@ def list_customer_monthly_io_items(
         or_(
             and_(OrderItem.incoming_date >= start, OrderItem.incoming_date <= end),
             and_(OrderItem.return_date >= start, OrderItem.return_date <= end),
-            fo_in_month,
+            fo_in_range,
         ),
     ]
 

@@ -27,7 +27,8 @@ export default function CustomersPage() {
   })
   const [err, setErr] = useState(null)
   const [exportModal, setExportModal] = useState(null)
-  const [exportMonth, setExportMonth] = useState(currentMonthValue)
+  const [exportMonthFrom, setExportMonthFrom] = useState(currentMonthValue)
+  const [exportMonthTo, setExportMonthTo] = useState(currentMonthValue)
   const [exportErr, setExportErr] = useState(null)
   const [exportSubmitting, setExportSubmitting] = useState(false)
 
@@ -72,42 +73,59 @@ export default function CustomersPage() {
 
   function openMonthlyExport(row) {
     setExportErr(null)
-    setExportMonth(currentMonthValue())
+    const cur = currentMonthValue()
+    setExportMonthFrom(cur)
+    setExportMonthTo(cur)
     setExportModal({ id: row.id, name: row.name })
+  }
+
+  function parseYearMonth(value) {
+    const m = String(value ?? '').trim().match(/^(\d{4})-(\d{2})$/)
+    if (!m) return null
+    const year = Number(m[1])
+    const month = Number(m[2])
+    if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) return null
+    return { year, month }
   }
 
   async function submitMonthlyExport(e) {
     e.preventDefault()
     if (!exportModal) return
     setExportErr(null)
-    const m = String(exportMonth ?? '').trim()
-    const match = m.match(/^(\d{4})-(\d{2})$/)
-    if (!match) {
-      setExportErr('请选择有效月份')
+    const from = parseYearMonth(exportMonthFrom)
+    const to = parseYearMonth(exportMonthTo)
+    if (!from || !to) {
+      setExportErr('请选择有效月份范围')
       return
     }
-    const year = Number(match[1])
-    const month = Number(match[2])
-    if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
-      setExportErr('请选择有效月份')
+    const fromKey = from.year * 100 + from.month
+    const toKey = to.year * 100 + to.month
+    if (toKey < fromKey) {
+      setExportErr('结束月份不能早于起始月份')
       return
     }
     setExportSubmitting(true)
     try {
-      const resp = await getJson(
-        `/api/customers/${exportModal.id}/monthly-io-items?year=${year}&month=${month}`,
-      )
+      const qs = new URLSearchParams({
+        year_from: String(from.year),
+        month_from: String(from.month),
+        year_to: String(to.year),
+        month_to: String(to.month),
+      })
+      const resp = await getJson(`/api/customers/${exportModal.id}/monthly-io-items?${qs}`)
       const items = Array.isArray(resp?.items) ? resp.items : []
       if (items.length === 0) {
-        setExportErr('该月暂无出入明细')
+        setExportErr('该月份范围内暂无出入明细')
         return
       }
-      const ym = `${year}${String(month).padStart(2, '0')}`
+      const fromLabel = `${from.year}${String(from.month).padStart(2, '0')}`
+      const toLabel = `${to.year}${String(to.month).padStart(2, '0')}`
+      const rangeLabel = fromLabel === toLabel ? fromLabel : `${fromLabel}-${toLabel}`
       exportIoDetailExcel({
         customerName: exportModal.name,
         items,
-        fileName: `${exportModal.name}-出入明细-${ym}.xls`,
-        headerYear: year,
+        fileName: `${exportModal.name}-出入明细-${rangeLabel}.xls`,
+        headerYear: from.year,
       })
       setExportModal(null)
     } catch (ex) {
@@ -220,7 +238,7 @@ export default function CustomersPage() {
                   <td>{r.remark}</td>
                   <td className="row-actions">
                     <button type="button" className="btn btn-ghost" onClick={() => openMonthlyExport(r)}>
-                      按月导出
+                      按月范围导出
                     </button>
                     <button type="button" className="btn btn-ghost" onClick={() => openEdit(r)}>
                       编辑
@@ -358,7 +376,7 @@ export default function CustomersPage() {
       {exportModal ? (
         <Modal
           open
-          title={`按月导出出入明细 · ${exportModal.name}`}
+          title={`按月范围导出出入明细 · ${exportModal.name}`}
           onClose={() => {
             if (exportSubmitting) return
             setExportModal(null)
@@ -366,14 +384,23 @@ export default function CustomersPage() {
         >
           <form className="form-grid" onSubmit={submitMonthlyExport} onKeyDown={preventModalFormEnterSubmit}>
             <p className="muted full" style={{ marginTop: '-0.25rem' }}>
-              导出该客户「来料日期」或「送回日期」落在所选月份的明细（格式与处理中数据导出一致）。
+              导出该客户「来料日期」或「送回日期」落在所选月份范围内的明细（如 3–5 月；格式与处理中数据导出一致）。
             </p>
             <label>
-              月份
+              起始月份
               <input
                 type="month"
-                value={exportMonth}
-                onChange={(e) => setExportMonth(e.target.value)}
+                value={exportMonthFrom}
+                onChange={(e) => setExportMonthFrom(e.target.value)}
+                required
+              />
+            </label>
+            <label>
+              结束月份
+              <input
+                type="month"
+                value={exportMonthTo}
+                onChange={(e) => setExportMonthTo(e.target.value)}
                 required
               />
             </label>
