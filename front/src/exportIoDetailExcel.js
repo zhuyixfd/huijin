@@ -150,10 +150,10 @@ export function exportIoDetailExcel({ customerName, items, fileName, headerYear 
         String(codes[u] ?? '').trim() || '—',
         unitStatus || '—',
         String(fo?.spec ?? '').trim() || '—',
-        String(fo?.return_date ?? '').trim() || '—',
-        String(fo?.weight_return ?? '').trim() || '—',
         String(it?.remark ?? '').trim() || '—',
         String(it?.forging_requirements ?? '').trim() || '—',
+        String(fo?.return_date ?? '').trim() || '—',
+        String(fo?.weight_return ?? '').trim() || '—',
         String(fo?.remark ?? '').trim() || '—',
       ])
     }
@@ -174,10 +174,10 @@ export function exportIoDetailExcel({ customerName, items, fileName, headerYear 
     '件号',
     '生产状态',
     '锻造规格',
-    '送回日期',
-    '送回重量',
     '锻造备注',
     '锻造要求',
+    '送回日期',
+    '送回重量',
     '分支备注',
   ]
 
@@ -188,7 +188,7 @@ export function exportIoDetailExcel({ customerName, items, fileName, headerYear 
     return true
   }
 
-  const mergeCols = new Set([0, 1, 2, 3, 4, 5, 6, 12, 13])
+  const mergeCols = new Set([0, 1, 2, 3, 4, 5, 6, 10, 11])
   const spansByCol = new Map()
   const rowPieceGroups = expandedRows.map((r) => {
     const g = stripUnitCodeSuffix(r?.[7] ?? '')
@@ -241,7 +241,7 @@ export function exportIoDetailExcel({ customerName, items, fileName, headerYear 
     let tds = ''
     for (let c = 0; c < cells.length; c += 1) {
       const v = cells[c]
-      const isNum = c === 6 || c === 11
+      const isNum = c === 6 || c === 13
       const spanArr = spansByCol.get(c)
       if (spanArr) {
         const span = spanArr[rowIndex]
