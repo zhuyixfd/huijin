@@ -3653,6 +3653,18 @@ export default function TasksPage({
       return
     }
     if (selectedIds.length === 0) return
+    const n = selectedIds.length
+    const ok = window.confirm(
+      `确定对已勾选的 ${n} 条订单做「件号重排」？\n\n将按「${day}日」字母覆盖原有件号，不可自动撤销。\n请确认不是误点「开始处理」。`,
+    )
+    if (!ok) return
+    if (n >= 20) {
+      const typed = window.prompt(`将覆盖 ${n} 条订单的件号。请输入「重排」确认：`)
+      if (typed !== '重排') {
+        setErr('已取消件号重排')
+        return
+      }
+    }
     setErr(null)
     setBatchPieceSubmitting(true)
     try {

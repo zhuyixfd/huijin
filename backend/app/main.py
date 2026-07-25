@@ -13,9 +13,11 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.audit_log import OperationAuditMiddleware
 from app.bootstrap import init_db
 from app.database import engine
 from app.db_backup import ensure_backup_dir, run_scheduled_evening_backup_if_due
+from app.routers import audit_logs as audit_logs_router
 from app.routers import auth as auth_router
 from app.routers import backups as backups_router
 from app.routers import case_studies as case_studies_router
@@ -73,6 +75,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(OperationAuditMiddleware)
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users_router.router, prefix="/api/users", tags=["users"])
@@ -84,6 +87,7 @@ app.include_router(dashboard_router.router, prefix="/api/dashboard", tags=["dash
 app.include_router(case_studies_router.router, prefix="/api/case-studies", tags=["case-studies"])
 app.include_router(meta_router.router, prefix="/api/meta", tags=["meta"])
 app.include_router(backups_router.router, prefix="/api/backups", tags=["backups"])
+app.include_router(audit_logs_router.router, prefix="/api/audit-logs", tags=["audit-logs"])
 
 
 @app.get("/health")

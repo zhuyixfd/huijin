@@ -51,6 +51,15 @@ export default function EmployeeAdmin() {
   const [backupMsg, setBackupMsg] = useState(null)
   const [backupErr, setBackupErr] = useState(null)
 
+  const [auditItems, setAuditItems] = useState([])
+  const [auditTotal, setAuditTotal] = useState(0)
+  const [auditPage, setAuditPage] = useState(1)
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditErr, setAuditErr] = useState(null)
+  const [auditFilterUser, setAuditFilterUser] = useState('')
+  const [auditFilterAction, setAuditFilterAction] = useState('')
+  const [auditDetail, setAuditDetail] = useState(null)
+
   const loadUsers = useCallback(() => {
     setListLoading(true)
     authFetch('/api/users')
@@ -75,12 +84,36 @@ export default function EmployeeAdmin() {
       .finally(() => setBackupLoading(false))
   }, [])
 
+  const loadAuditLogs = useCallback((page = 1) => {
+    setAuditLoading(true)
+    setAuditErr(null)
+    const qs = new URLSearchParams({
+      page: String(page),
+      page_size: '50',
+    })
+    if (auditFilterUser.trim()) qs.set('username', auditFilterUser.trim())
+    if (auditFilterAction.trim()) qs.set('action', auditFilterAction.trim())
+    getJson(`/api/audit-logs?${qs}`)
+      .then((data) => {
+        setAuditItems(data.items || [])
+        setAuditTotal(Number(data.total) || 0)
+        setAuditPage(Number(data.page) || page)
+      })
+      .catch((e) => {
+        setAuditItems([])
+        setAuditTotal(0)
+        setAuditErr(e instanceof Error ? e.message : '加载操作日志失败')
+      })
+      .finally(() => setAuditLoading(false))
+  }, [auditFilterUser, auditFilterAction])
+
   useEffect(() => {
     queueMicrotask(() => {
       loadUsers()
       loadBackupStatus()
+      loadAuditLogs(1)
     })
-  }, [loadUsers, loadBackupStatus])
+  }, [loadUsers, loadBackupStatus, loadAuditLogs])
 
   async function runBackupNow() {
     setBackupErr(null)
@@ -436,6 +469,196 @@ export default function EmployeeAdmin() {
           </table>
         </div>
       </div>
+
+      <div className="employee-list-wrap" style={{ marginTop: '2rem' }}>
+        <h3 className="employee-list-title">操作日志</h3>
+        <p className="muted" style={{ marginTop: 0 }}>
+          记录写操作（登录、改状态、件号重排、备份恢复等）：时间、操作人、IP、操作内容。保留约 90 天。
+        </p>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+            marginBottom: '0.75rem',
+            alignItems: 'center',
+          }}
+        >
+          <input
+            type="text"
+            placeholder="用户名"
+            value={auditFilterUser}
+            onChange={(e) => setAuditFilterUser(e.target.value)}
+            style={{ width: '7rem' }}
+          />
+          <input
+            type="text"
+            placeholder="操作（如：件号重排）"
+            value={auditFilterAction}
+            onChange={(e) => setAuditFilterAction(e.target.value)}
+            style={{ width: '10rem' }}
+          />
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={auditLoading}
+            onClick={() => loadAuditLogs(1)}
+          >
+            查询
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={auditLoading}
+            onClick={() => loadAuditLogs(auditPage)}
+          >
+            刷新
+          </button>
+          <span className="muted" style={{ fontSize: '0.86rem' }}>
+            共 {auditTotal} 条
+          </span>
+        </div>
+        {auditErr ? <p className="err">{auditErr}</p> : null}
+        <div className="data-table-wrap account-table-wrap">
+          <table className="data-table account-table">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>操作人</th>
+                <th>IP</th>
+                <th>操作</th>
+                <th>结果</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {auditLoading ? (
+                <tr>
+                  <td colSpan={6} className="muted">
+                    加载中…
+                  </td>
+                </tr>
+              ) : !auditItems.length ? (
+                <tr>
+                  <td colSpan={6} className="muted">
+                    暂无日志（部署并重启后端后开始记录）
+                  </td>
+                </tr>
+              ) : (
+                auditItems.map((row) => (
+                  <tr key={row.id}>
+                    <td className="cell-nowrap">{fmtDateTime(row.created_at)}</td>
+                    <td>
+                      {row.display_name || row.username || '—'}
+                      {row.username && row.display_name ? (
+                        <span className="muted"> ({row.username})</span>
+                      ) : null}
+                    </td>
+                    <td className="cell-mono cell-nowrap">{row.ip || '—'}</td>
+                    <td>{row.action}</td>
+                    <td className="cell-nowrap">{row.status_code ?? '—'}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ padding: '0.15rem 0.4rem', fontSize: '0.85rem' }}
+                        onClick={() => setAuditDetail(row)}
+                      >
+                        详情
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {auditTotal > 50 ? (
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={auditLoading || auditPage <= 1}
+              onClick={() => loadAuditLogs(auditPage - 1)}
+            >
+              上一页
+            </button>
+            <span className="muted" style={{ alignSelf: 'center' }}>
+              第 {auditPage} / {Math.max(1, Math.ceil(auditTotal / 50))} 页
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={auditLoading || auditPage * 50 >= auditTotal}
+              onClick={() => loadAuditLogs(auditPage + 1)}
+            >
+              下一页
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      {auditDetail ? (
+        <Modal open title={`操作详情 #${auditDetail.id}`} titleAs="h3" onClose={() => setAuditDetail(null)}>
+          <dl className="form-grid" style={{ margin: 0 }}>
+            <div>
+              <dt className="muted">时间</dt>
+              <dd>{fmtDateTime(auditDetail.created_at)}</dd>
+            </div>
+            <div>
+              <dt className="muted">操作人</dt>
+              <dd>
+                {auditDetail.display_name || auditDetail.username || '—'}
+                {auditDetail.user_id != null ? ` · id=${auditDetail.user_id}` : ''}
+              </dd>
+            </div>
+            <div>
+              <dt className="muted">IP</dt>
+              <dd className="cell-mono">{auditDetail.ip || '—'}</dd>
+            </div>
+            <div className="full">
+              <dt className="muted">浏览器 / 设备（User-Agent）</dt>
+              <dd style={{ wordBreak: 'break-all', fontSize: '0.85rem' }}>
+                {auditDetail.user_agent || '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="muted">操作</dt>
+              <dd>{auditDetail.action}</dd>
+            </div>
+            <div className="full">
+              <dt className="muted">请求</dt>
+              <dd className="cell-mono">
+                {auditDetail.method} {auditDetail.path}
+                {auditDetail.query_string ? `?${auditDetail.query_string}` : ''}
+              </dd>
+            </div>
+            <div>
+              <dt className="muted">状态码 / 耗时</dt>
+              <dd>
+                {auditDetail.status_code ?? '—'} / {auditDetail.duration_ms ?? '—'} ms
+              </dd>
+            </div>
+            <div className="full">
+              <dt className="muted">请求内容</dt>
+              <dd>
+                <pre
+                  style={{
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
+                    maxHeight: '16rem',
+                    overflow: 'auto',
+                    margin: 0,
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  {auditDetail.request_body || '—'}
+                </pre>
+              </dd>
+            </div>
+          </dl>
+        </Modal>
+      ) : null}
 
       {pwdTarget ? (
         <Modal

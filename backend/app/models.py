@@ -202,3 +202,24 @@ class SplitMergeLog(Base):
         ForeignKey("users.id"), nullable=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class OperationLog(Base):
+    """操作审计：谁在何时从何 IP 做了什么。"""
+
+    __tablename__ = "operation_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    username: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    display_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    method: Mapped[str] = mapped_column(String(16))
+    path: Mapped[str] = mapped_column(String(512), index=True)
+    query_string: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    action: Mapped[str] = mapped_column(String(128), index=True)
+    status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    request_body: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
