@@ -17,6 +17,7 @@ from app.audit_log import OperationAuditMiddleware
 from app.bootstrap import init_db
 from app.database import engine
 from app.db_backup import ensure_backup_dir, run_scheduled_evening_backup_if_due
+from app.paths import UPLOAD_ROOT
 from app.routers import audit_logs as audit_logs_router
 from app.routers import auth as auth_router
 from app.routers import backups as backups_router
@@ -61,9 +62,8 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="汇金特材 API", lifespan=lifespan)
 
-_UPLOAD_ROOT = Path(__file__).resolve().parent.parent / "uploads"
-_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=str(_UPLOAD_ROOT)), name="uploads")
+UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_ROOT)), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,

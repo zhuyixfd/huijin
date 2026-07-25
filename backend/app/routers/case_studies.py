@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user, require_permission
+from app.paths import BACKEND_ROOT, UPLOAD_ROOT
 from app.permissions import PERM_ORDER_PROCESS
 from app.models import CaseStudy, Customer, OrderItem
 from app.models import User as UserModel
@@ -20,8 +21,7 @@ from app.schemas_business import CaseStudyListOut, CaseStudyRow
 
 router = APIRouter()
 
-_BACKEND_ROOT = Path(__file__).resolve().parent.parent
-UPLOAD_CASES_DIR = _BACKEND_ROOT / "uploads" / "cases"
+UPLOAD_CASES_DIR = UPLOAD_ROOT / "cases"
 ALLOWED_SUFFIX = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_FILES = 16
 MAX_BYTES = 8 * 1024 * 1024
@@ -85,7 +85,7 @@ def _delete_upload_files(paths: list[str]) -> None:
         rel = str(raw_path or "").strip()
         if not rel.startswith("/uploads/cases/"):
             continue
-        dest = (_BACKEND_ROOT / rel.lstrip("/\\")).resolve()
+        dest = (BACKEND_ROOT / rel.lstrip("/\\")).resolve()
         try:
             dest.relative_to(base_dir)
         except ValueError:

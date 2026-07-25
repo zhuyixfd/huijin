@@ -1,0 +1,25 @@
+[Unit]
+Description=汇金特材 API (uvicorn)
+After=network.target mysql.service mysqld.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/huijin/backend
+Environment=PYTHONUNBUFFERED=1
+# 若 .env 不在代码里自动加载，可取消下一行注释：
+# EnvironmentFile=-/var/www/huijin/backend/.env
+ExecStart=/var/www/huijin/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8400
+Restart=always
+RestartSec=3
+# 给上传/长请求留足时间
+TimeoutStopSec=30
+
+# 日志进 journalctl：journalctl -u huijin-api -f
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

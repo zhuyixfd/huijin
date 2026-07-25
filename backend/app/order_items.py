@@ -131,9 +131,10 @@ def _guard_split_group_status_change(
     if row.split_group_id and row.split_base_order_no:
         raise HTTPException(status_code=400, detail="拆分订单未合并前，禁止进入出库/已发回")
 
-_BACKEND_ROOT = Path(__file__).resolve().parent.parent
-UPLOAD_REMARK_DIR = _BACKEND_ROOT / "uploads" / "order_remarks"
-UPLOAD_INCOMING_SHEET_DIR = _BACKEND_ROOT / "uploads" / "incoming_sheets"
+from app.paths import UPLOAD_ROOT
+
+UPLOAD_REMARK_DIR = UPLOAD_ROOT / "order_remarks"
+UPLOAD_INCOMING_SHEET_DIR = UPLOAD_ROOT / "incoming_sheets"
 ALLOWED_SUFFIX = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_REMARK_FILES = 12
 MAX_REMARK_BYTES = 8 * 1024 * 1024
