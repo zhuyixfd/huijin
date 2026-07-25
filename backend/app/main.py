@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+import asyncio
+import logging
 
 from dotenv import load_dotenv
 
@@ -13,7 +15,9 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.bootstrap import init_db
 from app.database import engine
+from app.db_backup import ensure_backup_dir, run_scheduled_evening_backup_if_due
 from app.routers import auth as auth_router
+from app.routers import backups as backups_router
 from app.routers import case_studies as case_studies_router
 from app.routers import customers as customers_router
 from app.routers import dashboard as dashboard_router
@@ -23,11 +27,34 @@ from app.routers import orders as orders_router
 from app.routers import tasks as tasks_router
 from app.routers import users as users_router
 
+logger = logging.getLogger(__name__)
+
+
+async def _evening_backup_loop() -> None:
+    """后台轮询：每天 20:00 自动备份数据库。"""
+    while True:
+        try:
+            info = await asyncio.to_thread(run_scheduled_evening_backup_if_due)
+            if info is not None:
+                logger.info("每日备份完成：%s (%s bytes)", info.filename, info.size_bytes)
+        except Exception:
+            logger.exception("每日备份失败")
+        await asyncio.sleep(30)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
-    yield
+    ensure_backup_dir()
+    task = asyncio.create_task(_evening_backup_loop())
+    try:
+        yield
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="汇金特材 API", lifespan=lifespan)
@@ -56,6 +83,7 @@ app.include_router(tasks_router.router, prefix="/api/tasks", tags=["tasks"])
 app.include_router(dashboard_router.router, prefix="/api/dashboard", tags=["dashboard"])
 app.include_router(case_studies_router.router, prefix="/api/case-studies", tags=["case-studies"])
 app.include_router(meta_router.router, prefix="/api/meta", tags=["meta"])
+app.include_router(backups_router.router, prefix="/api/backups", tags=["backups"])
 
 
 @app.get("/health")

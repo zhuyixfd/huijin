@@ -17,4 +17,5 @@ dist/
 .idea/
 .vscode/
 backend/app/uploads/*
+backend/backups/
 *.log

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import './EmployeeAdmin.css'
 import './Pages.css'
-import { patchJson } from './api.js'
+import { getJson, patchJson, postJson } from './api.js'
 import { authFetch, formatApiError } from './auth.js'
 import Modal from './Modal.jsx'
 import { preventModalFormEnterSubmit } from './modalUtils.js'
@@ -12,6 +12,14 @@ function fmtDateTime(iso) {
   const t = new Date(iso)
   if (Number.isNaN(t.getTime())) return String(iso)
   return t.toLocaleString('zh-CN', { hour12: false })
+}
+
+function fmtSize(n) {
+  const x = Number(n)
+  if (!Number.isFinite(x) || x < 0) return '—'
+  if (x < 1024) return `${x} B`
+  if (x < 1024 * 1024) return `${(x / 1024).toFixed(1)} KB`
+  return `${(x / 1024 / 1024).toFixed(2)} MB`
 }
 
 export default function EmployeeAdmin() {
@@ -37,6 +45,12 @@ export default function EmployeeAdmin() {
     () => new Set(PERM_OPTIONS.map(([code]) => code)),
   )
 
+  const [backupStatus, setBackupStatus] = useState(null)
+  const [backupLoading, setBackupLoading] = useState(false)
+  const [backupBusy, setBackupBusy] = useState(false)
+  const [backupMsg, setBackupMsg] = useState(null)
+  const [backupErr, setBackupErr] = useState(null)
+
   const loadUsers = useCallback(() => {
     setListLoading(true)
     authFetch('/api/users')
@@ -49,9 +63,60 @@ export default function EmployeeAdmin() {
       .finally(() => setListLoading(false))
   }, [])
 
+  const loadBackupStatus = useCallback(() => {
+    setBackupLoading(true)
+    setBackupErr(null)
+    getJson('/api/backups/status')
+      .then(setBackupStatus)
+      .catch((e) => {
+        setBackupStatus(null)
+        setBackupErr(e instanceof Error ? e.message : '加载备份信息失败')
+      })
+      .finally(() => setBackupLoading(false))
+  }, [])
+
   useEffect(() => {
-    queueMicrotask(() => loadUsers())
-  }, [loadUsers])
+    queueMicrotask(() => {
+      loadUsers()
+      loadBackupStatus()
+    })
+  }, [loadUsers, loadBackupStatus])
+
+  async function runBackupNow() {
+    setBackupErr(null)
+    setBackupMsg(null)
+    setBackupBusy(true)
+    try {
+      const info = await postJson('/api/backups/run', {})
+      setBackupMsg(`备份完成：${info.label || info.filename}`)
+      await loadBackupStatus()
+    } catch (e) {
+      setBackupErr(e instanceof Error ? e.message : '备份失败')
+    } finally {
+      setBackupBusy(false)
+    }
+  }
+
+  async function restorePreviousEvening() {
+    const prev = backupStatus?.previous_evening
+    const tip = prev
+      ? `确定恢复到「${prev.label}」？\n当前数据库会被覆盖，恢复后请刷新页面。`
+      : '确定恢复到头一天晚上 20:00 的备份？\n当前数据库会被覆盖，恢复后请刷新页面。'
+    if (!window.confirm(tip)) return
+    setBackupErr(null)
+    setBackupMsg(null)
+    setBackupBusy(true)
+    try {
+      const resp = await postJson('/api/backups/restore-previous-evening', {})
+      setBackupMsg(resp?.message || '恢复完成')
+      window.alert(`${resp?.message || '恢复完成'}\n请刷新页面。`)
+      await loadBackupStatus()
+    } catch (e) {
+      setBackupErr(e instanceof Error ? e.message : '恢复失败')
+    } finally {
+      setBackupBusy(false)
+    }
+  }
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -283,6 +348,87 @@ export default function EmployeeAdmin() {
                         <span className="muted">—</span>
                       )}
                     </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="employee-list-wrap" style={{ marginTop: '2rem' }}>
+        <h3 className="employee-list-title">数据备份</h3>
+        <p className="muted" style={{ marginTop: 0 }}>
+          系统每天晚上 20:00 自动备份数据库。可将数据恢复到「头一天晚上 20:00」那一份（会覆盖当前库）。
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={backupBusy || backupLoading}
+            onClick={runBackupNow}
+          >
+            {backupBusy ? '处理中…' : '立即备份'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={backupBusy || backupLoading || !backupStatus?.previous_evening}
+            onClick={restorePreviousEvening}
+          >
+            恢复到头一天晚上 20:00
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={backupBusy || backupLoading}
+            onClick={loadBackupStatus}
+          >
+            刷新
+          </button>
+        </div>
+        {backupStatus?.previous_evening ? (
+          <p className="muted" style={{ marginTop: 0 }}>
+            可恢复目标：{backupStatus.previous_evening.label}
+            （{fmtSize(backupStatus.previous_evening.size_bytes)}）
+          </p>
+        ) : (
+          <p className="muted" style={{ marginTop: 0 }}>
+            暂无「头一天晚上 20:00」备份（需至少跑过一次晚间定时备份）。
+          </p>
+        )}
+        {backupMsg ? <p style={{ color: 'var(--ok, #0a7)' }}>{backupMsg}</p> : null}
+        {backupErr ? <p className="err">{backupErr}</p> : null}
+        <div className="data-table-wrap account-table-wrap">
+          <table className="data-table account-table">
+            <thead>
+              <tr>
+                <th>备份</th>
+                <th>时间</th>
+                <th>大小</th>
+                <th>类型</th>
+              </tr>
+            </thead>
+            <tbody>
+              {backupLoading ? (
+                <tr>
+                  <td colSpan={4} className="muted">
+                    加载中…
+                  </td>
+                </tr>
+              ) : !backupStatus?.backups?.length ? (
+                <tr>
+                  <td colSpan={4} className="muted">
+                    暂无备份文件
+                  </td>
+                </tr>
+              ) : (
+                backupStatus.backups.map((b) => (
+                  <tr key={b.filename}>
+                    <td className="cell-mono">{b.filename}</td>
+                    <td className="cell-nowrap">{fmtDateTime(b.created_at)}</td>
+                    <td className="cell-nowrap">{fmtSize(b.size_bytes)}</td>
+                    <td>{b.is_evening ? '晚 20:00 定时' : '手动'}</td>
                   </tr>
                 ))
               )}
