@@ -15,6 +15,35 @@ from app.timeutil import today_cn
 # 共 31 个：每月 1 日 A … 26 日 Z、27 日 a … 31 日 e；每月 1 日重新从 A 起（区分大小写）
 DAY_CODE_CYCLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcde"
 
+# 全库件号数字后缀最大值缓存（避免列表接口反复全表扫描 JSON）
+_max_suffix_cache: int | None = None
+
+
+def invalidate_max_suffix_cache() -> None:
+    global _max_suffix_cache
+    _max_suffix_cache = None
+
+
+def _bump_max_suffix_cache(n: int) -> None:
+    global _max_suffix_cache
+    if _max_suffix_cache is None or n > _max_suffix_cache:
+        _max_suffix_cache = n
+
+
+def codes_are_complete(row: OrderItem) -> bool:
+    """件号已齐全（长度=支数且无空位）时可跳过列表补齐。"""
+    if row.quantity is None:
+        return True
+    qty = max(1, int(row.quantity or 1))
+    raw = row.processing_unit_codes
+    if not isinstance(raw, list) or len(raw) < qty:
+        return False
+    for i in range(qty):
+        c = raw[i]
+        if c is None or not str(c).strip():
+            return False
+    return True
+
 
 def count_processing_piece_strip(db: Session) -> list[tuple[str, int]]:
     """当前「处理中」且不含待出库的明细：按件号首字母累计件数（仅已有 processing_unit_codes 的件）。"""
@@ -86,6 +115,9 @@ def _suffix_int(label: str) -> int | None:
 
 def _max_numeric_suffix_db(db: Session) -> int:
     """扫描已持久化的件号，取数字后缀最大值（用于新号递增）。"""
+    global _max_suffix_cache
+    if _max_suffix_cache is not None:
+        return _max_suffix_cache
     rows = db.scalars(select(OrderItem.processing_unit_codes)).all()
     m = 0
     for raw in rows:
@@ -100,6 +132,7 @@ def _max_numeric_suffix_db(db: Session) -> int:
             v = _suffix_int(t)
             if v is not None:
                 m = max(m, v)
+    _max_suffix_cache = m
     return m
 
 
@@ -142,6 +175,8 @@ def ensure_order_item_processing_codes(db: Session, row: OrderItem) -> None:
         if not any_processing:
             return
 
+    if codes_are_complete(row):
+        return
     qty = max(1, int(row.quantity or 1))
     codes = _normalize_codes_list(row.processing_unit_codes, qty)
     seed = next((c for c in codes if isinstance(c, str) and str(c).strip()), None)
@@ -231,7 +266,12 @@ def _assign_continuous_codes_for_group(
             changed = True
         if changed:
             row.processing_unit_codes = [c for c in codes]
-        _sync_finished_piece_codes(db, row)
+            _sync_finished_piece_codes(db, row)
+            for c in codes:
+                if c:
+                    v = _suffix_int(str(c))
+                    if v is not None:
+                        _bump_max_suffix_cache(v)
     return next_n
 
 
@@ -242,7 +282,8 @@ def ensure_processing_codes_batch(db: Session, items: list[OrderItem]) -> None:
         if r.production_status == "已发回":
             continue
         if r.production_status != "在库中":
-            rows.append(r)
+            if not codes_are_complete(r):
+                rows.append(r)
             continue
         qty0 = max(1, int(r.quantity or 1))
         fallback = r.production_status or "在库中"
@@ -258,7 +299,7 @@ def ensure_processing_codes_batch(db: Session, items: list[OrderItem]) -> None:
             base.append(fallback)
         base = base[:qty0]
         any_processing = any(st not in ("在库中", "已发回") for st in base)
-        if any_processing:
+        if any_processing and not codes_are_complete(r):
             rows.append(r)
     if not rows:
         return
@@ -305,6 +346,7 @@ def reassign_processing_codes_batch(
         else:
             standalone.append(row)
     groups: list[list[OrderItem]] = list(by_family.values()) + [[r] for r in standalone]
+    invalidate_max_suffix_cache()
     next_n = _max_numeric_suffix_db(db) + 1
     day_char = day_code_char_by_dom(day_of_month)
     for group in groups:
@@ -313,6 +355,7 @@ def reassign_processing_codes_batch(
         next_n = _assign_continuous_codes_for_group(
             db, group, next_n=next_n, force_day_char=day_char
         )
+    invalidate_max_suffix_cache()
 
 
 def sync_processing_codes_length(row: OrderItem) -> None:

@@ -14,6 +14,7 @@ from app.models import CaseStudy, Customer, CutHeadLog, OrderItem, SplitMergeLog
 from app.models import User as UserModel
 from app.order_number import generate_next_order_no
 from app.processing_codes import (
+    codes_are_complete,
     count_processing_piece_strip,
     day_code_char,
     ensure_processing_codes_batch,
@@ -142,17 +143,13 @@ def _task_filter_conditions(
         elif cat == "completed":
             conds.append(OrderItem.production_status == "已发回")
         elif cat == "in_progress":
-            conds.append(OrderItem.production_status != "在库中")
-            conds.append(OrderItem.production_status != "已发回")
-            conds.append(OrderItem.production_status != "待发回")
-            conds.append(OrderItem.production_status != "出库中")
-        elif cat == "ready_outbound":
             conds.append(
-                or_(
-                    OrderItem.production_status == "待发回",
-                    OrderItem.production_status == "出库中",
+                OrderItem.production_status.not_in(
+                    ("在库中", "已发回", "待发回", "出库中")
                 )
             )
+        elif cat == "ready_outbound":
+            conds.append(OrderItem.production_status.in_(("待发回", "出库中")))
         else:
             raise HTTPException(status_code=400, detail="无效的 status_category")
 
@@ -267,61 +264,40 @@ def list_task_items(
         in_tomorrow_queue=in_tomorrow_queue,
     )
 
-    def _matches_piece_letter(item: OrderItem, key: str) -> bool:
-        raw = item.processing_unit_codes
-        if not raw or not isinstance(raw, list):
-            return False
-        for s in raw:
-            if not isinstance(s, str):
-                continue
-            t = s.strip()
-            if not t:
-                continue
-            if t[0] == key:
-                return True
-        return False
-
-    rows: list[tuple[OrderItem, str]] = []
-    total: int = 0
     piece_key = (piece_letter or "").strip()
     if piece_key:
-        all_stmt = (
-            select(OrderItem, Customer.name)
-            .join(Customer, OrderItem.customer_id == Customer.id)
-            .where(*conds)
-            .order_by(OrderItem.id.desc())
+        # 下推到 SQL：JSON 数组中任一元素以该字母开头（区分大小写）
+        conds.append(OrderItem.processing_unit_codes.isnot(None))
+        conds.append(
+            func.json_search(OrderItem.processing_unit_codes, "one", f"{piece_key}%").isnot(None)
         )
-        all_rows = db.execute(all_stmt).all()
-        proc_items_all = [
-            item
-            for item, _ in all_rows
-            if item.production_status not in ("在库中", "已发回")
-        ]
-        if proc_items_all:
-            ensure_processing_codes_batch(db, proc_items_all)
-            db.commit()
-            for item in proc_items_all:
-                db.refresh(item)
-        filtered = [(item, cust_name) for item, cust_name in all_rows if _matches_piece_letter(item, piece_key)]
-        total = len(filtered)
-        rows = filtered[skip : skip + limit]
-    else:
-        count_stmt = (
-            select(func.count(OrderItem.id))
-            .join(Customer, OrderItem.customer_id == Customer.id)
-            .where(*conds)
-        )
-        total = int(db.scalar(count_stmt) or 0)
 
-        stmt = (
-            select(OrderItem, Customer.name)
-            .join(Customer, OrderItem.customer_id == Customer.id)
-            .where(*conds)
-            .order_by(OrderItem.id.desc())
-            .offset(skip)
-            .limit(limit)
+    need_customer_join = bool(
+        (customer_q and customer_q.strip())
+        or (
+            search_value
+            and search_value.strip()
+            and (search_col or "").strip().lower() in ("customer", "customer_name")
         )
-        rows = db.execute(stmt).all()
+    )
+
+    count_stmt = select(func.count(OrderItem.id)).select_from(OrderItem)
+    if need_customer_join:
+        count_stmt = count_stmt.join(Customer, OrderItem.customer_id == Customer.id)
+    count_stmt = count_stmt.where(*conds)
+    total = int(db.scalar(count_stmt) or 0)
+
+    # 始终带客户名；用 LEFT JOIN 避免无客户筛选时仍强制内连接开销差异不大，保持语义一致
+    stmt = (
+        select(OrderItem, Customer.name)
+        .join(Customer, OrderItem.customer_id == Customer.id)
+        .where(*conds)
+        .order_by(OrderItem.id.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    rows = db.execute(stmt).all()
+
     item_ids = [item.id for item, _ in rows]
     case_total: dict[int, int] = {}
     case_by_unit: dict[int, dict[str, int]] = {}
@@ -339,16 +315,15 @@ def list_task_items(
             inner = case_by_unit.setdefault(oid, {})
             inner[uk] = inner.get(uk, 0) + n
 
+    # 列表只补齐「本页」中尚不齐全的件号，避免全表扫描/逐条 refresh
     proc_items = [
         item
         for item, _ in rows
-        if item.production_status not in ("在库中", "已发回")
+        if item.production_status not in ("在库中", "已发回") and not codes_are_complete(item)
     ]
     if proc_items:
         ensure_processing_codes_batch(db, proc_items)
         db.commit()
-        for item in proc_items:
-            db.refresh(item)
 
     items_by_id = {item.id: item for item, _ in rows}
     outputs_map = load_finished_outputs_map(db, item_ids, items_by_id)
