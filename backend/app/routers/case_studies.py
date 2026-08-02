@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user, require_permission
-from app.paths import BACKEND_ROOT, UPLOAD_ROOT
+from app.image_thumbs import delete_image_and_thumb, ensure_image_thumb, ensure_image_thumbs
+from app.paths import UPLOAD_ROOT
 from app.permissions import PERM_ORDER_PROCESS
 from app.models import CaseStudy, Customer, OrderItem
 from app.models import User as UserModel
@@ -37,7 +38,8 @@ def _safe_suffix(filename: str) -> str:
 
 
 def _row_to_case_study_out(cs: CaseStudy, order_no: str, customer_name: str) -> CaseStudyRow:
-    imgs = list(cs.images) if isinstance(cs.images, list) else []
+    imgs = [str(x) for x in (cs.images if isinstance(cs.images, list) else [])]
+    thumbs = ensure_image_thumbs(imgs)
     return CaseStudyRow(
         id=cs.id,
         order_item_id=cs.order_item_id,
@@ -45,7 +47,8 @@ def _row_to_case_study_out(cs: CaseStudy, order_no: str, customer_name: str) -> 
         customer_name=customer_name,
         unit_index=cs.unit_index,
         note=cs.note,
-        images=[str(x) for x in imgs],
+        images=imgs,
+        image_thumbs=thumbs,
         created_at=cs.created_at,
     )
 
@@ -75,23 +78,18 @@ async def _save_upload_files(upload_list: list[UploadFile]) -> list[str]:
         name = f"{uuid.uuid4().hex}{ext}"
         dest = UPLOAD_CASES_DIR / name
         dest.write_bytes(raw)
-        saved_paths.append(f"/uploads/cases/{name}")
+        rel = f"/uploads/cases/{name}"
+        ensure_image_thumb(rel)
+        saved_paths.append(rel)
     return saved_paths
 
 
 def _delete_upload_files(paths: list[str]) -> None:
-    base_dir = UPLOAD_CASES_DIR.resolve()
     for raw_path in paths:
         rel = str(raw_path or "").strip()
         if not rel.startswith("/uploads/cases/"):
             continue
-        dest = (BACKEND_ROOT / rel.lstrip("/\\")).resolve()
-        try:
-            dest.relative_to(base_dir)
-        except ValueError:
-            continue
-        if dest.is_file():
-            dest.unlink(missing_ok=True)
+        delete_image_and_thumb(rel)
 
 
 @router.get("", response_model=CaseStudyListOut)

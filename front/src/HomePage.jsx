@@ -3,18 +3,12 @@ import './Pages.css'
 import { deleteReq, getJson, putFormData } from './api.js'
 import { apiUrl } from './config.js'
 import CaseStudyEditorModal from './CaseStudyEditorModal.jsx'
+import { fmtDateTime } from './datetime.js'
 
 const CASE_PAGE = 20
 
 /** 首页柱状图不含此处；单独展示「已完成」 */
 const STATUS_DONE_KEY = '已发回'
-
-function fmtDateTime(iso) {
-  if (!iso) return '—'
-  const t = new Date(iso)
-  if (Number.isNaN(t.getTime())) return String(iso)
-  return t.toLocaleString('zh-CN', { hour12: false })
-}
 
 export default function HomePage() {
   const [summary, setSummary] = useState(null)
@@ -294,17 +288,21 @@ export default function HomePage() {
                 {c.note ? <p className="home-case-note">{c.note}</p> : null}
                 {Array.isArray(c.images) && c.images.length > 0 ? (
                   <div className="home-case-images">
-                    {c.images.map((src) => (
-                      <a
-                        key={src}
-                        href={apiUrl(src)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="home-case-img-link"
-                      >
-                        <img src={apiUrl(src)} alt="" loading="lazy" />
-                      </a>
-                    ))}
+                    {c.images.map((src, i) => {
+                      const thumb = Array.isArray(c.image_thumbs) ? c.image_thumbs[i] : null
+                      return (
+                        <a
+                          key={src}
+                          href={apiUrl(src)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="home-case-img-link"
+                          title="点击查看原图"
+                        >
+                          <img src={apiUrl(thumb || src)} alt="" loading="lazy" />
+                        </a>
+                      )
+                    })}
                   </div>
                 ) : null}
               </li>

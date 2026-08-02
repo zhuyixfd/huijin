@@ -6,7 +6,7 @@ import json
 import logging
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 from fastapi import Request, Response
@@ -18,6 +18,7 @@ from starlette.types import ASGIApp
 from app.database import SessionLocal
 from app.models import OperationLog, User
 from app.security import decode_token
+from app.timeutil import now_cn
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ _SKIP_EXACT = frozenset(
 _ACTION_RULES: list[tuple[re.Pattern[str], str, str]] = [
     # (method_regex, path_regex, label)
     (re.compile(r"^POST$"), re.compile(r"^/api/auth/login$"), "登录"),
-    (re.compile(r"^POST$"), re.compile(r"^/api/order-items/batch-processing-codes$"), "件号重排"),
+    (re.compile(r"^POST$"), re.compile(r"^/api/order-items/batch-processing-codes$"), "件号重排-执行修改"),
     (re.compile(r"^POST$"), re.compile(r"^/api/order-items/batch-ensure-processing-codes$"), "件号补齐"),
     (re.compile(r"^POST$"), re.compile(r"^/api/order-items/batch-production-status$"), "批量改生产状态"),
     (re.compile(r"^PATCH$"), re.compile(r"^/api/order-items/\d+/unit-production-statuses$"), "逐支改生产状态"),
@@ -186,6 +187,46 @@ def should_audit(method: str, path: str) -> bool:
     return method.upper() in _WRITE_METHODS
 
 
+def log_user_action(
+    *,
+    user: User | None,
+    ip: str | None,
+    action: str,
+    method: str = "POST",
+    path: str,
+    request_body: dict | list | str | None = None,
+    status_code: int = 200,
+    user_agent: str | None = None,
+) -> None:
+    """业务代码内显式记一条操作日志（如用户确认弹窗）。"""
+    body: str | None
+    if request_body is None:
+        body = None
+    elif isinstance(request_body, str):
+        body = request_body[:_BODY_MAX]
+    else:
+        try:
+            body = json.dumps(_redact_obj(request_body), ensure_ascii=False, separators=(",", ":"))
+            if len(body) > _BODY_MAX:
+                body = body[:_BODY_MAX] + "…(截断)"
+        except Exception:
+            body = str(request_body)[:_BODY_MAX]
+    write_operation_log(
+        user_id=getattr(user, "id", None) if user else None,
+        username=getattr(user, "username", None) if user else None,
+        display_name=getattr(user, "display_name", None) if user else None,
+        ip=ip,
+        method=method,
+        path=path,
+        query_string=None,
+        action=action,
+        status_code=status_code,
+        duration_ms=None,
+        request_body=body,
+        user_agent=user_agent,
+    )
+
+
 def write_operation_log(
     *,
     user_id: int | None,
@@ -221,7 +262,7 @@ def write_operation_log(
         db.commit()
         # 偶尔清理过期日志（约每 50 次写入抽一次，用 id 取模近似）
         if row.id and row.id % 50 == 0:
-            cutoff = datetime.now() - timedelta(days=_RETENTION_DAYS)
+            cutoff = now_cn() - timedelta(days=_RETENTION_DAYS)
             db.execute(delete(OperationLog).where(OperationLog.created_at < cutoff))
             db.commit()
     except Exception:

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.constants_metal import slowest_production_status
 from app.models import OrderItem
+from app.timeutil import today_cn
 
 # 共 31 个：每月 1 日 A … 26 日 Z、27 日 a … 31 日 e；每月 1 日重新从 A 起（区分大小写）
 DAY_CODE_CYCLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcde"
@@ -44,7 +45,7 @@ def count_processing_piece_strip(db: Session) -> list[tuple[str, int]]:
 
 def day_code_char(ref: date | None = None) -> str:
     """当日件号首字母：按当月第几天取轮回表（非跨月连续）。"""
-    d = ref or date.today()
+    d = ref or today_cn()
     dom = max(1, min(int(d.day), len(DAY_CODE_CYCLE)))
     return DAY_CODE_CYCLE[dom - 1]
 
@@ -59,7 +60,7 @@ def _anchor_date_for_piece_code(row: OrderItem) -> date:
     ct = row.cutting_time
     if ct is not None:
         try:
-            return ct.date() if hasattr(ct, "date") else date.today()
+            return ct.date() if hasattr(ct, "date") else today_cn()
         except (TypeError, ValueError):
             pass
     inc = row.incoming_date
@@ -68,10 +69,10 @@ def _anchor_date_for_piece_code(row: OrderItem) -> date:
     ca = row.created_at
     if ca is not None:
         try:
-            return ca.date() if hasattr(ca, "date") else date.today()
+            return ca.date() if hasattr(ca, "date") else today_cn()
         except (TypeError, ValueError):
             pass
-    return date.today()
+    return today_cn()
 
 
 def _day_char_for_item(row: OrderItem) -> str:
@@ -205,7 +206,7 @@ def _assign_continuous_codes_for_group(
             if prefix:
                 break
     if not prefix:
-        day_char = force_day_char or day_code_char(date.today())
+        day_char = force_day_char or day_code_char(today_cn())
         prefix = f"{day_char}{next_n}"
         next_n += 1
 

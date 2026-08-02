@@ -57,8 +57,7 @@ function returnDateCell(it) {
   if (!d) return '—'
   const s = String(d)
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
-  const t = new Date(s)
-  return Number.isNaN(t.getTime()) ? s : t.toLocaleDateString('zh-CN')
+  return s
 }
 
 const DELIVERY_SLIP_SERIAL_STORAGE_KEY = 'delivery_slip.serial.v1'

@@ -2,10 +2,11 @@ import uuid
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.audit_log import client_ip, log_user_action
 from app.constants_metal import slowest_production_status
 from app.database import get_db
 from app.deps import get_current_user, require_permission
@@ -455,9 +456,11 @@ def batch_set_production_status(
     if not has_permission(current, need):
         raise HTTPException(status_code=403, detail="无权限执行该批量状态变更")
 
-    from datetime import date, datetime
+    from datetime import date
 
-    now_cut = datetime.now()
+    from app.timeutil import now_cn, today_cn
+
+    now_cut = now_cn()
     for row in items:
         old_ps = row.production_status
         if st not in ("待发回", "出库中", "已发回"):
@@ -465,9 +468,9 @@ def batch_set_production_status(
         row = _guard_split_group_status_change(db, row, target_status=st)
         row.production_status = st
         if st == "已发回" and old_ps != "已发回":
-            row.returned_at = datetime.now()
+            row.returned_at = now_cn()
             if row.return_date is None:
-                row.return_date = date.today()
+                row.return_date = today_cn()
         if row.unit_production_statuses is not None or int(row.quantity or 1) > 1:
             set_all_unit_production_statuses(row, st)
         if st in ("在库中", "已发回"):
@@ -532,11 +535,11 @@ def patch_unit_production_statuses(
     row.unit_production_statuses = base
     row.production_status = slowest_production_status(base, fallback=row.production_status)
     if row.production_status == "已发回" and old_ps != "已发回":
-        from datetime import date, datetime
+        from app.timeutil import now_cn, today_cn
 
-        row.returned_at = datetime.now()
+        row.returned_at = now_cn()
         if row.return_date is None:
-            row.return_date = date.today()
+            row.return_date = today_cn()
     if row.production_status not in ("待发回", "出库中", "已发回"):
         row = _split_merged_multi_spec_family(db, row, target_status=row.production_status)
         qty = max(1, int(row.quantity or 1))
@@ -582,19 +585,53 @@ def batch_ensure_processing_codes(
 @router.post("/batch-processing-codes")
 def batch_reassign_processing_codes(
     body: OrderItemBatchProcessingCodes,
-    _: UserModel = Depends(require_permission(PERM_ORDER_PROCESS)),
+    request: Request,
+    current: UserModel = Depends(require_permission(PERM_ORDER_PROCESS)),
     db: Session = Depends(get_db),
 ):
-    """手动件号重排：按指定日序字母覆盖所选明细的件号（慎用）。"""
+    """手动件号重排：仅处理请求中的明细；必须带前端用户确认回执。"""
     ids = list(dict.fromkeys(body.item_ids))
     if not ids:
         raise HTTPException(status_code=400, detail="请至少选择一条明细")
+    if len(ids) > 100:
+        raise HTTPException(status_code=400, detail="单次最多重排 100 条（请只勾选当前页）")
+    conf = body.client_confirm
+    if not conf.confirmed:
+        raise HTTPException(status_code=400, detail="未确认，已取消件号重排")
+    if int(conf.confirmed_count) != len(ids):
+        raise HTTPException(
+            status_code=400,
+            detail=f"确认条数（{conf.confirmed_count}）与提交条数（{len(ids)}）不一致",
+        )
+    if int(conf.day_of_month) != int(body.day_of_month):
+        raise HTTPException(status_code=400, detail="确认日期与提交日期不一致")
+    if len(ids) >= 20 and (conf.typed_confirm or "").strip() != "重排":
+        raise HTTPException(status_code=400, detail="大批量重排需在确认框输入「重排」")
+
     day = int(body.day_of_month)
+    # 1) 先记「用户确认」
+    log_user_action(
+        user=current,
+        ip=client_ip(request),
+        action="件号重排-用户确认",
+        path="/api/order-items/batch-processing-codes",
+        request_body={
+            "confirmed": True,
+            "confirmed_count": len(ids),
+            "day_of_month": day,
+            "item_ids": ids,
+            "confirm_prompt": conf.confirm_prompt,
+            "typed_confirm": conf.typed_confirm,
+        },
+        user_agent=request.headers.get("user-agent"),
+    )
+
     items = db.scalars(select(OrderItem).where(OrderItem.id.in_(ids))).all()
     if len(items) != len(ids):
         raise HTTPException(status_code=404, detail="未找到所选明细")
     reassign_processing_codes_batch(db, list(items), day_of_month=day)
     db.commit()
+    # 2) 「执行修改」由操作审计中间件记录本次 POST
     return {"ok": True, "count": len(ids)}
 
 
@@ -666,9 +703,9 @@ def patch_order_item(
         and row.cutting_time is None
         and "cutting_time" not in data
     ):
-        from datetime import datetime
+        from app.timeutil import now_cn
 
-        row.cutting_time = datetime.now()
+        row.cutting_time = now_cn()
     if row.quantity is None:
         _clear_processing_unit_codes(db, row)
         row.unit_production_statuses = None
@@ -710,11 +747,11 @@ def patch_order_item(
     if had_explicit_production_status and isinstance(row.unit_production_statuses, list):
         set_all_unit_production_statuses(row, row.production_status)
     if old_ps != "已发回" and row.production_status == "已发回":
-        from datetime import date, datetime
+        from app.timeutil import now_cn, today_cn
 
-        row.returned_at = datetime.now()
+        row.returned_at = now_cn()
         if row.return_date is None:
-            row.return_date = date.today()
+            row.return_date = today_cn()
     base_order_no = row.split_base_order_no
     gid = row.split_group_id
     _ensure_merge_after_status_change(db, row, operator_user_id=getattr(current, "id", None))

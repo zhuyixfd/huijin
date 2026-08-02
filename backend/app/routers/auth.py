@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -9,6 +7,7 @@ from app.deps import get_current_user
 from app.models import User
 from app.schemas import LoginBody, TokenResponse, UserOut
 from app.security import create_access_token, verify_password
+from app.timeutil import now_cn
 
 router = APIRouter()
 
@@ -22,7 +21,7 @@ def login(body: LoginBody, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
         )
-    user.last_login_at = datetime.now()
+    user.last_login_at = now_cn()
     db.add(user)
     db.commit()
     token = create_access_token(user.id, user.username)

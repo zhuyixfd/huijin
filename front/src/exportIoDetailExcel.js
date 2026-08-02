@@ -1,4 +1,5 @@
 import { formatForgingSpecCsv } from './finishedOutputs.js'
+import { parseApiDateTime } from './datetime.js'
 
 function escapeHtml(s) {
   return String(s ?? '')
@@ -11,10 +12,21 @@ function escapeHtml(s) {
 
 function fmtDateTime(iso) {
   if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return String(iso)
+  const d = parseApiDateTime(iso)
+  if (!d) return String(iso)
   const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  // 按北京时间输出
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d)
+  const get = (t) => parts.find((p) => p.type === t)?.value || '00'
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`
 }
 
 function compareOrderNo(a, b) {

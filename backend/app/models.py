@@ -1,7 +1,20 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    JSON,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -55,6 +68,13 @@ class OrderItem(Base):
     """来料订单（一行一单）：订单编号与客户均在同一表"""
 
     __tablename__ = "order_items"
+    __table_args__ = (
+        Index("ix_order_items_prod_status_id", "production_status", "id"),
+        Index("ix_order_items_today_queue_id", "in_today_queue", "id"),
+        Index("ix_order_items_tomorrow_queue_id", "in_tomorrow_queue", "id"),
+        Index("ix_order_items_created_at_id", "created_at", "id"),
+        Index("ix_order_items_customer_status", "customer_id", "production_status"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 

@@ -13,6 +13,7 @@ from pathlib import Path
 
 from app.config import settings
 from app.database import engine
+from app.timeutil import now_cn, today_cn
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ def _require_bin(name: str) -> str:
 
 
 def evening_backup_filename(d: date | None = None) -> str:
-    day = d or date.today()
+    day = d or today_cn()
     return f"{settings.mysql_database}_{day.strftime('%Y%m%d')}_2000.sql"
 
 
@@ -67,7 +68,7 @@ def create_backup(*, evening: bool = False, when: datetime | None = None) -> Bac
     """导出整库到 backups/。evening=True 时使用固定晚 8 点文件名（同日覆盖）。"""
     ensure_backup_dir()
     dump_bin = _require_bin("mysqldump")
-    now = when or datetime.now()
+    now = when or now_cn()
     if evening:
         out = evening_backup_path(now.date())
     else:
@@ -142,7 +143,7 @@ def list_backups() -> list[BackupInfo]:
 
 def previous_evening_backup(today: date | None = None) -> BackupInfo | None:
     """头一天晚上 8 点的备份；若不存在则回退到更早的最近一份晚 8 点备份。"""
-    day = today or date.today()
+    day = today or today_cn()
     for i in range(1, RETENTION_DAYS + 3):
         d = day - timedelta(days=i)
         p = evening_backup_path(d)
@@ -153,7 +154,7 @@ def previous_evening_backup(today: date | None = None) -> BackupInfo | None:
 
 def prune_old_backups() -> None:
     ensure_backup_dir()
-    cutoff = date.today() - timedelta(days=RETENTION_DAYS)
+    cutoff = today_cn() - timedelta(days=RETENTION_DAYS)
     for p in BACKUP_DIR.glob(f"{settings.mysql_database}_*.sql"):
         m = _EVENING_RE.match(p.name)
         if m:
@@ -214,7 +215,7 @@ def restore_previous_evening() -> BackupInfo:
 def run_scheduled_evening_backup_if_due(now: datetime | None = None) -> BackupInfo | None:
     """若当前为 20:00～20:02 且今日晚备尚未完成，则执行一次。"""
     global _last_evening_backup_date
-    now = now or datetime.now()
+    now = now or now_cn()
     if now.hour != 20 or now.minute > 2:
         return None
     if _last_evening_backup_date == now.date():

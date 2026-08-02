@@ -1,11 +1,10 @@
 """订单编号：hj + 客户缩写 + 年月日 + 当日流水（5 位），由服务端生成。"""
 
-from datetime import datetime
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Customer, OrderItem
+from app.timeutil import now_cn
 
 
 def generate_next_order_no(db: Session, *, customer_id: int) -> str:
@@ -17,7 +16,7 @@ def generate_next_order_no(db: Session, *, customer_id: int) -> str:
     if not abbr:
         raise ValueError("客户缩写无效")
 
-    day = datetime.now().strftime("%Y%m%d")
+    day = now_cn().strftime("%Y%m%d")
     prefix = f"hj{abbr}{day}"
     nos = db.scalars(
         select(OrderItem.order_no).where(OrderItem.order_no.startswith(prefix))

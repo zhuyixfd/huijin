@@ -385,6 +385,71 @@ def seed_admin(db: Session) -> None:
         db.commit()
 
 
+def migrate_utc_datetimes_to_china_once() -> None:
+    """历史数据按 UTC 写入；一次性 +8 小时改为北京时间（幂等）。"""
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS app_migrations (
+                  name VARCHAR(64) PRIMARY KEY,
+                  applied_at DATETIME NOT NULL
+                )
+                """
+            )
+        )
+        done = conn.execute(
+            text("SELECT 1 FROM app_migrations WHERE name = 'utc_to_china_plus_8h'")
+        ).first()
+        if done:
+            return
+        # 连接已 SET +08:00；对既有 UTC 墙钟时间整体平移 8 小时
+        stmts = [
+            "UPDATE order_items SET created_at = DATE_ADD(created_at, INTERVAL 8 HOUR) WHERE created_at IS NOT NULL",
+            "UPDATE order_items SET returned_at = DATE_ADD(returned_at, INTERVAL 8 HOUR) WHERE returned_at IS NOT NULL",
+            "UPDATE order_items SET cutting_time = DATE_ADD(cutting_time, INTERVAL 8 HOUR) WHERE cutting_time IS NOT NULL",
+            "UPDATE users SET created_at = DATE_ADD(created_at, INTERVAL 8 HOUR) WHERE created_at IS NOT NULL",
+            "UPDATE users SET last_login_at = DATE_ADD(last_login_at, INTERVAL 8 HOUR) WHERE last_login_at IS NOT NULL",
+            "UPDATE customers SET created_at = DATE_ADD(created_at, INTERVAL 8 HOUR) WHERE created_at IS NOT NULL",
+            "UPDATE operation_logs SET created_at = DATE_ADD(created_at, INTERVAL 8 HOUR) WHERE created_at IS NOT NULL",
+            "UPDATE case_studies SET created_at = DATE_ADD(created_at, INTERVAL 8 HOUR) WHERE created_at IS NOT NULL",
+            "UPDATE grind_logs SET created_at = DATE_ADD(created_at, INTERVAL 8 HOUR) WHERE created_at IS NOT NULL",
+            "UPDATE cut_head_logs SET created_at = DATE_ADD(created_at, INTERVAL 8 HOUR) WHERE created_at IS NOT NULL",
+            "UPDATE split_merge_logs SET created_at = DATE_ADD(created_at, INTERVAL 8 HOUR) WHERE created_at IS NOT NULL",
+        ]
+        for sql in stmts:
+            try:
+                conn.execute(text(sql))
+            except Exception:
+                # 表/列不存在时跳过
+                pass
+        conn.execute(
+            text(
+                "INSERT INTO app_migrations (name, applied_at) VALUES ('utc_to_china_plus_8h', NOW())"
+            )
+        )
+
+
+def ensure_order_item_query_indexes() -> None:
+    """列表 / nav-counts 热路径索引（幂等）。"""
+    inspector = inspect(engine)
+    if "order_items" not in inspector.get_table_names():
+        return
+    existing = {ix["name"] for ix in inspector.get_indexes("order_items")}
+    specs = [
+        ("ix_order_items_prod_status_id", "(production_status, id)"),
+        ("ix_order_items_today_queue_id", "(in_today_queue, id)"),
+        ("ix_order_items_tomorrow_queue_id", "(in_tomorrow_queue, id)"),
+        ("ix_order_items_created_at_id", "(created_at, id)"),
+        ("ix_order_items_customer_status", "(customer_id, production_status)"),
+    ]
+    with engine.begin() as conn:
+        for name, cols in specs:
+            if name in existing:
+                continue
+            conn.execute(text(f"CREATE INDEX {name} ON order_items {cols}"))
+
+
 def init_db() -> None:
     migrate_orders_flatten()
     Base.metadata.create_all(bind=engine)
@@ -411,6 +476,8 @@ def init_db() -> None:
     ensure_order_item_finished_outputs_return_date()
     ensure_order_item_finished_outputs_pieces()
     ensure_order_item_finished_outputs_pieces_nullable()
+    ensure_order_item_query_indexes()
+    migrate_utc_datetimes_to_china_once()
     db = SessionLocal()
     try:
         seed_admin(db)

@@ -385,9 +385,22 @@ class OrderItemBatchEnsureProcessingCodes(BaseModel):
     item_ids: list[int] = Field(min_length=1, max_length=500)
 
 
-class OrderItemBatchProcessingCodes(BaseModel):
-    item_ids: list[int] = Field(min_length=1, max_length=500)
+class ClientConfirmInfo(BaseModel):
+    """前端用户确认弹窗的回执，后端会单独记一条「用户确认」日志。"""
+
+    confirmed: bool = True
+    confirmed_count: int = Field(ge=1, le=200)
     day_of_month: int = Field(ge=1, le=31)
+    confirm_prompt: str | None = Field(default=None, max_length=500)
+    typed_confirm: str | None = Field(default=None, max_length=32)
+
+
+class OrderItemBatchProcessingCodes(BaseModel):
+    """件号重排：仅允许当前页勾选量级（≤100），且必须带用户确认回执。"""
+
+    item_ids: list[int] = Field(min_length=1, max_length=100)
+    day_of_month: int = Field(ge=1, le=31)
+    client_confirm: ClientConfirmInfo
 
 
 class SplitMergeLogRow(BaseModel):
@@ -453,7 +466,11 @@ class CaseStudyRow(BaseModel):
     customer_name: str
     unit_index: int | None = None
     note: str | None = None
-    images: list[str] = Field(default_factory=list, description="可访问的相对路径，如 /uploads/cases/xxx.png")
+    images: list[str] = Field(default_factory=list, description="原图路径，如 /uploads/cases/xxx.png")
+    image_thumbs: list[str] = Field(
+        default_factory=list,
+        description="缩略图路径（与 images 一一对应；首页列表用此字段）",
+    )
     created_at: datetime
 
 

@@ -174,9 +174,9 @@ def batch_set_production_status(
     if not has_permission(current, need):
         raise HTTPException(status_code=403, detail="无权限执行该批量状态变更")
 
-    from datetime import datetime
+    from app.timeutil import now_cn
 
-    now_cut = datetime.now()
+    now_cut = now_cn()
     for row in items:
         _guard_split_group_status_change(row, target_status=st)
         row.production_status = st
@@ -246,9 +246,9 @@ def patch_order_item(
         and row.cutting_time is None
         and "cutting_time" not in data
     ):
-        from datetime import datetime
+        from app.timeutil import now_cn
 
-        row.cutting_time = datetime.now()
+        row.cutting_time = now_cn()
     if row.production_status in ("在库中", "已发回"):
         row.processing_unit_codes = None
     else:

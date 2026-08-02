@@ -391,7 +391,9 @@ def create_work_order(
     item_fields = OrderItemCreate(**payload).model_dump()
     item_fields.pop("finished_outputs", None)
     if item_fields.get("incoming_date") is None:
-        item_fields["incoming_date"] = date.today()
+        from app.timeutil import today_cn
+
+        item_fields["incoming_date"] = today_cn()
 
     from app.order_item_finished import normalize_finished_output_inputs
 

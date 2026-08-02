@@ -24,6 +24,7 @@ import {
 import { buildProcessingDayColumns } from './processingDayCode.js'
 import { can, PERM } from './permissions.js'
 import CaseStudyEditorModal from './CaseStudyEditorModal.jsx'
+import { fmtDate, fmtDateTime, parseApiDateTime } from './datetime.js'
 
 function todayDateISO() {
   const d = new Date()
@@ -123,26 +124,14 @@ const emptyWorkOrderForm = () => ({
   ...emptyItemForm(),
 })
 
-function fmtDateTime(iso) {
-  if (!iso) return '—'
-  const t = new Date(iso)
-  if (Number.isNaN(t.getTime())) return String(iso)
-  return t.toLocaleString('zh-CN', { hour12: false })
-}
-
-function fmtDate(v) {
-  if (!v) return '—'
-  const s = String(v)
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
-  const t = new Date(s)
-  return Number.isNaN(t.getTime()) ? s : t.toLocaleDateString('zh-CN')
-}
-
 function fmtCuttingDate(v) {
   if (!v) return '—'
-  const t = new Date(v)
-  if (Number.isNaN(t.getTime())) return String(v).slice(0, 16)
-  return t.toLocaleDateString('zh-CN')
+  const t = parseApiDateTime(v)
+  if (!t) {
+    const s = String(v)
+    return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : s.slice(0, 16)
+  }
+  return t.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' })
 }
 
 function fmtNum(v) {
@@ -2490,6 +2479,11 @@ export default function TasksPage({
     }
   }, [showBulkCheckboxCol])
 
+  // 翻页 / 改每页条数时清空勾选，禁止跨页批量操作
+  useEffect(() => {
+    queueMicrotask(() => setSelectedIds([]))
+  }, [page, pageSize])
+
   useEffect(() => {
     const el = headerSelectRef.current
     if (!el || !showBulkCheckboxCol || !bulkSelectColumnVisible) return
@@ -3652,15 +3646,33 @@ export default function TasksPage({
       setErr('请选择 1～31 日')
       return
     }
-    if (selectedIds.length === 0) return
-    const n = selectedIds.length
-    const ok = window.confirm(
-      `确定对已勾选的 ${n} 条订单做「件号重排」？\n\n将按「${day}日」字母覆盖原有件号，不可自动撤销。\n请确认不是误点「开始处理」。`,
-    )
-    if (!ok) return
+    if (batchPieceSubmitting) return
+    // 严格只改当前页勾选，不跨页
+    const pageIds = rows.map((r) => r.id)
+    const pageIdSet = new Set(pageIds)
+    const ids = selectedIds.filter((id) => pageIdSet.has(id))
+    if (ids.length === 0) {
+      setErr('请先勾选当前页要重排的订单')
+      return
+    }
+    if (ids.length > pageIds.length) {
+      setErr('勾选异常，请刷新后只勾选当前页再试')
+      return
+    }
+    const n = ids.length
+    const confirmPrompt =
+      `【仅当前页】确定对已勾选的 ${n} 条订单做「件号重排」？\n\n` +
+      `将按「${day}日」字母覆盖原有件号，不可自动撤销。\n` +
+      `不会改动其他页的订单。`
+    const ok = window.confirm(confirmPrompt)
+    if (!ok) {
+      setErr('已取消件号重排')
+      return
+    }
+    let typedConfirm = null
     if (n >= 20) {
-      const typed = window.prompt(`将覆盖 ${n} 条订单的件号。请输入「重排」确认：`)
-      if (typed !== '重排') {
+      typedConfirm = window.prompt(`将覆盖当前页 ${n} 条订单的件号。请输入「重排」确认：`)
+      if (typedConfirm !== '重排') {
         setErr('已取消件号重排')
         return
       }
@@ -3669,9 +3681,17 @@ export default function TasksPage({
     setBatchPieceSubmitting(true)
     try {
       await postJson('/api/order-items/batch-processing-codes', {
-        item_ids: selectedIds,
+        item_ids: ids,
         day_of_month: day,
+        client_confirm: {
+          confirmed: true,
+          confirmed_count: n,
+          day_of_month: day,
+          confirm_prompt: confirmPrompt,
+          typed_confirm: typedConfirm,
+        },
       })
+      setSelectedIds([])
       await loadTasks()
     } catch (err) {
       setErr(err instanceof Error ? err.message : '件号重排失败')
@@ -5651,7 +5671,7 @@ export default function TasksPage({
                       {batchPieceSubmitting ? '重排中…' : '件号重排'}
                     </button>
                     <span className="muted" style={{ fontSize: '0.86rem' }}>
-                      对已勾选订单生效
+                      仅当前页已勾选 · 每次需确认
                     </span>
                     <button
                       type="button"
@@ -7436,11 +7456,20 @@ export default function TasksPage({
                   {row.note ? <p className="task-case-card-note">{row.note}</p> : null}
                   {Array.isArray(row.images) && row.images.length > 0 ? (
                     <div className="task-case-card-images">
-                      {row.images.map((src) => (
-                        <a key={src} href={apiUrl(src)} target="_blank" rel="noopener noreferrer">
-                          <img src={apiUrl(src)} alt="" loading="lazy" />
-                        </a>
-                      ))}
+                      {row.images.map((src, i) => {
+                        const thumb = Array.isArray(row.image_thumbs) ? row.image_thumbs[i] : null
+                        return (
+                          <a
+                            key={src}
+                            href={apiUrl(src)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="点击查看原图"
+                          >
+                            <img src={apiUrl(thumb || src)} alt="" loading="lazy" />
+                          </a>
+                        )
+                      })}
                     </div>
                   ) : null}
                 </article>

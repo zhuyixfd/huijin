@@ -3,16 +3,10 @@ import './EmployeeAdmin.css'
 import './Pages.css'
 import { getJson, patchJson, postJson } from './api.js'
 import { authFetch, formatApiError } from './auth.js'
+import { fmtDateTime } from './datetime.js'
 import Modal from './Modal.jsx'
 import { preventModalFormEnterSubmit } from './modalUtils.js'
 import { PERM_OPTIONS } from './permissions.js'
-
-function fmtDateTime(iso) {
-  if (!iso) return '—'
-  const t = new Date(iso)
-  if (Number.isNaN(t.getTime())) return String(iso)
-  return t.toLocaleString('zh-CN', { hour12: false })
-}
 
 function fmtSize(n) {
   const x = Number(n)
